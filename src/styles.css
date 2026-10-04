@@ -26,36 +26,7 @@ body { min-height: 100dvh; font-family: var(--font-body); color: var(--ink); bac
 #root { background: var(--sand); }
 button, input { font: inherit; }
 
-.version-mark {
-  position: fixed;
-  top: max(5px, env(safe-area-inset-top));
-  right: max(7px, env(safe-area-inset-right));
-  z-index: 100;
-  color: var(--forest);
-  font-size: .62rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-  line-height: 1;
-  opacity: .55;
-  pointer-events: none;
-  user-select: none;
-}
-
-/* First page: built from the generated Acampa Kids poster elements on the poster's dark green. */
-.camping-home { position: relative; min-height: 100dvh; overflow: hidden; background: var(--forest-dark); }
-.camping-nav { max-width: 1240px; margin: 0 auto; padding: 22px 28px 0; display: flex; justify-content: center; }
-.camping-nav .logo { display: block; }
-.camping-nav .logo-img { width: 84px; height: 84px; border: 0; border-radius: 50%; box-shadow: none; background: transparent; object-fit: contain; }
-.camping-nav__name, .camping-nav__season { display: none; }
-
-.camping-hero { position: relative; max-width: 1240px; margin: 0 auto; padding: 22px 28px 64px; display: flex; flex-direction: column; align-items: center; gap: 26px; }
-.camping-badge { width: min(100%, 520px); height: auto; transform: rotate(-2deg); filter: drop-shadow(0 10px 0 rgba(0,0,0,.22)); }
-
-.camping-panel { position: relative; width: min(100%, 720px); }
-.camping-panel__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; image-rendering: auto; }
-.camping-panel__content { position: relative; padding: 42px 52px 48px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
-.camping-panel__title { margin: 0; color: var(--sand); font-family: var(--font-display); font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; letter-spacing: -.03em; text-align: center; }
-.camping-panel__camp { margin: -6px 0 0; color: var(--sand); opacity: .85; font-size: .82rem; font-weight: 700; text-align: center; }
+/* Login screen (version mark, poster shell, phone + code steps): src/styles/login.scss */
 
 .role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; }
 .role-card { min-height: 64px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 14px 18px; border: 0; border-radius: 16px; cursor: pointer; color: var(--forest-dark); text-align: left; background: var(--sand); box-shadow: 0 5px 0 rgba(0,0,0,.2); transition: transform .2s ease, box-shadow .2s ease; }
@@ -66,37 +37,8 @@ button, input { font: inherit; }
 .role-card__label { font-family: var(--font-display); font-size: .95rem; font-weight: 800; }
 .role-card__description { display: none; }
 
-/* Steps inside the green panel (phone + code) */
-.camping-panel__content { min-height: 300px; }
-.panel-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.panel-text { margin: -8px 0 0; max-width: 40ch; text-align: center; color: var(--sand); opacity: .92; font-size: 1rem; line-height: 1.5; }
-.panel-text strong { color: #fff; }
-.camping-panel .back-button { color: var(--sand); padding: 6px 10px; font-size: .95rem; }
-.camping-panel .back-button:hover { background: rgba(255,255,255,.14); }
 .role-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; border-radius: 999px; background: var(--sand); color: var(--forest-dark); font-family: var(--font-display); font-weight: 800; font-size: .85rem; }
 .role-chip__icon { width: 26px; height: 26px; object-fit: contain; }
-.camping-panel .form { width: min(100%, 420px); gap: 14px; }
-.camping-panel .phone-field { border: 0; background: var(--sand); box-shadow: 0 5px 0 rgba(0,0,0,.2); border-radius: 16px; }
-.camping-panel .phone-field__prefix { color: var(--forest-dark); border-right-color: rgba(8,99,56,.3); }
-.camping-panel .phone-field input { color: var(--forest-dark); text-align: center; }
-.camping-panel .phone-field input::placeholder { color: rgba(8,99,56,.4); }
-.camping-panel .button { border-radius: 16px; }
-.camping-panel .button--primary { background: var(--sun); color: var(--forest-dark); box-shadow: 0 5px 0 rgba(0,0,0,.22); }
-.camping-panel .button--primary:active:not(:disabled) { box-shadow: 0 2px 0 rgba(0,0,0,.22); }
-.camping-panel .button--secondary { background: var(--sand); color: var(--forest-dark); box-shadow: 0 5px 0 rgba(0,0,0,.22); }
-.camping-panel .otp-boxes input { border: 0; background: var(--sand); color: var(--forest-dark); box-shadow: 0 5px 0 rgba(0,0,0,.2); border-radius: 14px; }
-.camping-panel .otp-boxes input:focus { outline: 3px solid var(--sun); }
-.camping-panel .countdown { background: var(--sand); color: var(--forest-dark); border: 0; }
-.camping-panel .countdown--expired { background: #f5d6cc; color: #9a3f31; }
-.camping-panel .message--error { background: #f5d6cc; color: #9a3f31; border: 0; max-width: 420px; }
-.camping-panel .resend-button { align-self: center; color: var(--sand); font-size: .85rem; }
-.camping-panel .resend-button:disabled { color: rgba(244,240,229,.6); cursor: default; }
-.camping-panel .resend-button:hover:not(:disabled) { background: rgba(255,255,255,.14); }
-.camping-panel .mock-note { color: rgba(244,240,229,.75); }
-
-.camping-cloud { position: absolute; left: clamp(0px, 4vw, 80px); top: 48px; width: clamp(70px, 8vw, 110px); height: auto; transform: rotate(-4deg); pointer-events: none; }
-.camping-cactus { position: absolute; left: clamp(-10px, 3vw, 60px); bottom: -28px; width: clamp(140px, 15vw, 220px); height: auto; pointer-events: none; filter: drop-shadow(0 6px 0 rgba(0,0,0,.2)); }
-.camping-sun { position: absolute; right: clamp(-40px, 2vw, 40px); bottom: 24px; width: clamp(150px, 20vw, 250px); height: auto; transform: rotate(6deg); pointer-events: none; }
 
 /* Existing authentication screens keep the same palette and simpler interaction styles. */
 .screen { max-width: 640px; margin: 0 auto; padding: 32px 20px 48px; display: flex; flex-direction: column; align-items: center; gap: 18px; animation: pop-in .35s ease; }
@@ -125,7 +67,7 @@ button, input { font: inherit; }
 .footer-note { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
 .footer-note .admin-title__icon { width: 1.15em; height: 1.15em; }.user-card, .frozen-card { width: 100%; background: var(--paper); border: 3px solid #fff; border-radius: var(--radius); box-shadow: 0 6px 0 rgba(24,61,54,.12); padding: 18px; }.user-card__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 2px dashed #d8e1db; }.user-card__row:last-child { border-bottom: 0; }.user-card__label { color: var(--muted); font-weight: 700; font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; }.user-card__value { font-family: var(--font-display); font-weight: 700; }.user-card__roles { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }.confetti, .decoration { color: var(--pine); font-size: 1.6rem; letter-spacing: 8px; }.frozen-card { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 36px 28px; }.frozen-card__emoji { font-size: 3.2rem; }
 
-@media (max-width: 760px) { .camping-nav { padding: 18px 18px 0; }.camping-nav .logo-img { width: 72px; height: 72px; }.camping-hero { padding: 16px 16px 200px; gap: 20px; }.camping-badge { width: min(100%, 360px); }.camping-panel__content { padding: 30px 22px 34px; gap: 16px; min-height: 0; }.camping-panel .otp-boxes { gap: 6px; }.camping-panel .otp-boxes input { width: 44px; height: 54px; font-size: 1.5rem; }.role-card { min-height: 58px; padding: 12px 14px; }.camping-sun { right: 50%; bottom: 20px; width: 150px; transform: translateX(50%) rotate(6deg); }.camping-cloud { left: 10px; top: 0; width: 60px; }.camping-cactus { left: 6px; width: 110px; }.camping-sun { right: 14px; transform: rotate(6deg); width: 110px; } }
+@media (max-width: 760px) { .role-card { min-height: 58px; padding: 12px 14px; } }
 @media (max-width: 390px) { .role-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 

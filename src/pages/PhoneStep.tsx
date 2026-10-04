@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../api/client";
 import { fetchActiveCamp } from "../api/camps";
+import { isIpalphaUnavailable } from "../auth/ipalpha";
 import { requestOtp } from "../auth/store";
+import IpalphaSignInButton from "../components/ipalpha/IpalphaSignInButton";
 import PhoneInput from "../components/PhoneInput";
 import StaffAccessDialog, { isStaffAccessError } from "../components/StaffAccessDialog";
 import { useT } from "../i18n";
@@ -12,10 +14,19 @@ interface PhoneStepProps {
   phone: string; // masked
   onPhoneChange: (masked: string) => void;
   onSent: (info: { phoneE164: string; expiresAt: string; delivery: "sms" | "mock" | "redirect" }) => void;
+  /** IPALPHA_UNAVAILABLE (the code is relayed through IPAlpha): show the maintenance scene. */
+  onUnavailable: () => void;
+  /** "Entrar com IPAlpha" below the form — absent when the backend has the feature off. */
+  ipalpha?: {
+    busy: boolean;
+    error: string | null;
+    notice: string | null;
+    onStart: () => void;
+  };
 }
 
 /** Step 1 — Brazilian cell phone entry (rendered inside the green panel). */
-export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepProps) {
+export default function PhoneStep({ phone, onPhoneChange, onSent, onUnavailable, ipalpha }: PhoneStepProps) {
   const t = useT();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +57,9 @@ export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepPro
       const res = await requestOtp(phoneE164);
       onSent({ phoneE164, expiresAt: res.expiresAt, delivery: res.delivery });
     } catch (err) {
-      if (isStaffAccessError(err)) {
+      if (isIpalphaUnavailable(err)) {
+        onUnavailable();
+      } else if (isStaffAccessError(err)) {
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "ACCOUNT_FROZEN") {
         setError(err.message);
@@ -76,6 +89,10 @@ export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepPro
 
         {error && <p className="message message--error">{error}</p>}
       </form>
+
+      {ipalpha && (
+        <IpalphaSignInButton busy={ipalpha.busy} disabled={loading} error={ipalpha.error} notice={ipalpha.notice} onStart={ipalpha.onStart} />
+      )}
 
       <StaffAccessDialog error={accessError} onClose={() => setAccessError(null)} />
     </>

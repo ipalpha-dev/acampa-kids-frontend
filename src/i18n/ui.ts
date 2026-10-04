@@ -22,6 +22,20 @@ export type UiKey =
   | "login.frozen"
   | "login.almostThere"
   | "login.chooseProfile"
+  // IPAlpha sign-in + One Tap banner
+  | "login.or"
+  | "login.ipalpha"
+  | "login.ipalphaOpening"
+  | "login.ipalphaDenied"
+  | "login.ipalphaFailed"
+  | "login.ipalphaNoProfile"
+  | "login.popupBlocked"
+  | "oneTap.title"
+  // core unavailable ("em manutenção")
+  | "maintenance.title"
+  | "maintenance.text"
+  | "maintenance.retry"
+  | "maintenance.imageAlt"
   // common
   | "common.cancel"
   | "common.save"
@@ -158,6 +172,18 @@ const pt: Catalog = {
   "access.dialogTitle": "Acesso ainda não liberado",
   "access.opensAt": "Abre em {when}",
   "access.closesAt": "Fecha em {when}",
+  "login.or": "ou",
+  "login.ipalpha": "Entrar com IPAlpha",
+  "login.ipalphaOpening": "Abrindo o IPAlpha…",
+  "login.ipalphaDenied": "Tudo bem, você pode entrar com o celular.",
+  "login.ipalphaFailed": "Não conseguimos entrar com o IPAlpha agora. Tente de novo ou entre com o celular.",
+  "login.ipalphaNoProfile": "Ainda não encontramos você no acampamento deste ano. Entre com o celular cadastrado ou fale com a organização.",
+  "login.popupBlocked": "O navegador bloqueou a janela do IPAlpha. Permita janelas pop-up para este site e tente de novo.",
+  "oneTap.title": "Entrar com IPAlpha",
+  "maintenance.title": "Estamos arrumando o acampamento!",
+  "maintenance.text": "Volte daqui a pouquinho.",
+  "maintenance.retry": "Tentar de novo",
+  "maintenance.imageAlt": "Uma barraca alegre com uma plaquinha de obras, um sol sorridente e um cacto de capacete",
 };
 
 const en: Catalog = {
@@ -234,6 +260,18 @@ const en: Catalog = {
   "access.dialogTitle": "Access not open yet",
   "access.opensAt": "Opens {when}",
   "access.closesAt": "Closes {when}",
+  "login.or": "or",
+  "login.ipalpha": "Sign in with IPAlpha",
+  "login.ipalphaOpening": "Opening IPAlpha…",
+  "login.ipalphaDenied": "That's okay — you can sign in with your phone.",
+  "login.ipalphaFailed": "We couldn't sign you in with IPAlpha right now. Try again or sign in with your phone.",
+  "login.ipalphaNoProfile": "We couldn't find you in this year's camp yet. Sign in with your registered phone or talk to the organizers.",
+  "login.popupBlocked": "Your browser blocked the IPAlpha window. Allow pop-ups for this site and try again.",
+  "oneTap.title": "Sign in with IPAlpha",
+  "maintenance.title": "We're tidying up the camp!",
+  "maintenance.text": "Come back in a little while.",
+  "maintenance.retry": "Try again",
+  "maintenance.imageAlt": "A cheerful tent with a little construction sign, a smiling sun and a cactus in a hard hat",
 };
 
 const es: Catalog = {
@@ -310,6 +348,18 @@ const es: Catalog = {
   "access.dialogTitle": "Acceso aún no liberado",
   "access.opensAt": "Abre {when}",
   "access.closesAt": "Cierra {when}",
+  "login.or": "o",
+  "login.ipalpha": "Entrar con IPAlpha",
+  "login.ipalphaOpening": "Abriendo IPAlpha…",
+  "login.ipalphaDenied": "No pasa nada, puedes entrar con tu celular.",
+  "login.ipalphaFailed": "No pudimos entrar con IPAlpha ahora. Inténtalo de nuevo o entra con tu celular.",
+  "login.ipalphaNoProfile": "Todavía no te encontramos en el campamento de este año. Entra con el celular registrado o habla con la organización.",
+  "login.popupBlocked": "El navegador bloqueó la ventana de IPAlpha. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
+  "oneTap.title": "Entrar con IPAlpha",
+  "maintenance.title": "¡Estamos ordenando el campamento!",
+  "maintenance.text": "Vuelve en un ratito.",
+  "maintenance.retry": "Intentar de nuevo",
+  "maintenance.imageAlt": "Una carpa alegre con un cartelito de obras, un sol sonriente y un cactus con casco",
 };
 
 const fr: Catalog = {
@@ -386,9 +436,109 @@ const fr: Catalog = {
   "access.dialogTitle": "Accès pas encore ouvert",
   "access.opensAt": "Ouvre {when}",
   "access.closesAt": "Ferme {when}",
+  "login.or": "ou",
+  "login.ipalpha": "Se connecter avec IPAlpha",
+  "login.ipalphaOpening": "Ouverture d'IPAlpha…",
+  "login.ipalphaDenied": "Pas de souci, vous pouvez vous connecter avec votre portable.",
+  "login.ipalphaFailed": "Impossible de vous connecter avec IPAlpha pour le moment. Réessayez ou connectez-vous avec votre portable.",
+  "login.ipalphaNoProfile": "Nous ne vous trouvons pas encore dans le camp de cette année. Connectez-vous avec le portable enregistré ou parlez à l'organisation.",
+  "login.popupBlocked": "Le navigateur a bloqué la fenêtre IPAlpha. Autorisez les fenêtres pop-up pour ce site et réessayez.",
+  "oneTap.title": "Se connecter avec IPAlpha",
+  "maintenance.title": "On range le camp !",
+  "maintenance.text": "Revenez dans un petit moment.",
+  "maintenance.retry": "Réessayer",
+  "maintenance.imageAlt": "Une tente joyeuse avec un petit panneau de travaux, un soleil souriant et un cactus avec un casque",
 };
 
-const CATALOGS: Record<Locale, Catalog> = { pt, en, es, fr };
+const de: Catalog = {
+  "login.phoneTitle": "Wie lautet deine Handynummer?",
+  "login.continue": "Weiter",
+  "login.sending": "Wird gesendet…",
+  "login.phoneInvalid": "Gib eine gültige Handynummer mit Vorwahl ein (z. B. (11) 98123-4567).",
+  "login.genericError": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
+  "login.otpSentSms": "Wir haben eine SMS an {phone} geschickt",
+  "login.otpSentMock": "Code erzeugt (Entwicklungsmodus) für {phone}",
+  "login.otpSentRedirect": "Code an das Testhandy für {phone} gesendet",
+  "login.otpTitle": "Gib den Code ein",
+  "login.verify": "Anmelden",
+  "login.verifying": "Wird geprüft…",
+  "login.resend": "Code erneut senden",
+  "login.resending": "Wird erneut gesendet…",
+  "login.back": "Zurück",
+  "login.codeExpired": "Der Code ist abgelaufen. Fordere einen neuen an.",
+  "login.attemptsLeft": "Noch {n} Versuch(e).",
+  "login.frozen": "Konto für {minutes} Minute(n) gesperrt.",
+  "login.almostThere": "Fast geschafft, {name}! 🏕️",
+  "login.chooseProfile": "Mit welchem Profil möchtest du dich anmelden?",
+  "common.cancel": "Abbrechen",
+  "common.save": "Speichern",
+  "common.saving": "Wird gespeichert…",
+  "common.delete": "Löschen",
+  "common.edit": "Bearbeiten",
+  "common.close": "Schließen",
+  "common.back": "Zurück",
+  "common.search": "Suchen",
+  "common.loading": "Wird geladen…",
+  "common.error": "Etwas ist schiefgelaufen.",
+  "common.yes": "Ja",
+  "common.no": "Nein",
+  "common.all": "Alle",
+  "common.none": "Keine",
+  "common.continue": "Weiter",
+  "common.confirm": "Bestätigen",
+  "common.add": "Hinzufügen",
+  "common.remove": "Entfernen",
+  "common.open": "Öffnen",
+  "common.seeMore": "Mehr anzeigen",
+  "common.empty": "Hier ist noch nichts.",
+  "common.retry": "Noch einmal versuchen",
+  "common.version": "Version {version}",
+  "role.parent": "Eltern",
+  "role.staff": "Mitarbeitende",
+  "role.health_staff": "Gesundheitsteam",
+  "role.admin": "Organisation",
+  "nav.home": "Start",
+  "nav.schedule": "Programm",
+  "nav.instructions": "Hinweise",
+  "nav.preparation": "Vorbereitung",
+  "nav.photos": "Fotos",
+  "nav.checkin": "Check-in",
+  "nav.bus": "Bus",
+  "nav.vest": "Westen",
+  "nav.score": "Punktestand",
+  "nav.medications": "Medikamente",
+  "nav.occurrences": "Vorkommnisse",
+  "nav.settings": "Einstellungen",
+  "nav.logout": "Abmelden",
+  "search.byName": "Nach Namen suchen…",
+  "search.person": "Namen eingeben…",
+  "search.child": "Kind suchen…",
+  "search.event": "Programmpunkt, Tag oder Uhrzeit suchen…",
+  "search.role": "Aufgabe suchen…",
+  "search.camperStaff": "Nach Name, Leitung, Team, Zimmer suchen…",
+  "search.score": "Kind, Notiz, Person suchen…",
+  "search.meds": "Kind finden…",
+  "access.ended": "Das Camp ist vorbei. Wir freuen uns auf dich im nächsten Jahr!",
+  "access.notYetStaff": "Die App ist für die Mitarbeitenden noch nicht freigegeben.",
+  "access.notYetParent": "Die App ist für die Eltern noch nicht freigegeben.",
+  "access.dialogTitle": "Zugang noch nicht freigegeben",
+  "access.opensAt": "Öffnet {when}",
+  "access.closesAt": "Schließt {when}",
+  "login.or": "oder",
+  "login.ipalpha": "Mit IPAlpha anmelden",
+  "login.ipalphaOpening": "IPAlpha wird geöffnet…",
+  "login.ipalphaDenied": "Alles gut – du kannst dich auch mit deinem Handy anmelden.",
+  "login.ipalphaFailed": "Die Anmeldung mit IPAlpha hat gerade nicht geklappt. Versuch es noch einmal oder melde dich mit deinem Handy an.",
+  "login.ipalphaNoProfile": "Wir haben dich im Camp dieses Jahres noch nicht gefunden. Melde dich mit deiner hinterlegten Handynummer an oder sprich mit der Organisation.",
+  "login.popupBlocked": "Dein Browser hat das IPAlpha-Fenster blockiert. Erlaube Pop-ups für diese Seite und versuch es noch einmal.",
+  "oneTap.title": "Mit IPAlpha anmelden",
+  "maintenance.title": "Wir räumen gerade das Camp auf!",
+  "maintenance.text": "Schau gleich noch mal vorbei.",
+  "maintenance.retry": "Noch einmal versuchen",
+  "maintenance.imageAlt": "Ein fröhliches Zelt mit einem kleinen Baustellenschild, einer lächelnden Sonne und einem Kaktus mit Bauhelm",
+};
+
+const CATALOGS: Record<Locale, Catalog> = { pt, en, es, fr, de };
 
 export function t(locale: Locale, key: UiKey, vars: Record<string, string | number> = {}): string {
   const catalog = CATALOGS[locale] ?? pt;

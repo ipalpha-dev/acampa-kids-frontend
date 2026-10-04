@@ -40,6 +40,12 @@ const GEO: Record<Locale, Record<GeoError["kind"], string>> = {
     timeout: "Le GPS a mis trop de temps à répondre. Réessayez dans un endroit plus dégagé.",
     unavailable: "Impossible de lire votre position. Activez le GPS et réessayez.",
   },
+  de: {
+    unsupported: "Auf diesem Gerät steht dem Browser kein GPS zur Verfügung.",
+    denied: "Wir brauchen deinen Standort, um zu bestätigen, dass du in der Gemeinde bist. Erlaube den Zugriff in den Browser-Einstellungen und versuch es noch einmal.",
+    timeout: "Das GPS hat zu lange gebraucht. Versuch es noch einmal an einem offeneren Ort.",
+    unavailable: "Dein Standort konnte nicht gelesen werden. Schalte das GPS ein und versuch es noch einmal.",
+  },
 };
 
 function geoMsg(kind: GeoError["kind"]): string {

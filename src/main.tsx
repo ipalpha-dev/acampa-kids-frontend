@@ -5,6 +5,7 @@ import { ConfirmProvider } from "./components/ConfirmDialog";
 import { I18nProvider } from "./i18n";
 import { registerSW } from "virtual:pwa-register";
 import "./styles.css";
+import "./styles/login.scss";
 
 // service worker: precaches the whole app so it opens with no network; new
 // builds are picked up silently the next time the app is opened online

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
+import { isIpalphaUnavailable } from "../auth/ipalpha";
 import { requestOtp, verifyOtp, type CampSummary } from "../auth/store";
 import OtpInput from "../components/OtpInput";
 import StaffAccessDialog, { isStaffAccessError } from "../components/StaffAccessDialog";
@@ -14,6 +15,8 @@ interface OtpStepProps {
   onExpiryChange: (iso: string) => void;
   onVerified: (info: { token: string; tokenExpiresAt: string; user: LoggedUser; camp: CampSummary; camps?: CampSummary[] }) => void;
   onBack: () => void;
+  /** IPALPHA_UNAVAILABLE (the code is relayed through IPAlpha): show the maintenance scene. */
+  onUnavailable: () => void;
 }
 
 function remaining(expiresAt: string): number {
@@ -52,6 +55,7 @@ export default function OtpStep({
   onExpiryChange,
   onVerified,
   onBack,
+  onUnavailable,
 }: OtpStepProps) {
   const t = useT();
   const { tx } = useI18n();
@@ -80,7 +84,10 @@ export default function OtpStep({
         const res = await verifyOtp(phoneE164, value);
         onVerified({ token: res.token, tokenExpiresAt: res.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps });
       } catch (err) {
-        if (isStaffAccessError(err)) {
+        if (isIpalphaUnavailable(err)) {
+          setCode("");
+          onUnavailable();
+        } else if (isStaffAccessError(err)) {
           setAccessError(err);
           setCode("");
         } else if (err instanceof ApiError) {
@@ -105,7 +112,7 @@ export default function OtpStep({
         setLoading(false);
       }
     },
-    [phoneE164, onVerified, t],
+    [phoneE164, onVerified, onUnavailable, t],
   );
 
   async function handleResend() {
@@ -117,7 +124,8 @@ export default function OtpStep({
       setCode("");
       setAttemptsLeft(null);
     } catch (err) {
-      if (isStaffAccessError(err)) setAccessError(err);
+      if (isIpalphaUnavailable(err)) onUnavailable();
+      else if (isStaffAccessError(err)) setAccessError(err);
       else setError(err instanceof Error ? err.message : tx("Não foi possível reenviar."));
     } finally {
       setResending(false);

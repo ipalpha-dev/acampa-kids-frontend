@@ -16,6 +16,7 @@ const REL: Record<Locale, { today: string; tomorrow: string; yesterday: string; 
   en: { today: "today", tomorrow: "tomorrow", yesterday: "yesterday", at: "at" },
   es: { today: "hoy", tomorrow: "mañana", yesterday: "ayer", at: "a las" },
   fr: { today: "aujourd'hui", tomorrow: "demain", yesterday: "hier", at: "à" },
+  de: { today: "heute", tomorrow: "morgen", yesterday: "gestern", at: "um" },
 };
 
 /** Local "YYYY-MM-DD" on the device clock. */
@@ -159,22 +160,22 @@ export function speakDateTime(iso: string): string {
 export function speakAgo(iso: string | null, now = Date.now()): string {
   const language = loc();
   if (!iso) {
-    return language === "en" ? "never synced" : language === "fr" ? "jamais synchronisé" : "nunca sincronizado";
+    return language === "en" ? "never synced" : language === "fr" ? "jamais synchronisé" : language === "de" ? "noch nie synchronisiert" : "nunca sincronizado";
   }
   const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
   if (s < 10) {
-    return language === "en" ? "just now" : language === "es" ? "ahora mismo" : language === "fr" ? "à l'instant" : "agora mesmo";
+    return language === "en" ? "just now" : language === "es" ? "ahora mismo" : language === "fr" ? "à l'instant" : language === "de" ? "gerade eben" : "agora mesmo";
   }
   if (s < 60) {
-    return language === "en" ? `${s}s ago` : language === "fr" ? `il y a ${s}s` : language === "es" ? `hace ${s}s` : `há ${s}s`;
+    return language === "en" ? `${s}s ago` : language === "fr" ? `il y a ${s}s` : language === "es" ? `hace ${s}s` : language === "de" ? `vor ${s} s` : `há ${s}s`;
   }
   const m = Math.round(s / 60);
   if (m < 60) {
-    return language === "en" ? `${m} min ago` : language === "fr" ? `il y a ${m} min` : language === "es" ? `hace ${m} min` : `há ${m} min`;
+    return language === "en" ? `${m} min ago` : language === "fr" ? `il y a ${m} min` : language === "es" ? `hace ${m} min` : language === "de" ? `vor ${m} Min.` : `há ${m} min`;
   }
   const h = Math.round(m / 60);
   if (h < 48) {
-    return language === "en" ? `${h}h ago` : language === "fr" ? `il y a ${h}h` : language === "es" ? `hace ${h}h` : `há ${h}h`;
+    return language === "en" ? `${h}h ago` : language === "fr" ? `il y a ${h}h` : language === "es" ? `hace ${h}h` : language === "de" ? `vor ${h} Std.` : `há ${h}h`;
   }
   return speakStamp(iso, new Date(now));
 }

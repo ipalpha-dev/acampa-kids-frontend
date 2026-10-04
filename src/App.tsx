@@ -1,9 +1,13 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { ApiError } from "./api/client";
 import CampingLayout from "./components/CampingLayout";
+import IpalphaOneTap from "./components/ipalpha/IpalphaOneTap";
+import MaintenanceScene from "./components/MaintenanceScene";
 import StaffAccessDialog from "./components/StaffAccessDialog";
 import Toast from "./components/Toast";
+import { fetchIpalphaConfig, type IpalphaConfig } from "./auth/ipalpha";
 import { clearAuth, clearPendingOtp, loadAuth, loadPendingOtp, saveAuth, savePendingOtp, switchCamp, switchRole, validateAuth, type CampSummary } from "./auth/store";
+import { useIpalphaSignIn } from "./auth/useIpalphaSignIn";
 import Dashboard from "./pages/Dashboard";
 import RoleSwitchDialog from "./components/RoleSwitchDialog";
 import OtpStep from "./pages/OtpStep";
@@ -45,6 +49,38 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   /** just logged in holding more than one profile: ask which one before letting them in */
   const [choosingRole, setChoosingRole] = useState(false);
+  /** "Entrar com IPAlpha" + One Tap: null = feature off (or not known yet) */
+  const [ipalphaConfig, setIpalphaConfig] = useState<IpalphaConfig | null>(null);
+  /** IPAlpha (core) unreachable from either login path → the "em manutenção" scene */
+  const [maintenance, setMaintenance] = useState(false);
+  /** the One Tap banner said none/close: hidden for the rest of this page view */
+  const [oneTapDismissed, setOneTapDismissed] = useState(false);
+  const [configNonce, setConfigNonce] = useState(0);
+
+  const loggedIn = step === "done";
+  useEffect(() => {
+    if (loggedIn) return;
+    let alive = true;
+    fetchIpalphaConfig().then((config) => alive && setIpalphaConfig(config));
+    return () => {
+      alive = false;
+    };
+  }, [loggedIn, configNonce]);
+
+  /** Same landing for every login path (SMS code or IPAlpha): save, then the profile chooser when there is more than one. */
+  function finishLogin({ token, tokenExpiresAt, user, camp, camps }: { token: string; tokenExpiresAt: string; user: LoggedUser; camp: CampSummary; camps?: CampSummary[] }) {
+    clearPendingOtp();
+    const next = { token, tokenExpiresAt, user, camp, camps: camps ?? [] };
+    saveAuth(next);
+    setSession(next);
+    // the login always lands on the highest-priority profile: let them
+    // pick when they hold more than one (mãe que também é da equipe)
+    setChoosingRole(user.roles.length > 1);
+    setStep("done");
+  }
+
+  const showMaintenance = useCallback(() => setMaintenance(true), []);
+  const ipalpha = useIpalphaSignIn({ config: ipalphaConfig, onSignedIn: finishLogin, onUnavailable: showMaintenance });
   useEffect(() => {
     const stored = loadAuth();
     if (!stored) {
@@ -194,7 +230,16 @@ export default function App() {
   }
 
   let content: ReactElement;
-  if (step === "otp" && otp) {
+  if (maintenance) {
+    content = (
+      <MaintenanceScene
+        onRetry={() => {
+          setMaintenance(false);
+          setConfigNonce((n) => n + 1);
+        }}
+      />
+    );
+  } else if (step === "otp" && otp) {
     content = (
       <OtpStep
         key={otp.phoneE164}
@@ -207,20 +252,12 @@ export default function App() {
           savePendingOtp(next);
           setOtp(next);
         }}
-        onVerified={({ token, tokenExpiresAt, user, camp, camps }) => {
-          clearPendingOtp();
-          const next = { token, tokenExpiresAt, user, camp, camps: camps ?? [] };
-          saveAuth(next);
-          setSession(next);
-          // the login always lands on the highest-priority profile: let them
-          // pick when they hold more than one (mãe que também é da equipe)
-          setChoosingRole(user.roles.length > 1);
-          setStep("done");
-        }}
+        onVerified={finishLogin}
         onBack={() => {
           clearPendingOtp();
           setStep("phone");
         }}
+        onUnavailable={showMaintenance}
       />
     );
   } else {
@@ -233,15 +270,31 @@ export default function App() {
           setOtp({ phoneE164, expiresAt, delivery });
           setStep("otp");
         }}
+        onUnavailable={showMaintenance}
+        ipalpha={ipalphaConfig ? { busy: ipalpha.busy, error: ipalpha.error, notice: ipalpha.notice, onStart: () => ipalpha.start() } : undefined}
       />
     );
   }
+
+  const showOneTap = !!ipalphaConfig && step === "phone" && !maintenance && !oneTapDismissed;
 
   return (
     <>
       <VersionMark />
       <CampingLayout>{content}</CampingLayout>
+      {showOneTap && ipalphaConfig && (
+        <IpalphaOneTap
+          authOrigin={ipalphaConfig.authOrigin}
+          clientId={ipalphaConfig.clientId}
+          entryPoint={ipalphaConfig.entryPoint}
+          title={t("oneTap.title")}
+          onSelect={(personId) => ipalpha.start(personId)}
+          onOther={() => ipalpha.start()}
+          onDismiss={() => setOneTapDismissed(true)}
+        />
+      )}
       <StaffAccessDialog error={evicted} onClose={() => setEvicted(null)} />
+      <StaffAccessDialog error={ipalpha.accessError} onClose={ipalpha.clearAccessError} />
       <Toast message={campToast} onClose={() => setCampToast(null)} />
     </>
   );

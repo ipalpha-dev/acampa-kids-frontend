@@ -63,5 +63,5 @@ export interface LoggedUser {
   /** the role picked at login — what this session acts as */
   activeRole: Role;
   /** last device language saved at login — UI + SMS follow this */
-  locale?: "pt" | "en" | "es" | "fr";
+  locale?: "pt" | "en" | "es" | "fr" | "de";
 }
