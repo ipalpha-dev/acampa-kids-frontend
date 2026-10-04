@@ -7,6 +7,8 @@ import {
   closePopup,
   completeIpalpha,
   exactOrigin,
+  IPALPHA_MISCONFIGURED,
+  IPALPHA_RATE_LIMITED,
   isIpalphaUnavailable,
   openBlankPopup,
   startIpalpha,
@@ -57,8 +59,13 @@ export function useIpalphaSignIn({ config, onSignedIn, onUnavailable }: Options)
   const fail = useCallback(
     (err: unknown) => {
       if (!alive.current) return;
+      // only a core outage is maintenance; everything else stays inline, the SMS form keeps working
       if (isIpalphaUnavailable(err)) {
         callbacks.current.onUnavailable();
+      } else if (err instanceof ApiError && err.code === IPALPHA_MISCONFIGURED) {
+        setError(t("login.ipalphaMisconfigured"));
+      } else if (err instanceof ApiError && err.code === IPALPHA_RATE_LIMITED) {
+        setError(t("login.ipalphaRateLimited"));
       } else if (isStaffAccessError(err)) {
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "IPALPHA_DENIED") {

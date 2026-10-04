@@ -30,6 +30,8 @@ export type UiKey =
   | "login.ipalphaFailed"
   | "login.ipalphaNoProfile"
   | "login.popupBlocked"
+  | "login.ipalphaMisconfigured"
+  | "login.ipalphaRateLimited"
   | "oneTap.title"
   // core unavailable ("em manutenção")
   | "maintenance.title"
@@ -179,6 +181,8 @@ const pt: Catalog = {
   "login.ipalphaFailed": "Não conseguimos entrar com o IPAlpha agora. Tente de novo ou entre com o celular.",
   "login.ipalphaNoProfile": "Ainda não encontramos você no acampamento deste ano. Entre com o celular cadastrado ou fale com a organização.",
   "login.popupBlocked": "O navegador bloqueou a janela do IPAlpha. Permita janelas pop-up para este site e tente de novo.",
+  "login.ipalphaMisconfigured": "O login com IPAlpha não está disponível agora. Você pode entrar com o seu celular.",
+  "login.ipalphaRateLimited": "Muitas tentativas em pouco tempo. Aguarde um minutinho e tente de novo, ou entre com o seu celular.",
   "oneTap.title": "Entrar com IPAlpha",
   "maintenance.title": "Estamos arrumando o acampamento!",
   "maintenance.text": "Volte daqui a pouquinho.",
@@ -267,6 +271,8 @@ const en: Catalog = {
   "login.ipalphaFailed": "We couldn't sign you in with IPAlpha right now. Try again or sign in with your phone.",
   "login.ipalphaNoProfile": "We couldn't find you in this year's camp yet. Sign in with your registered phone or talk to the organizers.",
   "login.popupBlocked": "Your browser blocked the IPAlpha window. Allow pop-ups for this site and try again.",
+  "login.ipalphaMisconfigured": "Signing in with IPAlpha isn't available right now. You can sign in with your phone.",
+  "login.ipalphaRateLimited": "Lots of tries in a short time. Wait a minute and try again, or sign in with your phone.",
   "oneTap.title": "Sign in with IPAlpha",
   "maintenance.title": "We're tidying up the camp!",
   "maintenance.text": "Come back in a little while.",
@@ -355,6 +361,8 @@ const es: Catalog = {
   "login.ipalphaFailed": "No pudimos entrar con IPAlpha ahora. Inténtalo de nuevo o entra con tu celular.",
   "login.ipalphaNoProfile": "Todavía no te encontramos en el campamento de este año. Entra con el celular registrado o habla con la organización.",
   "login.popupBlocked": "El navegador bloqueó la ventana de IPAlpha. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
+  "login.ipalphaMisconfigured": "El acceso con IPAlpha no está disponible ahora. Puedes entrar con tu celular.",
+  "login.ipalphaRateLimited": "Muchos intentos en poco tiempo. Espera un minuto e inténtalo de nuevo, o entra con tu celular.",
   "oneTap.title": "Entrar con IPAlpha",
   "maintenance.title": "¡Estamos ordenando el campamento!",
   "maintenance.text": "Vuelve en un ratito.",
@@ -443,6 +451,8 @@ const fr: Catalog = {
   "login.ipalphaFailed": "Impossible de vous connecter avec IPAlpha pour le moment. Réessayez ou connectez-vous avec votre portable.",
   "login.ipalphaNoProfile": "Nous ne vous trouvons pas encore dans le camp de cette année. Connectez-vous avec le portable enregistré ou parlez à l'organisation.",
   "login.popupBlocked": "Le navigateur a bloqué la fenêtre IPAlpha. Autorisez les fenêtres pop-up pour ce site et réessayez.",
+  "login.ipalphaMisconfigured": "La connexion avec IPAlpha n'est pas disponible pour le moment. Vous pouvez vous connecter avec votre portable.",
+  "login.ipalphaRateLimited": "Beaucoup de tentatives en peu de temps. Patientez une minute et réessayez, ou connectez-vous avec votre portable.",
   "oneTap.title": "Se connecter avec IPAlpha",
   "maintenance.title": "On range le camp !",
   "maintenance.text": "Revenez dans un petit moment.",
@@ -531,6 +541,8 @@ const de: Catalog = {
   "login.ipalphaFailed": "Die Anmeldung mit IPAlpha hat gerade nicht geklappt. Versuch es noch einmal oder melde dich mit deinem Handy an.",
   "login.ipalphaNoProfile": "Wir haben dich im Camp dieses Jahres noch nicht gefunden. Melde dich mit deiner hinterlegten Handynummer an oder sprich mit der Organisation.",
   "login.popupBlocked": "Dein Browser hat das IPAlpha-Fenster blockiert. Erlaube Pop-ups für diese Seite und versuch es noch einmal.",
+  "login.ipalphaMisconfigured": "Die Anmeldung mit IPAlpha ist gerade nicht verfügbar. Du kannst dich mit deinem Handy anmelden.",
+  "login.ipalphaRateLimited": "Viele Versuche in kurzer Zeit. Warte eine Minute und versuch es noch einmal, oder melde dich mit deinem Handy an.",
   "oneTap.title": "Mit IPAlpha anmelden",
   "maintenance.title": "Wir räumen gerade das Camp auf!",
   "maintenance.text": "Schau gleich noch mal vorbei.",

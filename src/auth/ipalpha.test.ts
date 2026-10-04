@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AUTH_MESSAGE_TYPE, awaitPopupMessage, exactOrigin, type PopupOutcome } from "./ipalpha";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AUTH_MESSAGE_TYPE, awaitPopupMessage, completeIpalpha, exactOrigin, type PopupOutcome } from "./ipalpha";
 
 const AUTH = "https://auth.example.test";
 
@@ -64,6 +64,23 @@ describe("awaitPopupMessage", () => {
     const wait = awaitPopupMessage({ authOrigin: AUTH, popup: closing, pollMs: 5 });
     (closing as unknown as { closed: boolean }).closed = true;
     expect(await wait).toEqual({ kind: "closed" });
+  });
+});
+
+describe("completeIpalpha", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("sends the device locale with the code and state, like the SMS-code verify", async () => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-DE"]);
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await completeIpalpha("the-code", "the-state");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/api/auth/ipalpha/complete");
+    expect(JSON.parse(String(init.body))).toEqual({ code: "the-code", state: "the-state", locale: "de" });
   });
 });
 

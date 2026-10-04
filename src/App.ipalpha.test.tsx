@@ -82,6 +82,29 @@ describe("login screen — IPAlpha", () => {
     expect(popup.location.href).toBe("about:blank");
   });
 
+  const inlineCases: [string, Route, RegExp][] = [
+    ["IPALPHA_MISCONFIGURED", { status: 500, body: { error: { code: "IPALPHA_MISCONFIGURED", message: "x" } } }, /O login com IPAlpha não está disponível agora/],
+    ["IPALPHA_RATE_LIMITED", { status: 429, body: { error: { code: "IPALPHA_RATE_LIMITED", message: "x", secondsLeft: 30 } } }, /Muitas tentativas em pouco tempo/],
+  ];
+  for (const [code, route, text] of inlineCases) {
+    it(`${code} on start: a gentle note under the button, no maintenance scene, the SMS form stays usable`, async () => {
+      stubApi({ "/api/auth/ipalpha/config": CONFIG_ON, "/api/auth/ipalpha/start": route });
+      const popup = { closed: false, close: vi.fn(), focus: vi.fn(), location: { href: "about:blank" } };
+      vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
+      renderApp();
+      fireEvent.click(await screen.findByRole("button", { name: /Entrar com IPAlpha/ }));
+      expect(await screen.findByText(text)).toBeInTheDocument();
+      expect(popup.close).toHaveBeenCalled();
+      expect(screen.queryByRole("heading", { name: "Estamos arrumando o acampamento!" })).toBeNull();
+      expect(screen.getByRole("heading", { name: "Qual é o seu celular?" })).toBeInTheDocument();
+      const phone = screen.getByPlaceholderText("(11) 98123-4567");
+      expect(phone).not.toBeDisabled();
+      fireEvent.change(phone, { target: { value: "11981234567" } });
+      expect(screen.getByRole("button", { name: "Continuar" })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /Entrar com IPAlpha/ })).not.toBeDisabled();
+    });
+  }
+
   it("tells the person when the browser blocked the popup", async () => {
     stubApi({ "/api/auth/ipalpha/config": CONFIG_ON });
     vi.spyOn(window, "open").mockReturnValue(null);

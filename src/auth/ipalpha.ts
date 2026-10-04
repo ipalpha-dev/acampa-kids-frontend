@@ -1,4 +1,5 @@
 import { ApiError, api } from "../api/client";
+import { deviceLocale } from "../i18n";
 import type { OtpVerifyResult } from "./store";
 
 /**
@@ -34,6 +35,10 @@ const POPUP_HEIGHT = 720;
 
 /** Error codes the IPAlpha paths may answer (§5) that the UI treats specially. */
 export const IPALPHA_UNAVAILABLE = "IPALPHA_UNAVAILABLE";
+/** Core refused Acampa's own request (deploy configuration) — inline note, never the maintenance scene. */
+export const IPALPHA_MISCONFIGURED = "IPALPHA_MISCONFIGURED";
+/** Too many sign-in starts from this network in a minute — inline note. */
+export const IPALPHA_RATE_LIMITED = "IPALPHA_RATE_LIMITED";
 
 export function isIpalphaUnavailable(err: unknown): boolean {
   return err instanceof ApiError && err.code === IPALPHA_UNAVAILABLE;
@@ -73,7 +78,8 @@ export function startIpalpha(personHint?: string): Promise<IpalphaStart> {
 export function completeIpalpha(code: string, state: string): Promise<OtpVerifyResult> {
   return api<OtpVerifyResult>("/api/auth/ipalpha/complete", {
     method: "POST",
-    body: JSON.stringify({ code, state }),
+    // device language, exactly like the SMS-code verify (saved on the account for its SMS)
+    body: JSON.stringify({ code, state, locale: deviceLocale() }),
   });
 }
 
