@@ -133,6 +133,12 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "L'enfant a une allergie médicamenteuse — vérifiez avant de donner",
     de: "Das Kind hat eine Medikamentenallergie — vor der Gabe prüfen",
   },
+  "Alergia a medicamentos: {list} — confira antes de dar": {
+    en: "Drug allergy: {list} — check before giving",
+    es: "Alergia a medicamentos: {list} — revisa antes de dar",
+    fr: "Allergie médicamenteuse : {list} — vérifiez avant de donner",
+    de: "Medikamentenallergie: {list} — vor der Gabe prüfen",
+  },
   "Procurar criança": {
     en: "Find a child",
     es: "Buscar niño",

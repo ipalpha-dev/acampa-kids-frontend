@@ -99,8 +99,14 @@ function KidEmergency({ token, kid: { camper: k }, tabbed }: { token: string; ki
           </dd>
           <dt>{tx("Convênio")}</dt>
           <dd>
-            {health?.insurance || "—"}
-            {health?.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: health.insuranceCard })}</span>}
+            {live.data?.healthForbidden ? (
+              <span className="cat-hint">{tx("Não disponível para o seu perfil agora")}</span>
+            ) : (
+              <>
+                {health?.insurance || "—"}
+                {health?.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: health.insuranceCard })}</span>}
+              </>
+            )}
           </dd>
         </dl>
         {asked ? (

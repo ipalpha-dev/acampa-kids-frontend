@@ -21,6 +21,19 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   // ── parent area ──
   "sua criança": { en: "your child", es: "tu niño", fr: "votre enfant", de: "dein Kind" },
   "Não conseguimos ler as informações de saúde agora.": { en: "We couldn't read the health details right now.", es: "No pudimos leer la información de salud ahora.", fr: "Impossible de lire les informations de santé pour le moment.", de: "Die Gesundheitsangaben konnten gerade nicht gelesen werden." },
+  "As informações de saúde de {name} não estão disponíveis para o seu perfil agora. Se precisar, fale com a coordenação — ela pode ajudar.": {
+    en: "{name}'s health details aren't available to your profile right now. If you need them, talk to the coordinators — they can help.",
+    es: "La información de salud de {name} no está disponible para tu perfil ahora. Si la necesitas, habla con la coordinación: puede ayudarte.",
+    fr: "Les informations de santé de {name} ne sont pas disponibles pour votre profil pour le moment. Si besoin, parlez-en à la coordination : elle peut vous aider.",
+    de: "Die Gesundheitsangaben von {name} sind für dein Profil gerade nicht verfügbar. Wenn du sie brauchst, sprich mit der Lagerleitung – sie hilft gern.",
+  },
+  "Não disponível para o seu perfil agora": { en: "Not available to your profile right now", es: "No disponible para tu perfil ahora", fr: "Pas disponible pour votre profil pour le moment", de: "Für dein Profil gerade nicht verfügbar" },
+  "O IPAlpha não deixou salvar as informações de saúde pelo seu perfil. Nada foi alterado — fale com a coordenação, que pode ajudar.": {
+    en: "IPAlpha didn't let your profile save the health details. Nothing was changed — talk to the coordinators, they can help.",
+    es: "IPAlpha no permitió guardar la información de salud desde tu perfil. No se cambió nada: habla con la coordinación, puede ayudarte.",
+    fr: "IPAlpha n'a pas permis d'enregistrer les informations de santé depuis votre profil. Rien n'a été modifié — parlez-en à la coordination, elle peut vous aider.",
+    de: "IPAlpha hat das Speichern der Gesundheitsangaben über dein Profil nicht erlaubt. Es wurde nichts geändert – sprich mit der Lagerleitung, sie hilft gern.",
+  },
   "Esses dados ficam no IPAlpha, em Meus dados.": { en: "These details live in IPAlpha, under My data.", es: "Estos datos están en IPAlpha, en Mis datos.", fr: "Ces informations se trouvent dans IPAlpha, dans Mes données.", de: "Diese Angaben findest du in IPAlpha unter Meine Daten." },
   "no IPAlpha, em Meus dados": { en: "in IPAlpha, under My data", es: "en IPAlpha, en Mis datos", fr: "dans IPAlpha, dans Mes données", de: "in IPAlpha unter Meine Daten" },
   "Ver contato de emergência e documentos": { en: "See emergency contact and documents", es: "Ver contacto de emergencia y documentos", fr: "Voir le contact d'urgence et les documents", de: "Notfallkontakt und Dokumente ansehen" },

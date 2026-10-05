@@ -69,7 +69,10 @@ function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; revi
   const healthLabel = useHealthLabel(token);
   const labelOf = (id: string | null | undefined) => (id ? healthLabel(id) || null : null);
   const [editing, setEditing] = useState(false);
-  const h: HealthInfo | null = live.data ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
+  /** IPAlpha did not let this profile read the kid's health: never shown as "nothing informed" */
+  const forbidden = !!live.data?.healthForbidden;
+  const h: HealthInfo | null = live.data && !forbidden ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
+  const first = (kid.name || live.data?.name || "").split(" ")[0] || tx("sua criança");
   const notes = live.data?.generalNotes ?? kid.generalNotes;
   const empty = h && !h.allergies.length && !h.drugAllergies.length && !h.healthIssues.length && !h.medications.length && !h.foodRestrictions && !h.healthNotes;
 
@@ -83,7 +86,9 @@ function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; revi
       </div>
       <div className={`detail-card ${styles.reveal} ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
         {!h ? (
-          live.error ? (
+          forbidden ? (
+            <p className="cat-hint">{tx("As informações de saúde de {name} não estão disponíveis para o seu perfil agora. Se precisar, fale com a coordenação — ela pode ajudar.", { name: first })}</p>
+          ) : live.error ? (
             <p className="cat-hint">
               {tx("Não conseguimos ler as informações de saúde agora.")}{" "}
               <button type="button" className="link-btn" onClick={live.reload}>{tx("Tentar de novo")}</button>

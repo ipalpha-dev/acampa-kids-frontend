@@ -4,7 +4,7 @@ import { bearer } from "../auth/store";
 export type ImportField =
   | "name" | "birthDate" | "probableGender" | "bed" | "bedroomPreference" | "team" | "transportation" | "bedroom" | "leader"
   | "cpf" | "guardianCpf" | "rg" | "school" | "schoolGrade" | "church" | "invitedBy" | "guardianName"
-  | "guardianPhone" | "guardianEmail" | "emergencyContact" | "insurance" | "insuranceCard" | "weightKg"
+  | "guardianPhone" | "guardianEmail" | "guardian2Name" | "guardian2Phone" | "emergencyContact" | "insurance" | "insuranceCard" | "weightKg"
   | "allergies" | "drugAllergies" | "healthIssues" | "neurodivergent" | "dailyMedication" | "foodRestrictions" | "healthNotes" | "generalNotes";
 
 export interface ImportColumn {

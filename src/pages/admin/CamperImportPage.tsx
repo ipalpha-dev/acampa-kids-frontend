@@ -405,7 +405,7 @@ function createdTopics(items: { kind: string; label: string }[]): { topic: strin
   return [...topics.values()];
 }
 
-function ColumnMapping({ record, fields, busy, onSubmit }: { record: CamperImport; fields: { key: ImportField; label: string }[]; busy: boolean; onSubmit: (mapping: Record<string, string | null>) => void }) {
+export function ColumnMapping({ record, fields, busy, onSubmit }: { record: CamperImport; fields: { key: ImportField; label: string }[]; busy: boolean; onSubmit: (mapping: Record<string, string | null>) => void }) {
   const { tx } = useI18n();
   const [mapping, setMapping] = useState<Record<string, string | null>>(() => Object.fromEntries(record.columns.map((c) => [c.source, c.target])));
   const used = new Set(Object.values(mapping).filter(Boolean));
@@ -443,7 +443,7 @@ function ColumnMapping({ record, fields, busy, onSubmit }: { record: CamperImpor
           <span className="import-column__samples">{c.samples.join(" · ")}</span>
           <select className="cat-input" value={mapping[c.source] ?? ""} onChange={(e) => assign(c.source, e.target.value || null)}>
             <option value="">{tx("Ignorar")}</option>
-            {fields.map((f) => <option key={f.key} value={f.key} disabled={used.has(f.key) && mapping[c.source] !== f.key}>{f.label}</option>)}
+            {fields.map((f) => <option key={f.key} value={f.key} disabled={used.has(f.key) && mapping[c.source] !== f.key}>{tx(f.label)}</option>)}
           </select>
         </label>))}</div>
     </details>}
@@ -452,7 +452,7 @@ function ColumnMapping({ record, fields, busy, onSubmit }: { record: CamperImpor
   </section>;
 }
 
-const DUPLICATE_FIELDS=["name","birthDate","guardianName","guardianPhone","guardianEmail","bedroom","team","caretakerId","transportation","bed","school","schoolGrade","church","weightKg","allergies","drugAllergies","healthIssues","foodRestrictions","healthNotes","generalNotes","bedroomPreference","emergencyContact"];
+const DUPLICATE_FIELDS=["name","birthDate","guardianName","guardianPhone","guardianEmail","guardian2Name","guardian2Phone","bedroom","team","caretakerId","transportation","bed","school","schoolGrade","church","weightKg","allergies","drugAllergies","healthIssues","foodRestrictions","healthNotes","generalNotes","bedroomPreference","emergencyContact"];
 function usefulEntries(data:Record<string,unknown>|undefined){return DUPLICATE_FIELDS.flatMap((key)=>{const value=data?.[key];if(value==null||value===""||(Array.isArray(value)&&!value.length))return [];return [{key,value}]})}
 function duplicateFieldLabel(key:string){return PREVIEW_COLUMNS.find((column)=>column.key===key)?.label??key}
 function duplicateLabels(categories:Category[],bedrooms:{id:string;name:string}[],teams:{id:string;name:string}[],transports:{id:string;label:string}[],staff:{id:string;name:string}[],record:CamperImport){const labels=previewLabelMap(record,categories);for(const room of bedrooms)labels.set(room.id,room.name);for(const team of teams)labels.set(team.id,team.name);for(const transport of transports)labels.set(transport.id,transport.label);for(const member of staff)labels.set(member.id,member.name);return labels}
@@ -485,7 +485,8 @@ const PREVIEW_COLUMNS: { key: string; label: string }[] = [
   { key: "cpf", label: "CPF" }, { key: "guardianCpf", label: "CPF do responsável" }, { key: "rg", label: "RG" },
   { key: "school", label: "Escola" }, { key: "schoolGrade", label: "Série" }, { key: "church", label: "Igreja" },
   { key: "invitedBy", label: "Convidado por" }, { key: "guardianName", label: "Responsável" }, { key: "guardianPhone", label: "Telefone" },
-  { key: "guardianEmail", label: "E-mail" }, { key: "emergencyContact", label: "Emergência" }, { key: "insurance", label: "Convênio" },
+  { key: "guardianEmail", label: "E-mail" }, { key: "guardian2Name", label: "2º responsável" }, { key: "guardian2Phone", label: "Telefone do 2º" },
+  { key: "emergencyContact", label: "Emergência" }, { key: "insurance", label: "Convênio" },
   { key: "insuranceCard", label: "Carteirinha" }, { key: "weightKg", label: "Peso" }, { key: "allergies", label: "Alergias" },
   { key: "drugAllergies", label: "Alergia a remédios" }, { key: "healthIssues", label: "Condições de saúde" }, { key: "neurodivergent", label: "Neurodivergente" },
   { key: "dailyMedicationText", label: "Medicação diária" }, { key: "foodRestrictionText", label: "Restrição alimentar" }, { key: "healthNotes", label: "Observações médicas" },
@@ -582,7 +583,7 @@ function displayPreviewValue(key: string, value: unknown, labels: Map<string, st
   }
   if (key === "probableGender") return value === "F" ? tx("Feminino") : value === "M" ? tx("Masculino") : "—";
   if (key === "duplicateSource") return tx(String(value));
-  if (key === "guardianPhone") return formatBrazilPhoneClient(String(value));
+  if (key === "guardianPhone" || key === "guardian2Phone") return formatBrazilPhoneClient(String(value));
   if (key === "weightKg") return tx("{weight} kg", { weight: String(value).replace(".", ",") });
   if (ID_RE.test(String(value))) return "—";
   return String(value);

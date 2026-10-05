@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CAMPER_CATEGORY_KEYS, EMPTY_HEALTH, blankMedication, parentUpdateCamper, type Camper, type CamperHealthAnswer, type HealthInfo, type Medication, type ParentPatch } from "../../api/campers";
+import { CAMPER_CATEGORY_KEYS, EMPTY_HEALTH, blankMedication, isHealthForbidden, parentUpdateCamper, type Camper, type CamperHealthAnswer, type HealthInfo, type Medication, type ParentPatch } from "../../api/campers";
 import { CategoryChips } from "../../components/CategoryFields";
 import MedicationsEditor from "../../components/MedicationsEditor";
 import Dialog from "../../components/Dialog";
@@ -155,7 +155,8 @@ export default function AttentionEditDialog({ token, open, camper: k, health, ge
       onSaved?.(answer);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      // IPAlpha's own-kids rule refused this profile: nothing was saved, say so kindly
+      setError(isHealthForbidden(e) ? tx("O IPAlpha não deixou salvar as informações de saúde pelo seu perfil. Nada foi alterado — fale com a coordenação, que pode ajudar.") : e instanceof Error ? e.message : tx("Algo deu errado."));
     } finally {
       setBusy(false);
     }

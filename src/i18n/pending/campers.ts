@@ -367,6 +367,10 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Téléphone du responsable",
     de: "Telefon der Bezugsperson",
   },
+  "Nome do 2º responsável": { en: "Second guardian's name", es: "Nombre del 2.º responsable", fr: "Nom du 2e responsable", de: "Name der zweiten Bezugsperson" },
+  "Telefone do 2º responsável": { en: "Second guardian's phone", es: "Teléfono del 2.º responsable", fr: "Téléphone du 2e responsable", de: "Telefon der zweiten Bezugsperson" },
+  "2º responsável": { en: "Second guardian", es: "2.º responsable", fr: "2e responsable", de: "Zweite Bezugsperson" },
+  "Telefone do 2º": { en: "Second guardian's phone", es: "Teléfono del 2.º", fr: "Téléphone du 2e", de: "Telefon (zweite Bezugsperson)" },
   "CPF do responsável": {
     en: "Guardian's tax ID",
     es: "CPF del responsable",

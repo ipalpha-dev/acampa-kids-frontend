@@ -7,6 +7,8 @@ import BedIcon from "./BedIcon";
 import CamperPeekDialog from "./CamperPeekDialog";
 import OpsFamilyContact from "./OpsFamilyContact";
 import { useNames } from "../store/people";
+import { useHealthLabel } from "../hooks/usePersonData";
+import type { HealthInfo } from "../api/campers";
 import { ICONS } from "../icons";
 import { minutesOf, nowTime, slotParts, useMedicationDay, type MedEntry } from "../hooks/useMedicationDay";
 import { useDoseGrace } from "../hooks/useDoseGrace";
@@ -55,8 +57,14 @@ const ARRIVE_MS = 600;
 export default function MedicationChecklist({ token, day, variant = "page", title, now, initialSearch = "" }: MedicationChecklistProps) {
   const { tx } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
-  /** the kid opened in the popup — the list (and the search) stay exactly as they were */
-  const [peek, setPeek] = useState<{ id: string; name: string } | null>(null);
+  /**
+   * the kid opened in the popup — the list (and the search) stay exactly as
+   * they were. The prescription's health (allergies, drug allergies,
+   * conditions — read live for the care team) goes with it.
+   */
+  const [peek, setPeek] = useState<{ id: string; name: string; health: HealthInfo } | null>(null);
+  /** church health option id → label, for the drug-allergy flag */
+  const healthLabel = useHealthLabel(token);
   const [search, setSearch] = useState(initialSearch);
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -195,8 +203,8 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                   {/* the kid + WhatsApp are ONE line: on a phone the icon is simply the last
                       item of that line (top right of the card), never a floating overlay */}
                   <div className="meds-sos__top">
-                    <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name })}>
-                      <MedBody entry={e} sosDoses={taken} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
+                    <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name, health: e.health })}>
+                      <MedBody entry={e} sosDoses={taken} room={roomOf(e.kid.bedroom)} firstOf={firstOf} labelOf={healthLabel} />
                     </button>
                     <OpsFamilyContact token={token} camperId={e.kid.id} kidName={e.kid.name} className="meds-sos__wa" />
                   </div>
@@ -280,8 +288,8 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                           {given && <CheckGlyph size="1.2em" />}
                         </span>
                       </label>
-                      <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name })}>
-                        <MedBody entry={e} given={given} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
+                      <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name, health: e.health })}>
+                        <MedBody entry={e} given={given} room={roomOf(e.kid.bedroom)} firstOf={firstOf} labelOf={healthLabel} />
                       </button>
                       {/* while the dose can still be taken back, the corner offers exactly that */}
                       {justTicked ? (
@@ -349,7 +357,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                       ?
                     </span>
                     <button type="button" className="meds-row__hit" title={tx("Abrir a ficha de {name}", { name: e.kid.name })} onClick={() => navigate(`/campers/${e.kid.id}`)}>
-                      <MedBody entry={e} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
+                      <MedBody entry={e} room={roomOf(e.kid.bedroom)} firstOf={firstOf} labelOf={healthLabel} />
                     </button>
                     <OpsFamilyContact token={token} camperId={e.kid.id} kidName={e.kid.name} className="meds-row__wa" />
                   </div>
@@ -373,7 +381,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
     );
   })();
 
-  const peekDialog = <CamperPeekDialog camperId={peek?.id ?? null} name={peek?.name} onClose={() => setPeek(null)} />;
+  const peekDialog = <CamperPeekDialog camperId={peek?.id ?? null} name={peek?.name} health={peek?.health ?? null} onClose={() => setPeek(null)} />;
 
   if (!card)
     return (
@@ -404,10 +412,12 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
 }
 
 /** name + room chip + medicine + dose, plus who gave it and any warning about the kid */
-function MedBody({ entry, given, sosDoses, room, firstOf }: { entry: MedEntry; given?: MedicationDose; sosDoses?: MedicationDose[]; room?: Pick<Bedroom, "name" | "group"> | null; firstOf: (personId: string) => string }) {
+function MedBody({ entry, given, sosDoses, room, firstOf, labelOf }: { entry: MedEntry; given?: MedicationDose; sosDoses?: MedicationDose[]; room?: Pick<Bedroom, "name" | "group"> | null; firstOf: (personId: string) => string; labelOf: (id: string) => string }) {
   const { tx } = useI18n();
   const { kid, med } = entry;
   const cannotTake = entry.drugAllergies.length > 0;
+  const drugs = entry.drugAllergies.map(labelOf).filter(Boolean).join(", ");
+  const flag = drugs ? tx("Alergia a medicamentos: {list} — confira antes de dar", { list: drugs }) : tx("A criança tem alergia a medicamentos — confira antes de dar");
   return (
     <span className="bus-row__body">
       <span className="bus-row__name">
@@ -419,7 +429,7 @@ function MedBody({ entry, given, sosDoses, room, firstOf }: { entry: MedEntry; g
           </span>
         )}
         {cannotTake && (
-          <span className="meds-row__flag" title={tx("A criança tem alergia a medicamentos — confira antes de dar")}>
+          <span className="meds-row__flag" role="img" title={flag} aria-label={flag}>
             🚫💊
           </span>
         )}

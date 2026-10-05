@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { MEDICATION_PRESETS } from "../components/MedicationsEditor";
-import { fetchPrescriptionsPage, medKeyOf, SOS_SLOT, type MedicationDose, type Prescription } from "../api/medications";
-import type { Camper, Medication } from "../api/campers";
+import { fetchPrescriptionsPage, medKeyOf, prescriptionHealth, SOS_SLOT, type MedicationDose, type Prescription } from "../api/medications";
+import type { Camper, HealthInfo, Medication } from "../api/campers";
 import { applyServerData, getState, useCollection, useCollectionOrEmpty, useConnection } from "../store";
 import { rememberPeople } from "../store/people";
 import { fetchAllPages } from "./usePagedList";
@@ -41,11 +41,10 @@ export interface MedEntry {
   medKey: string;
   /** "HH:MM", "sos", or "" for a medicine the parents never scheduled */
   slot: string;
-  /**
-   * option ids of medicines the kid must NOT take, when the prescriptions read
-   * carries them (`drugAllergies` on the item) — empty otherwise
-   */
+  /** option ids of medicines the kid must NOT take (`drugAllergies` of the prescriptions read) */
   drugAllergies: string[];
+  /** what the prescriptions read carries about the kid's health, for the popup (care team only) */
+  health: HealthInfo;
 }
 
 /** the checklist of ONE day, already grouped the way both the tab and the home card show it */
@@ -125,16 +124,16 @@ export function useMedicationDay(token: string, day: string, search = ""): Medic
       .map((p) => {
         const known = byId.get(p.personId);
         const kid = known ? (known.name ? known : { ...known, name: p.name }) : ({ id: p.personId, personId: p.personId, name: p.name, bedroom: null } as unknown as Camper);
-        return { kid, meds: p.medications, drugAllergies: (p as Prescription & { drugAllergies?: string[] }).drugAllergies ?? [] };
+        return { kid, meds: p.medications, drugAllergies: p.drugAllergies ?? [], health: prescriptionHealth(p) };
       });
     const matches = (k: Camper) => !q || normalizeName(k.name).includes(q);
     const bySlot = new Map<string, MedEntry[]>();
     const sosList: MedEntry[] = [];
     const missing: MedEntry[] = [];
-    for (const { kid, meds, drugAllergies } of withMeds) {
+    for (const { kid, meds, drugAllergies, health } of withMeds) {
       if (!matches(kid)) continue;
       for (const med of meds) {
-        const entry = { kid, med, medKey: medKeyOf(med.name), drugAllergies };
+        const entry = { kid, med, medKey: medKeyOf(med.name), drugAllergies, health };
         if (med.asNeeded) sosList.push({ ...entry, slot: SOS_SLOT });
         else if (med.times.length === 0) missing.push({ ...entry, slot: "" });
         else

@@ -24,11 +24,36 @@ export interface MedicationDose {
   note: string;
 }
 
-/** One kid who takes medicines (live from IPAlpha). */
+/**
+ * One kid who takes medicines (live from IPAlpha, read with the care team's
+ * role token). The allergy lists (option ids of the church health lists)
+ * travel with the prescription so the checklist can flag a kid who must not
+ * take some medicine and the popup shows what to watch.
+ */
 export interface Prescription {
   personId: string;
   name: string;
   medications: import("./campers").Medication[];
+  /** medicines the kid must NOT take */
+  drugAllergies?: string[];
+  allergies?: string[];
+  healthIssues?: string[];
+}
+
+/** The health a prescription carries, as a block the health widgets read (fields it does not carry are empty). */
+export function prescriptionHealth(p: Prescription): import("./campers").HealthInfo {
+  return {
+    allergies: p.allergies ?? [],
+    drugAllergies: p.drugAllergies ?? [],
+    healthIssues: p.healthIssues ?? [],
+    neurodivergent: false,
+    medications: p.medications,
+    foodRestrictions: "",
+    healthNotes: "",
+    weightKg: null,
+    insurance: "",
+    insuranceCard: "",
+  };
 }
 
 /** `GET /api/medications/prescriptions?cursor` — one page (≤ 200) of the kids with medicines. */

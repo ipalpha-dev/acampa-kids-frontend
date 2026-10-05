@@ -1,4 +1,4 @@
-import { api, command } from "./client";
+import { ApiError, api, command } from "./client";
 import { bearer } from "../auth/store";
 import type { Staff } from "./staff";
 
@@ -86,6 +86,12 @@ export interface PersonLive {
   hasHealth?: boolean;
   /** health details: only on the person page, a health-tag filter or a name filter with ≤ 6 results */
   health?: HealthInfo | null;
+  /**
+   * IPAlpha refused this role's read of the kid's health (403 — e.g. a
+   * responsável whose link to the kid is not confirmed in IPAlpha yet). The
+   * screen says "not available for your profile", never "nothing informed".
+   */
+  healthForbidden?: boolean;
   /**
    * Not served to Acampa today (decision 39 keeps the birth date out of the
    * names read): ages are unknown, so age-based helpers (room distribution,
@@ -216,6 +222,11 @@ export async function deleteCamper(token: string, id: string): Promise<{ members
 }
 
 /** The kid's page: camp ops + name + health (roles allowed) + responsáveis — read live, never stored. */
+/** A health edit IPAlpha refused for this role (core's own-kids rule) — nothing was saved. */
+export function isHealthForbidden(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 403 && err.code === "CORE_FORBIDDEN";
+}
+
 export async function fetchCamper(token: string, id: string): Promise<Camper & { responsibles: Responsible[] }> {
   const res = await api<{ camper: Camper & { responsibles: Responsible[] } }>(`/api/campers/${encodeURIComponent(id)}`, { headers: bearer(token) });
   return res.camper;
