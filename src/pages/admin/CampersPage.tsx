@@ -16,6 +16,7 @@ import PrintLabelsDialog from "../../components/PrintLabelsDialog";
 import BedroomTag from "../../components/BedroomTag";
 import GroupIcon from "../../components/GroupIcon";
 import ImportSourceDialog from "../../components/ImportSourceDialog";
+import ImportConflictsCard from "../../components/ImportConflictsCard";
 import TeamFilterDialog from "../../components/TeamFilterDialog";
 import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
@@ -438,6 +439,8 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
 
       {mode.kind === "view" && (
         <>
+          {/* decision 78: import values a manual edit kept aside — the organização chooses which one stays */}
+          {!readOnly && !locked && <ImportConflictsCard token={token} subject="camper" />}
           <div className="staff-toolbar">
             <SearchField placeholder={tx("Buscar por nome, líder, time, quarto…")} value={search} onChange={setSearch} aria-label={tx("Buscar")} />
           </div>

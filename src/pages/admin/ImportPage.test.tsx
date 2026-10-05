@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ImportView, ResultBatch } from "../../api/imports";
+import type { ImportReview, ImportView, ResultBatch } from "../../api/imports";
 import { saveAuth } from "../../auth/store";
 import { ConfirmProvider } from "../../components/ConfirmDialog";
 import { I18nProvider } from "../../i18n";
@@ -27,39 +27,59 @@ function importView(over: Partial<ImportView> = {}): ImportView {
     id: "imp-1",
     subject: "camper",
     status: "analysing",
-    steps: [{ name: "mapping", done: 1, total: 3 }],
+    failureReason: null,
+    steps: [{ name: "read", done: 1, total: 3 }],
     file: { name: "kids.xlsx", size: 2048, sheet: "Planilha1" },
     mapping: {},
     fields: [],
     reviews: [],
-    appFields: [],
-    pendingRequired: [],
-    counts: { rows: 3, created: 0, updated: 0, skipped: 0, failed: 0 },
-    applied: { batches: 0, rows: 0 },
+    appFields: [TRANSPORT, BEDROOM],
+    counts: { rows: 3, pending: 0, batches: 0, created: 0, updated: 0, skipped: 0, failed: 0 },
+    applied: { batches: 0 },
     createdAt: null,
     expiresAt: null,
     ...over,
   };
 }
 
+const review = (over: Partial<ImportReview> & Pick<ImportReview, "id" | "kind">): ImportReview => ({
+  blocking: false,
+  options: [],
+  rowRef: null,
+  rowRefs: [],
+  field: null,
+  who: null,
+  basis: null,
+  existingPersonId: null,
+  firstRowRef: null,
+  choice: null,
+  value: null,
+  rows: null,
+  resolved: false,
+  context: {},
+  ...over,
+});
+
+/** persons-api's questions, as the backend passes them through */
+const MATCH = review({ id: "match:4:person", kind: "match", blocking: true, options: ["match", "new", "skip"], rowRef: 4, who: "person", basis: "nameBirthDate", existingPersonId: "p-ana", context: { name: "Ana P." } });
+const CATEGORY = review({ id: "category:transportation:0", kind: "category", options: ["bus-1", "car", "none"], field: "app:transportation", rowRefs: [2, 3], context: { value: "Bus 1" } });
+const REQUIRED = review({ id: "required:transportation", kind: "required", blocking: true, options: ["default", "skip"], field: "app:transportation", rowRefs: [5, 6] });
+const INVALID = review({ id: "invalid:7:birthDate", kind: "invalid", blocking: true, options: ["value", "skip"], rowRef: 7, field: "birthDate", context: { name: "Bia", original: "31/02/2016" } });
+
 const REVIEW = importView({
   status: "review",
-  steps: [{ name: "mapping", done: 3, total: 3 }],
+  steps: [{ name: "read", done: 3, total: 3 }, { name: "columns", done: 1, total: 1 }],
   mapping: { Nome: "name", Ônibus: null },
-  fields: [{ key: "name", label: "Nome" }],
-  appFields: [
-    { ...TRANSPORT, categoryMapping: { "Bus 1": "bus-1" }, emptyRows: 2, decision: null },
-    { ...BEDROOM, categoryMapping: {}, emptyRows: 0, decision: null },
-  ],
-  pendingRequired: ["transportation"],
+  fields: ["name", "birthDate", "app:transportation"],
+  reviews: [MATCH, CATEGORY, REQUIRED, INVALID],
+  counts: { rows: 3, pending: 3, batches: 0, created: 0, updated: 0, skipped: 0, failed: 0 },
 });
 
 const DONE = importView({
   status: "done",
-  steps: [{ name: "applying", done: 1, total: 1 }],
-  appFields: REVIEW.appFields,
-  counts: { rows: 3, created: 1, updated: 1, skipped: 1, failed: 0 },
-  applied: { batches: 1, rows: 3 },
+  steps: [{ name: "apply", done: 1, total: 1 }],
+  counts: { rows: 3, pending: 0, batches: 1, created: 1, updated: 1, skipped: 1, failed: 0 },
+  applied: { batches: 1 },
 });
 
 const RESULTS: ResultBatch[] = [
@@ -68,7 +88,7 @@ const RESULTS: ResultBatch[] = [
     rows: [
       { rowRef: "2", personId: "p-ana", status: "created", reason: null, appFields: { transportation: "bus-1" }, unfilled: ["bedroom"] },
       { rowRef: "3", personId: "p-bia", status: "updated", reason: null, appFields: { transportation: "car", bedroom: "r1" }, unfilled: [] },
-      { rowRef: "4", personId: null, status: "skipped", reason: "Transporte em branco", appFields: {}, unfilled: ["transportation"] },
+      { rowRef: "4", personId: null, status: "skipped", reason: "requiredFieldSkipped", appFields: {}, unfilled: ["transportation"] },
     ],
   },
 ];
@@ -94,10 +114,13 @@ function stubBackend() {
       if (url.pathname === "/api/imports" && method === "POST") return json({ import: current }, 201);
       if (url.pathname === "/api/imports/imp-1" && method === "GET") return json({ import: current });
       if (url.pathname === "/api/imports/imp-1" && method === "PATCH") {
-        const d = body as { required?: Record<string, { mode: string }> };
-        if (d.required?.transportation?.mode === "skip") {
-          current = { ...current, pendingRequired: [], appFields: current.appFields.map((f) => (f.key === "transportation" ? { ...f, decision: { mode: "skip" } } : f)) };
-        }
+        // persons-api's shape: each decided review becomes resolved, `pending` = blocking ones still open
+        const d = body as { reviews?: { id: string; choice?: string; value?: string }[] };
+        const reviews = current.reviews.map((r) => {
+          const hit = d.reviews?.find((x) => x.id === r.id);
+          return hit ? { ...r, choice: hit.choice ?? r.choice, value: hit.value ?? r.value, resolved: true } : r;
+        });
+        current = { ...current, reviews, counts: { ...current.counts, pending: reviews.filter((r) => r.blocking && !r.resolved).length } };
         return json({ import: current });
       }
       if (url.pathname === "/api/imports/imp-1/apply") {
@@ -143,12 +166,13 @@ describe("import through IPAlpha (CONTRACTS_ACAMPA §20 / §24)", () => {
     forgetOpenImports();
   });
 
-  it("upload → live steps → review with the required decision gating Apply → results with the unfilled fields", async () => {
+  it("upload → live steps → persons-api's questions gate Apply → results with gentle reasons and the unfilled fields", async () => {
     const backend = stubBackend();
     renderPage();
 
     // pick: Acampa's own fields are announced, the file goes as multipart with the subject
     expect(await screen.findByText(/Transporte/)).toBeInTheDocument();
+    expect(screen.getByText(/2º responsável/)).toBeInTheDocument();
     const input = screen.getByLabelText("Escolher planilha") as HTMLInputElement;
     const file = new File(["nome;onibus"], "kids.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     fireEvent.change(input, { target: { files: [file] } });
@@ -157,45 +181,77 @@ describe("import through IPAlpha (CONTRACTS_ACAMPA §20 / §24)", () => {
     const post = backend.calls.find((c) => c.method === "POST" && c.path === "/api/imports");
     expect(post?.body).toBeInstanceOf(FormData);
     expect((post?.body as FormData).get("subject")).toBe("camper");
-    expect(screen.getByText("Lendo as colunas da planilha")).toBeInTheDocument();
+    expect(screen.getByText("Lendo a planilha")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
 
     // IPAlpha finished reading: the progress event makes the page re-read the import
     backend.set(REVIEW);
     act(() => {
-      window.dispatchEvent(new CustomEvent(IMPORT_PROGRESS_EVENT, { detail: { importId: "imp-1", step: "mapping", done: 3, total: 3, status: "review" } }));
+      window.dispatchEvent(new CustomEvent(IMPORT_PROGRESS_EVENT, { detail: { importId: "imp-1", step: "observations", done: 3, total: 3, status: "review" } }));
     });
     expect(await screen.findByText("Confira antes de gravar")).toBeInTheDocument();
-    const apply = screen.getByRole("button", { name: "Gravar no IPAlpha" });
-    expect(apply).toBeDisabled();
-    expect(screen.getByText("Para gravar, decida o que fazer com: Transporte.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gravar no IPAlpha" })).toBeDisabled();
+    expect(screen.getByText("Para gravar, responda 3 pergunta(s) marcada(s) acima.")).toBeInTheDocument();
     expect(screen.getByText("Transporte: 2 linha(s) sem valor")).toBeInTheDocument();
+    // the match shows only the existing person's name from the people cache (id → name), the row's name from the file
+    expect(await screen.findByText(/parece ser Ana Paz, já cadastrado\(a\)/)).toBeInTheDocument();
 
-    // decide: don't import those rows now → PATCH only that decision → Apply unlocks
+    // each answer goes as persons-api's own shape {reviews:[{id, choice, value?}]}
+    fireEvent.click(screen.getByRole("button", { name: "É a mesma pessoa" }));
     fireEvent.click(screen.getByRole("radio", { name: "Não importar essas linhas agora" }));
+    fireEvent.change(screen.getByLabelText("Valor correto de Data de nascimento"), { target: { value: "28/02/2016" } });
+    fireEvent.click(screen.getByRole("button", { name: "Usar este valor" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Gravar no IPAlpha" })).toBeEnabled());
-    const patch = backend.calls.find((c) => c.method === "PATCH");
-    expect(patch?.body).toEqual({ required: { transportation: { mode: "skip" } } });
+    const patches = backend.calls.filter((c) => c.method === "PATCH").map((c) => c.body);
+    expect(patches).toEqual([
+      { reviews: [{ id: "match:4:person", choice: "match" }] },
+      { reviews: [{ id: "required:transportation", choice: "skip" }] },
+      { reviews: [{ id: "invalid:7:birthDate", choice: "value", value: "28/02/2016" }] },
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Gravar no IPAlpha" }));
     expect(await screen.findByText("Gravando no IPAlpha…")).toBeInTheDocument();
     expect(backend.calls.some((c) => c.method === "POST" && c.path === "/api/imports/imp-1/apply")).toBe(true);
 
-    // a batch landed and the import is over: results per batch, names resolved live, unfilled fields listed
+    // a batch landed (one value kept aside by a manual edit) and the import is over
     backend.set(DONE);
     act(() => {
-      window.dispatchEvent(new CustomEvent(IMPORT_BATCH_EVENT, { detail: { importId: "imp-1", batch: 1, rows: 3, applied: 3, unfilled: 2 } }));
+      window.dispatchEvent(new CustomEvent(IMPORT_BATCH_EVENT, { detail: { importId: "imp-1", batch: 1, rows: 3, applied: 2, skipped: 1, unfilled: 2, conflicts: 1 } }));
     });
     expect(await screen.findByText("Importação concluída 🎉")).toBeInTheDocument();
+    expect(screen.getByText(/1 valor\(es\) da planilha não substituíram/)).toBeInTheDocument();
     const results = await screen.findByRole("region", { name: "Resultado da importação" });
     expect(await within(results).findByText("Ana Paz")).toBeInTheDocument();
     expect(within(results).getByText("Bia Rios")).toBeInTheDocument();
     expect(within(results).getByText("Ficou sem: Quarto")).toBeInTheDocument();
     expect(within(results).getByText("Ficou sem: Transporte")).toBeInTheDocument();
-    // gentle wording: a skipped row is "não importado agora"
+    // gentle wording: a skipped row is "não importado agora", with the reason in words (never the code)
     expect(within(results).getByText("Não importado agora")).toBeInTheDocument();
-    const names = backend.calls.find((c) => c.path === "/api/people/names");
-    expect((names?.body as { personIds: string[] }).personIds.sort()).toEqual(["p-ana", "p-bia"]);
+    expect(within(results).getByText("Ficou para depois: um campo obrigatório estava em branco.")).toBeInTheDocument();
+    expect(within(results).queryByText("requiredFieldSkipped")).toBeNull();
+  });
+
+  it("a category value is mapped to one of the camp's options; a failed apply can continue where it stopped", async () => {
+    const backend = stubBackend();
+    backend.set(REVIEW);
+    forgetOpenImports();
+    renderPage();
+    // open the remembered import through the upload path
+    fireEvent.change(screen.getByLabelText("Escolher planilha"), { target: { files: [new File(["x"], "kids.csv")] } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar planilha" }));
+    expect(await screen.findByText("Confira antes de gravar")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Valores da planilha → opções do Acampa/ }));
+    fireEvent.change(screen.getByLabelText("Transporte: Bus 1"), { target: { value: "bus-1" } });
+    await waitFor(() => expect(backend.calls.some((c) => c.method === "PATCH")).toBe(true));
+    expect(backend.calls.find((c) => c.method === "PATCH")?.body).toEqual({ reviews: [{ id: "category:transportation:0", choice: "bus-1" }] });
+
+    backend.set(importView({ status: "failed", failureReason: "projectsUnavailable", counts: { ...DONE.counts } }));
+    act(() => {
+      window.dispatchEvent(new CustomEvent(IMPORT_PROGRESS_EVENT, { detail: { importId: "imp-1", step: "apply", done: 1, total: 2, status: "failed" } }));
+    });
+    expect(await screen.findByText("Não foi possível terminar esta importação")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continuar gravando" }));
+    await waitFor(() => expect(backend.calls.some((c) => c.method === "POST" && c.path === "/api/imports/imp-1/apply")).toBe(true));
   });
 
   it("refuses a file that is not .xlsx / .csv before sending it", async () => {

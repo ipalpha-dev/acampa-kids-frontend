@@ -32,6 +32,7 @@ import SearchField from "../../components/SearchField";
 import BedroomTag from "../../components/BedroomTag";
 import GroupIcon from "../../components/GroupIcon";
 import ImportSourceDialog from "../../components/ImportSourceDialog";
+import ImportConflictsCard from "../../components/ImportConflictsCard";
 import TeamFilterDialog from "../../components/TeamFilterDialog";
 import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
@@ -375,6 +376,8 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
 
       {mode.kind === "view" && (
         <>
+          {/* decision 78: import values a manual edit kept aside — the organização chooses which one stays */}
+          {!readOnly && camp.active && <ImportConflictsCard token={token} subject="team" />}
           <div className="staff-toolbar">
             <SearchField placeholder={tx("Buscar por nome, time, quarto…")} value={search} onChange={setSearch} aria-label={tx("Buscar")} />
           </div>

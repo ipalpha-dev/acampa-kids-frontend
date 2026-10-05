@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../../api/client";
 import {
+  APP_FIELD_LABEL,
+  APP_FIELD_PREFIX,
   IMPORT_MAX_BYTES,
   applyImport,
   cancelImport,
@@ -12,7 +14,6 @@ import {
   patchImport,
   type AppField,
   type Decisions,
-  type ImportAppField,
   type ImportReview,
   type ImportStep,
   type ImportSubject,
@@ -34,12 +35,15 @@ import styles from "./ImportPage.module.scss";
 /**
  * Importar acampantes / equipe — through IPAlpha (CONTRACTS_ACAMPA §20 / §24).
  *
- *   pick (who + file) → IPAlpha reads it (live steps) → review (columns, people
- *   that look alike, Acampa's own fields, the required ones) → apply (live
+ *   pick (who + file) → IPAlpha reads it (live steps) → review (the questions
+ *   IPAlpha asks: missing columns, people that look alike, values to fix,
+ *   Acampa's own fields, observations, required fields) → apply (live
  *   batches) → results per batch, with the Acampa fields each row still lacks.
  *
  * Only ids + Acampa field values come back; names are resolved on screen
- * (POST /api/people/names, paged by the people cache) and never stored.
+ * (POST /api/people/names, paged by the people cache) and never stored. The
+ * row names in the questions come from the file itself (the importer's own
+ * view, never kept).
  */
 
 interface ImportPageProps {
@@ -60,23 +64,48 @@ export function forgetOpenImports(): void {
   remembered.clear();
 }
 
-/** Gentle labels for Acampa's own fields (the backend's description is the fallback). */
-const APP_FIELD_LABEL: Record<string, string> = {
-  transportation: "Transporte",
-  bedroom: "Quarto",
-  team: "Time",
-  bedroomPreference: "Quer ficar com",
-  invitedBy: "Convidado por",
-  generalNotes: "Observações",
-  roomRole: "Função no quarto",
+/** The person fields IPAlpha maps a column to (persons-api CORE_FIELDS). */
+const CORE_FIELD_LABEL: Record<string, string> = {
+  name: "Nome",
+  nickname: "Apelido",
+  birthDate: "Data de nascimento",
+  sex: "Sexo",
+  homeChurch: "Igreja que frequenta",
+  phone: "Celular",
+  email: "E-mail",
+  cpf: "CPF",
+  rg: "RG",
+  school: "Escola",
+  schoolGrade: "Série",
+  emergencyContact: "Contato de emergência",
+  insurance: "Convênio médico",
+  insuranceCard: "Carteirinha",
+  weightKg: "Peso",
+  allergies: "Alergias",
+  drugAllergies: "Alergia a medicamentos",
+  healthIssues: "Condições de saúde",
+  neurodivergent: "Neurodivergência",
+  dailyMedication: "Medicação de uso diário",
+  foodRestrictions: "Restrição alimentar",
+  healthNotes: "Observações de saúde",
+  observations: "Observações gerais da planilha",
+  responsibleName: "Nome do responsável",
+  responsiblePhone: "Celular do responsável",
+  responsibleEmail: "E-mail do responsável",
+  responsibleCpf: "CPF do responsável",
+  responsible2Name: "Nome do 2º responsável",
+  responsible2Phone: "Celular do 2º responsável",
+  rowKind: "Tipo de linha",
 };
 
-/** IPAlpha's step names we know; anything else shows as it comes. */
+/** IPAlpha's steps (persons-api); anything else shows as it comes. */
 const STEP_LABEL: Record<string, string> = {
-  mapping: "Lendo as colunas da planilha",
+  read: "Lendo a planilha",
+  columns: "Entendendo as colunas",
   matching: "Procurando quem já tem cadastro",
-  extracting: "Organizando as observações",
-  applying: "Gravando no IPAlpha",
+  categories: "Ligando os valores às opções do Acampa",
+  observations: "Organizando as observações",
+  apply: "Gravando no IPAlpha",
 };
 
 const RESULT_LABEL: Record<ResultStatus, string> = {
@@ -86,6 +115,17 @@ const RESULT_LABEL: Record<ResultStatus, string> = {
   failed: "Não deu certo",
 };
 
+/** persons-api's row reasons, said gently (anything unknown → a generic line). */
+const REASON_LABEL: Record<string, string> = {
+  skippedByReview: "Você escolheu não importar esta linha agora.",
+  requiredFieldSkipped: "Ficou para depois: um campo obrigatório estava em branco.",
+  pendingDecision: "Faltou uma decisão para esta linha.",
+  unknownRowKind: "Não deu para saber o tipo desta linha.",
+  cannotLinkSelf: "Quem importa não pode ser o responsável nesta mesma importação.",
+};
+
+const WHO_LABEL: Record<string, string> = { responsible: "Responsável", responsible2: "2º responsável" };
+
 const ACTIVE: ImportView["status"][] = ["analysing", "applying"];
 
 function appFieldLabel(tx: Tx, field: Pick<AppField, "key" | "description">): string {
@@ -93,13 +133,33 @@ function appFieldLabel(tx: Tx, field: Pick<AppField, "key" | "description">): st
   return pt ? tx(pt) : field.description || field.key;
 }
 
+/** A core field key or `app:<key>` → its label. */
+function fieldLabel(tx: Tx, key: string | null, appFields: AppField[]): string {
+  if (!key) return "";
+  if (key.startsWith(APP_FIELD_PREFIX)) {
+    const k = key.slice(APP_FIELD_PREFIX.length);
+    const f = appFields.find((a) => a.key === k);
+    return f ? appFieldLabel(tx, f) : APP_FIELD_LABEL[k] ? tx(APP_FIELD_LABEL[k]) : k;
+  }
+  return CORE_FIELD_LABEL[key] ? tx(CORE_FIELD_LABEL[key]) : key;
+}
+
 function stepLabel(tx: Tx, name: string): string {
   const pt = STEP_LABEL[name];
   return pt ? tx(pt) : name;
 }
 
-function rowLabel(tx: Tx, rowRef: string): string {
-  return /^\d+$/.test(rowRef) ? tx("Linha {row}", { row: rowRef }) : rowRef;
+function rowLabel(tx: Tx, rowRef: string | number | null): string {
+  if (rowRef === null) return "";
+  return /^\d+$/.test(String(rowRef)) ? tx("Linha {row}", { row: rowRef }) : String(rowRef);
+}
+
+function reasonLabel(tx: Tx, reason: string): string {
+  for (const part of reason.split(",")) {
+    const pt = REASON_LABEL[part.trim()];
+    if (pt) return tx(pt);
+  }
+  return tx("Não deu certo desta vez.");
 }
 
 /** A friendly sentence for every refusal the import routes answer. */
@@ -122,12 +182,15 @@ export function importErrorMessage(tx: Tx, err: unknown): string {
       return tx("Este acampamento ainda não está ligado a uma edição no IPAlpha. Fale com quem cuida do IPAlpha.");
     case "DECISIONS_INVALID":
       return tx("Essa escolha não pôde ser guardada. Confira e tente de novo.");
+    case "DECISIONS_PENDING":
+      return tx("Ainda há perguntas para responder antes de gravar.");
     case "IPALPHA_UNAVAILABLE":
       return tx("O IPAlpha está em manutenção agora. Tente de novo daqui a pouco.");
     case "CORE_REJECTED":
-      if (err.reason === "decisionsPending") return tx("Ainda falta decidir o que fazer com alguns campos obrigatórios.");
+      if (err.reason === "importBusy") return tx("O IPAlpha ainda está trabalhando nesta planilha. Espere um instante.");
       return tx("O IPAlpha não aceitou esta etapa da importação agora.");
     case "CORE_FORBIDDEN":
+      if (err.reason === "notImportOwner") return tx("Só quem começou esta importação pode continuá-la.");
       return tx("O IPAlpha não permitiu esta importação para o seu perfil.");
     default:
       return err.message || tx("Algo deu errado. Tente novamente.");
@@ -148,6 +211,8 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
   const [results, setResults] = useState<ResultBatch[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  /** import values kept aside because someone changed the field by hand (decision 78) */
+  const [conflicts, setConflicts] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -232,6 +297,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
     const onBatch = (e: Event) => {
       const d = (e as CustomEvent<ImportBatchEvent>).detail;
       if (!d || d.importId !== id) return;
+      if (d.conflicts > 0) setConflicts((n) => n + d.conflicts);
       soon();
       void loadResults();
     };
@@ -255,7 +321,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
 
   // results: from the first batch on, and once more when it is over
   useEffect(() => {
-    if (status === "applying" || status === "done") void loadResults();
+    if (status === "applying" || status === "done" || status === "failed" || status === "cancelled") void loadResults();
   }, [status, loadResults]);
 
   function pickFile(f: File) {
@@ -275,6 +341,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       remembered.set(initialSubject, { token, id: created.id });
       setResults([]);
       setNextCursor(null);
+      setConflicts(0);
       setView(created);
     } catch (err) {
       setError(importErrorMessage(tx, err));
@@ -299,7 +366,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
 
   async function apply() {
     const v = viewRef.current;
-    if (!v || busy || v.pendingRequired.length > 0) return;
+    if (!v || busy || (v.status === "review" && v.counts.pending > 0)) return;
     setBusy("apply");
     setError(null);
     try {
@@ -319,7 +386,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
     const ok = await confirm({
       emoji: "🧹",
       title: tx("Cancelar esta importação?"),
-      message: tx("As linhas da planilha são apagadas do IPAlpha. Nenhum cadastro é alterado."),
+      message: tx("As linhas da planilha são apagadas do IPAlpha. O que já foi gravado continua salvo."),
       confirmLabel: tx("Cancelar importação"),
       cancelLabel: tx("Continuar importando"),
       danger: true,
@@ -343,6 +410,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
     setFile(null);
     setResults([]);
     setNextCursor(null);
+    setConflicts(0);
     setError(null);
   }
 
@@ -363,6 +431,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
 
   const stage: "pick" | ImportView["status"] = view ? view.status : "pick";
   const title = subject === "camper" ? tx("Importar acampantes") : tx("Importar equipe");
+  const resumable = view?.status === "failed" && !!view.failureReason && view.failureReason !== "analysisFailed";
 
   return (
     <div className="admin-page">
@@ -425,6 +494,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
                 </ul>
               </div>
             )}
+            {subject === "camper" && <p className="cat-hint">{tx("Se a criança tiver um 2º responsável, traga o nome e o celular dele em colunas próprias: ele é ligado à criança nesta importação.")}</p>}
             <p className="cat-hint">{tx("O IPAlpha lê a planilha, encontra quem já tem cadastro e prepara tudo. Nada é gravado antes de você conferir.")}</p>
             <div className="cat-form__actions">
               <button type="button" className="button button--secondary" onClick={leave}>
@@ -450,15 +520,18 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
           </section>
         )}
 
-        {view && stage === "review" && (
-          <ReviewStage view={view} saving={saving > 0} busy={busy} onDecide={decide} onApply={() => void apply()} onCancel={() => void cancel()} />
-        )}
+        {view && stage === "review" && <ReviewStage view={view} saving={saving > 0} busy={busy} onDecide={decide} onApply={() => void apply()} onCancel={() => void cancel()} />}
 
         {view && (stage === "applying" || stage === "done") && (
           <section className="cat-form" aria-live="polite">
             <h2 className="cat-form__title">{stage === "applying" ? tx("Gravando no IPAlpha…") : tx("Importação concluída 🎉")}</h2>
             {stage === "applying" && <Steps steps={view.steps} />}
             <Summary view={view} />
+            <Reveal open={conflicts > 0}>
+              <p className={styles.pendingNote}>
+                {tx("{n} valor(es) da planilha não substituíram o que alguém já tinha mudado à mão. Você escolhe qual fica em {list}.", { n: conflicts, list: listLabel })}
+              </p>
+            </Reveal>
             {stage === "done" && (
               <div className="cat-form__actions">
                 <button type="button" className="button button--secondary" onClick={startOver}>
@@ -476,15 +549,22 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
           <section className="cat-form">
             <h2 className="cat-form__title">{stage === "failed" ? tx("Não foi possível terminar esta importação") : tx("Importação cancelada")}</h2>
             <p className="cat-hint">
-              {stage === "failed"
-                ? tx("O IPAlpha não conseguiu concluir. O que já foi gravado continua salvo — você pode enviar a planilha de novo.")
-                : tx("As linhas da planilha foram apagadas do IPAlpha.")}
+              {stage === "cancelled"
+                ? tx("As linhas da planilha foram apagadas do IPAlpha. O que já tinha sido gravado continua salvo.")
+                : resumable
+                  ? tx("O IPAlpha parou no meio da gravação. O que já foi gravado continua salvo — grave de novo para continuar de onde parou.")
+                  : tx("O IPAlpha não conseguiu ler esta planilha. Confira o arquivo e envie de novo.")}
             </p>
-            {view.applied.rows > 0 && <Summary view={view} />}
+            {view.counts.batches > 0 && <Summary view={view} />}
             <div className="cat-form__actions">
-              <button type="button" className="button button--primary" onClick={startOver}>
+              <button type="button" className={`button ${resumable ? "button--secondary" : "button--primary"}`} onClick={startOver}>
                 {tx("Começar de novo")}
               </button>
+              {resumable && (
+                <button type="button" className="button button--primary" disabled={!!busy} onClick={() => void apply()}>
+                  {busy === "apply" ? tx("Gravando…") : tx("Continuar gravando")}
+                </button>
+              )}
             </div>
           </section>
         )}
@@ -556,9 +636,10 @@ function Steps({ steps }: { steps: ImportStep[] }) {
 function Summary({ view }: { view: ImportView }) {
   const { tx } = useI18n();
   const c = view.counts;
+  const processed = c.created + c.updated + c.skipped + c.failed;
   return (
     <div className={styles.summary}>
-      <p className="cat-hint">{tx("{applied} de {rows} linha(s) processadas", { applied: view.applied.rows, rows: c.rows })}</p>
+      <p className="cat-hint">{tx("{applied} de {rows} linha(s) processadas", { applied: processed, rows: c.rows })}</p>
       <ul className={styles.chips}>
         <li className={`${styles.chip} ${styles.chipCreated}`}>{tx("{n} cadastrado(s)", { n: c.created })}</li>
         <li className={`${styles.chip} ${styles.chipUpdated}`}>{tx("{n} atualizado(s)", { n: c.updated })}</li>
@@ -590,6 +671,10 @@ function Section({ title, badge, defaultOpen, children }: { title: string; badge
   );
 }
 
+function Badge({ open }: { open: number }) {
+  return open > 0 ? <span className={styles.badgeWarn}>{open}</span> : <span className={styles.badgeOk}>✓</span>;
+}
+
 interface ReviewStageProps {
   view: ImportView;
   saving: boolean;
@@ -599,19 +684,23 @@ interface ReviewStageProps {
   onCancel: () => void;
 }
 
+const openCount = (list: ImportReview[]) => list.filter((r) => !r.resolved).length;
+
 function ReviewStage({ view, saving, busy, onDecide, onApply, onCancel }: ReviewStageProps) {
   const { tx } = useI18n();
+  const byKind = (...kinds: string[]) => view.reviews.filter((r) => kinds.includes(r.kind));
+  const columnReviews = byKind("column");
+  const rowKinds = byKind("rowKind");
+  const people = byKind("match", "duplicate");
+  const invalid = byKind("invalid");
+  const categories = byKind("category");
+  const observations = byKind("observations");
+  const required = byKind("required");
   const columns = Object.keys(view.mapping);
-  const required = view.appFields.filter((f) => f.required && (f.emptyRows > 0 || view.pendingRequired.includes(f.key)));
-  const withCategories = view.appFields.filter((f) => f.kind === "category" && Object.keys(f.categoryMapping).length > 0);
-  const pending = view.pendingRequired;
-  const openReviews = view.reviews.filter((r) => !r.choice).length;
-  const candidateIds = useMemo(() => view.reviews.flatMap((r) => r.candidates.map((c) => c.personId)), [view.reviews]);
-  const nameOf = useNames(candidateIds);
-  const pendingLabels = pending.map((key) => {
-    const f = view.appFields.find((a) => a.key === key);
-    return f ? appFieldLabel(tx, f) : key;
-  });
+  const pending = view.counts.pending;
+  const existingIds = useMemo(() => view.reviews.map((r) => r.existingPersonId).filter((id): id is string => !!id), [view.reviews]);
+  const nameOf = useNames(existingIds);
+  const decideOne = (id: string, choice: string, extra: { value?: string } = {}) => onDecide({ reviews: [{ id, choice, ...extra }] });
 
   return (
     <section className="cat-form">
@@ -621,82 +710,169 @@ function ReviewStage({ view, saving, busy, onDecide, onApply, onCancel }: Review
         {tx("{n} linha(s) na planilha", { n: view.counts.rows })}
       </p>
 
-      {required.length > 0 && (
-        <Section title={tx("Campos obrigatórios em branco")} badge={pending.length > 0 ? <span className={styles.badgeWarn}>{pending.length}</span> : <span className={styles.badgeOk}>✓</span>} defaultOpen>
-          {required.map((f) => (
-            <RequiredDecisionField key={f.key} field={f} pending={pending.includes(f.key)} onDecide={onDecide} />
-          ))}
-        </Section>
-      )}
-
-      {view.reviews.length > 0 && (
-        <Section title={tx("Pessoas para conferir")} badge={openReviews > 0 ? <span className={styles.badgeWarn}>{openReviews}</span> : <span className={styles.badgeOk}>✓</span>} defaultOpen>
-          <ul className={styles.reviews}>
-            {view.reviews.map((r) => (
-              <ReviewItem key={r.id} review={r} nameOf={nameOf} onDecide={onDecide} />
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {withCategories.length > 0 && (
-        <Section title={tx("Valores da planilha → opções do Acampa")}>
-          {withCategories.map((f) => (
-            <div key={f.key} className={styles.group}>
-              <h3 className={styles.groupTitle}>{appFieldLabel(tx, f)}</h3>
-              <ul className={styles.pairs}>
-                {Object.entries(f.categoryMapping).map(([value, key]) => (
-                  <li key={value} className={styles.pair}>
-                    <span className={styles.pairFrom}>{value || tx("(vazio)")}</span>
-                    <span aria-hidden="true">→</span>
-                    <select
-                      className="cat-input"
-                      aria-label={tx("{field}: {value}", { field: appFieldLabel(tx, f), value: value || tx("(vazio)") })}
-                      value={key ?? ""}
-                      onChange={(e) => onDecide({ categories: { [f.key]: { [value]: e.target.value || null } } })}
-                    >
-                      <option value="">{tx("Deixar em branco")}</option>
-                      {(f.categories ?? []).map((c) => (
-                        <option key={c.key} value={c.key}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </Section>
-      )}
-
-      {columns.length > 0 && (
-        <Section title={tx("Colunas da planilha")} badge={<span className={styles.badgeNeutral}>{columns.length}</span>}>
+      {columnReviews.length > 0 && (
+        <Section title={tx("Colunas que o IPAlpha não encontrou")} badge={<Badge open={openCount(columnReviews)} />} defaultOpen>
           <ul className={styles.pairs}>
-            {columns.map((col) => (
-              <li key={col} className={styles.pair}>
-                <span className={styles.pairFrom}>{col}</span>
-                <span aria-hidden="true">→</span>
-                {view.fields.length > 0 ? (
-                  <select className="cat-input" aria-label={tx("Coluna {column}", { column: col })} value={view.mapping[col] ?? ""} onChange={(e) => onDecide({ mapping: { [col]: e.target.value || null } })}>
-                    <option value="">{tx("Não importar esta coluna")}</option>
-                    {view.fields.map((f) => (
-                      <option key={f.key} value={f.key}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className={styles.pairTo}>{view.mapping[col] ?? tx("não importada")}</span>
-                )}
+            {columnReviews.map((r) => (
+              <li key={r.id} className={styles.pair}>
+                <span className={styles.pairFrom}>{fieldLabel(tx, r.field, view.appFields)}</span>
+                <span aria-hidden="true">←</span>
+                <select className="cat-input" aria-label={tx("Coluna com {field}", { field: fieldLabel(tx, r.field, view.appFields) })} value={r.choice ?? ""} onChange={(e) => e.target.value && decideOne(r.id, e.target.value)}>
+                  <option value="">{tx("Escolha a coluna…")}</option>
+                  {r.options.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </select>
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      <Reveal open={pending.length > 0}>
-        <p className={styles.pendingNote}>{tx("Para gravar, decida o que fazer com: {fields}.", { fields: pendingLabels.join(", ") })}</p>
+      {rowKinds.length > 0 && (
+        <Section title={tx("Tipos de linha para conferir")} badge={<Badge open={openCount(rowKinds)} />} defaultOpen>
+          <ul className={styles.reviews}>
+            {rowKinds.map((r) => (
+              <ReviewChoices
+                key={r.id}
+                review={r}
+                head={tx("“{value}” em {n} linha(s)", { value: r.context.value ?? "", n: r.rowRefs.length })}
+                labels={{ camper: tx("Acampantes"), team: tx("Equipe"), skip: tx("Não importar agora") }}
+                onChoose={(choice) => decideOne(r.id, choice)}
+              />
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {people.length > 0 && (
+        <Section title={tx("Pessoas para conferir")} badge={<Badge open={openCount(people)} />} defaultOpen>
+          <ul className={styles.reviews}>
+            {people.map((r) =>
+              r.kind === "match" ? (
+                <ReviewChoices
+                  key={r.id}
+                  review={r}
+                  head={
+                    <>
+                      <strong>{rowLabel(tx, r.rowRef)}</strong>
+                      {r.who && WHO_LABEL[r.who] ? ` · ${tx(WHO_LABEL[r.who])}` : ""}
+                      {r.context.name ? ` · ${r.context.name}` : ""}
+                      {" — "}
+                      {r.basis === "phone"
+                        ? tx("o celular já é de {name}", { name: nameOf(r.existingPersonId) || tx("uma pessoa cadastrada") })
+                        : tx("parece ser {name}, já cadastrado(a)", { name: nameOf(r.existingPersonId) || tx("uma pessoa cadastrada") })}
+                    </>
+                  }
+                  labels={{ match: tx("É a mesma pessoa"), new: tx("Cadastrar como nova pessoa"), skip: tx("Não importar agora") }}
+                  onChoose={(choice) => decideOne(r.id, choice)}
+                />
+              ) : (
+                <ReviewChoices
+                  key={r.id}
+                  review={r}
+                  head={
+                    <>
+                      <strong>{rowLabel(tx, r.rowRef)}</strong>
+                      {r.context.name ? ` · ${r.context.name}` : ""}
+                      {" — "}
+                      {tx("a mesma pessoa já aparece na linha {row}", { row: r.firstRowRef ?? "?" })}
+                    </>
+                  }
+                  labels={{ use: tx("Importar esta linha também"), skip: tx("Não importar esta linha") }}
+                  onChoose={(choice) => decideOne(r.id, choice)}
+                />
+              ),
+            )}
+          </ul>
+        </Section>
+      )}
+
+      {invalid.length > 0 && (
+        <Section title={tx("Valores para corrigir")} badge={<Badge open={invalid.filter((r) => r.blocking && !r.resolved).length} />} defaultOpen={invalid.some((r) => r.blocking && !r.resolved)}>
+          <ul className={styles.reviews}>
+            {invalid.map((r) => (
+              <InvalidItem key={r.id} review={r} label={fieldLabel(tx, r.field, view.appFields)} onDecide={decideOne} />
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {categories.length > 0 && (
+        <Section title={tx("Valores da planilha → opções do Acampa")} badge={<Badge open={openCount(categories)} />}>
+          <ul className={styles.pairs}>
+            {categories.map((r) => {
+              const key = r.field?.startsWith(APP_FIELD_PREFIX) ? r.field.slice(APP_FIELD_PREFIX.length) : "";
+              const f = view.appFields.find((a) => a.key === key);
+              const label = f ? appFieldLabel(tx, f) : key;
+              return (
+                <li key={r.id} className={styles.pair}>
+                  <span className={styles.pairFrom}>
+                    {label}: {r.context.value || tx("(vazio)")}
+                  </span>
+                  <span aria-hidden="true">→</span>
+                  <select className="cat-input" aria-label={tx("{field}: {value}", { field: label, value: r.context.value || tx("(vazio)") })} value={r.choice ?? ""} onChange={(e) => e.target.value && decideOne(r.id, e.target.value)}>
+                    <option value="">{tx("Escolha…")}</option>
+                    {(f?.categories ?? []).map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}
+                      </option>
+                    ))}
+                    <option value="none">{tx("Deixar em branco")}</option>
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
+      {observations.map((r) => (
+        <Section key={r.id} title={tx("Observações que o IPAlpha não conseguiu organizar")} badge={<Badge open={openCount([r])} />} defaultOpen>
+          <ReviewChoices
+            review={r}
+            head={tx("{n} linha(s) têm observações que não couberam em nenhum campo. Onde guardamos?", { n: r.context.rows ?? r.rowRefs.length })}
+            labels={Object.fromEntries(r.options.map((o) => [o, o === "healthNotes" ? tx("Nas anotações de saúde (IPAlpha)") : o === "drop" ? tx("Não guardar") : tx("Em {field}", { field: fieldLabel(tx, o, view.appFields) })]))}
+            onChoose={(choice) => decideOne(r.id, choice)}
+            asBlock
+          />
+        </Section>
+      ))}
+
+      {required.length > 0 && (
+        <Section title={tx("Campos obrigatórios em branco")} badge={<Badge open={openCount(required)} />} defaultOpen>
+          {required.map((r) => (
+            <RequiredDecisionField key={r.id} review={r} appFields={view.appFields} onDecide={onDecide} />
+          ))}
+        </Section>
+      )}
+
+      {columns.length > 0 && (
+        <Section title={tx("Colunas da planilha")} badge={<span className={styles.badgeNeutral}>{columns.length}</span>}>
+          <p className="cat-hint">{tx("Mudar uma coluna faz o IPAlpha reler a planilha; suas escolhas continuam guardadas.")}</p>
+          <ul className={styles.pairs}>
+            {columns.map((col) => (
+              <li key={col} className={styles.pair}>
+                <span className={styles.pairFrom}>{col}</span>
+                <span aria-hidden="true">→</span>
+                <select className="cat-input" aria-label={tx("Coluna {column}", { column: col })} value={view.mapping[col] ?? ""} onChange={(e) => onDecide({ mapping: { [col]: e.target.value || null } })}>
+                  <option value="">{tx("Não importar esta coluna")}</option>
+                  {view.fields.map((key) => (
+                    <option key={key} value={key}>
+                      {fieldLabel(tx, key, view.appFields)}
+                    </option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <Reveal open={pending > 0}>
+        <p className={styles.pendingNote}>{tx("Para gravar, responda {n} pergunta(s) marcada(s) acima.", { n: pending })}</p>
       </Reveal>
 
       <div className="cat-form__actions">
@@ -704,7 +880,7 @@ function ReviewStage({ view, saving, busy, onDecide, onApply, onCancel }: Review
         <button type="button" className="button button--secondary" disabled={!!busy} onClick={onCancel}>
           {busy === "cancel" ? tx("Cancelando…") : tx("Cancelar importação")}
         </button>
-        <button type="button" className="button button--primary" disabled={pending.length > 0 || !!busy || saving} onClick={onApply}>
+        <button type="button" className="button button--primary" disabled={pending > 0 || !!busy || saving} onClick={onApply}>
           {busy === "apply" ? tx("Gravando…") : tx("Gravar no IPAlpha")}
         </button>
       </div>
@@ -712,23 +888,66 @@ function ReviewStage({ view, saving, busy, onDecide, onApply, onCancel }: Review
   );
 }
 
-function RequiredDecisionField({ field, pending, onDecide }: { field: ImportAppField; pending: boolean; onDecide: (d: Decisions) => void }) {
+/** One question with its options as buttons (the chosen one stays marked). */
+function ReviewChoices({ review: r, head, labels, onChoose, asBlock }: { review: ImportReview; head: ReactNode; labels: Record<string, string>; onChoose: (choice: string) => void; asBlock?: boolean }) {
+  const body = (
+    <>
+      <p className={styles.reviewHead}>{head}</p>
+      <div className={styles.choices}>
+        {r.options.map((option) => {
+          const on = r.choice === option;
+          return (
+            <button key={option} type="button" aria-pressed={on} className={`${styles.choice} ${on ? styles.choiceOn : ""}`} onClick={() => onChoose(option)}>
+              {labels[option] ?? option}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+  if (asBlock) return <div className={`${styles.review} ${r.resolved ? styles.reviewDone : ""}`}>{body}</div>;
+  return <li className={`${styles.review} ${r.resolved ? styles.reviewDone : ""}`}>{body}</li>;
+}
+
+function InvalidItem({ review: r, label, onDecide }: { review: ImportReview; label: string; onDecide: (id: string, choice: string, extra?: { value?: string }) => void }) {
   const { tx } = useI18n();
-  const label = appFieldLabel(tx, field);
-  const decision = field.decision;
-  const [mode, setMode] = useState<"default" | "skip" | null>(decision?.mode ?? null);
-  const [text, setText] = useState(decision?.mode === "default" ? decision.value : "");
+  const [text, setText] = useState(r.choice === "value" ? (r.value ?? "") : (r.context.original ?? ""));
+  const fallback = r.options.find((o) => o !== "value") ?? "drop";
+  return (
+    <li className={`${styles.review} ${r.resolved ? styles.reviewDone : ""}`}>
+      <p className={styles.reviewHead}>
+        <strong>{rowLabel(tx, r.rowRef)}</strong>
+        {r.context.name ? ` · ${r.context.name}` : ""} — {r.context.original ? tx("{field}: “{value}” não parece certo", { field: label, value: r.context.original }) : tx("{field} está em branco", { field: label })}
+      </p>
+      <div className={styles.defaultRow}>
+        <input className="cat-input" aria-label={tx("Valor correto de {field}", { field: label })} value={text} onChange={(e) => setText(e.target.value)} />
+        <button type="button" className={`${styles.choice} ${r.choice === "value" ? styles.choiceOn : ""}`} aria-pressed={r.choice === "value"} disabled={!text.trim()} onClick={() => onDecide(r.id, "value", { value: text.trim() })}>
+          {tx("Usar este valor")}
+        </button>
+        <button type="button" className={`${styles.choice} ${r.choice === fallback ? styles.choiceOn : ""}`} aria-pressed={r.choice === fallback} onClick={() => onDecide(r.id, fallback)}>
+          {fallback === "skip" ? tx("Não importar esta linha agora") : tx("Deixar em branco")}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function RequiredDecisionField({ review: r, appFields, onDecide }: { review: ImportReview; appFields: AppField[]; onDecide: (d: Decisions) => void }) {
+  const { tx } = useI18n();
+  const key = r.field?.startsWith(APP_FIELD_PREFIX) ? r.field.slice(APP_FIELD_PREFIX.length) : (r.field ?? "");
+  const field = appFields.find((f) => f.key === key);
+  const label = field ? appFieldLabel(tx, field) : key;
+  const [mode, setMode] = useState<"default" | "skip" | null>(r.choice === "default" || r.choice === "skip" ? r.choice : null);
+  const [text, setText] = useState(r.choice === "default" ? (r.value ?? "") : "");
   useEffect(() => {
-    setMode(field.decision?.mode ?? null);
-    if (field.decision?.mode === "default") setText(field.decision.value);
-  }, [field.decision]);
-  const categoryValue = decision?.mode === "default" ? decision.value : "";
+    if (r.choice === "default" || r.choice === "skip") setMode(r.choice);
+    if (r.choice === "default") setText(r.value ?? "");
+  }, [r.choice, r.value]);
+  const categoryValue = r.choice === "default" ? (r.value ?? "") : "";
 
   return (
-    <fieldset className={`${styles.required} ${pending ? styles.requiredPending : ""}`}>
-      <legend className={styles.requiredTitle}>
-        {tx("{field}: {n} linha(s) sem valor", { field: label, n: field.emptyRows })}
-      </legend>
+    <fieldset className={`${styles.required} ${!r.resolved ? styles.requiredPending : ""}`}>
+      <legend className={styles.requiredTitle}>{tx("{field}: {n} linha(s) sem valor", { field: label, n: r.rowRefs.length })}</legend>
       <div className={styles.choices} role="radiogroup" aria-label={label}>
         <button type="button" role="radio" aria-checked={mode === "default"} className={`${styles.choice} ${mode === "default" ? styles.choiceOn : ""}`} onClick={() => setMode("default")}>
           {tx("Usar um valor para todas as linhas vazias")}
@@ -740,7 +959,7 @@ function RequiredDecisionField({ field, pending, onDecide }: { field: ImportAppF
           className={`${styles.choice} ${mode === "skip" ? styles.choiceOn : ""}`}
           onClick={() => {
             setMode("skip");
-            onDecide({ required: { [field.key]: { mode: "skip" } } });
+            onDecide({ reviews: [{ id: r.id, choice: "skip" }] });
           }}
         >
           {tx("Não importar essas linhas agora")}
@@ -748,12 +967,12 @@ function RequiredDecisionField({ field, pending, onDecide }: { field: ImportAppF
       </div>
       <Reveal open={mode === "default"}>
         <div className={styles.defaultRow}>
-          {field.kind === "category" ? (
+          {field?.kind === "category" ? (
             <select
               className="cat-input"
               aria-label={tx("Valor para as linhas vazias de {field}", { field: label })}
               value={categoryValue}
-              onChange={(e) => e.target.value && onDecide({ required: { [field.key]: { mode: "default", value: e.target.value } } })}
+              onChange={(e) => e.target.value && onDecide({ reviews: [{ id: r.id, choice: "default", value: e.target.value }] })}
             >
               <option value="">{tx("Escolha…")}</option>
               {(field.categories ?? []).map((c) => (
@@ -765,7 +984,7 @@ function RequiredDecisionField({ field, pending, onDecide }: { field: ImportAppF
           ) : (
             <>
               <input className="cat-input" aria-label={tx("Valor para as linhas vazias de {field}", { field: label })} value={text} onChange={(e) => setText(e.target.value)} />
-              <button type="button" className="button button--secondary" disabled={!text.trim()} onClick={() => onDecide({ required: { [field.key]: { mode: "default", value: text.trim() } } })}>
+              <button type="button" className="button button--secondary" disabled={!text.trim()} onClick={() => onDecide({ reviews: [{ id: r.id, choice: "default", value: text.trim() }] })}>
                 {tx("Usar este valor")}
               </button>
             </>
@@ -776,41 +995,11 @@ function RequiredDecisionField({ field, pending, onDecide }: { field: ImportAppF
   );
 }
 
-function ReviewItem({ review: r, nameOf, onDecide }: { review: ImportReview; nameOf: (id: string | null | undefined) => string; onDecide: (d: Decisions) => void }) {
-  const { tx } = useI18n();
-  return (
-    <li className={`${styles.review} ${r.choice ? styles.reviewDone : ""}`}>
-      <p className={styles.reviewHead}>
-        <strong>{rowLabel(tx, r.rowRef)}</strong> · {r.message}
-      </p>
-      <div className={styles.choices}>
-        {r.candidates.map((c) => {
-          const on = r.choice === "match" && r.personId === c.personId;
-          return (
-            <button key={c.personId} type="button" aria-pressed={on} className={`${styles.choice} ${on ? styles.choiceOn : ""}`} onClick={() => onDecide({ reviews: { [r.id]: { choice: "match", personId: c.personId } } })}>
-              {tx("É {name}", { name: nameOf(c.personId) || tx("esta pessoa") })}
-            </button>
-          );
-        })}
-        <button type="button" aria-pressed={r.choice === "new"} className={`${styles.choice} ${r.choice === "new" ? styles.choiceOn : ""}`} onClick={() => onDecide({ reviews: { [r.id]: { choice: "new" } } })}>
-          {tx("Cadastrar como nova pessoa")}
-        </button>
-        <button type="button" aria-pressed={r.choice === "skip"} className={`${styles.choice} ${r.choice === "skip" ? styles.choiceOn : ""}`} onClick={() => onDecide({ reviews: { [r.id]: { choice: "skip" } } })}>
-          {tx("Não importar agora")}
-        </button>
-      </div>
-    </li>
-  );
-}
-
-function Results({ batches, appFields, listLabel, hasMore, loadingMore, onMore }: { batches: ResultBatch[]; appFields: ImportAppField[]; listLabel: string; hasMore: boolean; loadingMore: boolean; onMore: () => void }) {
+function Results({ batches, appFields, listLabel, hasMore, loadingMore, onMore }: { batches: ResultBatch[]; appFields: AppField[]; listLabel: string; hasMore: boolean; loadingMore: boolean; onMore: () => void }) {
   const { tx } = useI18n();
   const ids = useMemo(() => batches.flatMap((b) => b.rows.map((r) => r.personId).filter((id): id is string => !!id)), [batches]);
   const nameOf = useNames(ids);
-  const labelOf = (key: string) => {
-    const f = appFields.find((a) => a.key === key);
-    return f ? appFieldLabel(tx, f) : APP_FIELD_LABEL[key] ? tx(APP_FIELD_LABEL[key]) : key;
-  };
+  const labelOf = (key: string) => fieldLabel(tx, `${APP_FIELD_PREFIX}${key}`, appFields);
   const sorted = [...batches].sort((a, b) => a.batch - b.batch);
 
   return (
@@ -825,7 +1014,7 @@ function Results({ batches, appFields, listLabel, hasMore, loadingMore, onMore }
               <li key={`${b.batch}:${row.rowRef}`} className={styles.row}>
                 <span className={styles.rowName}>{(row.personId && nameOf(row.personId)) || rowLabel(tx, row.rowRef)}</span>
                 <span className={`${styles.status} ${styles[`status_${row.status}`] ?? ""}`}>{tx(RESULT_LABEL[row.status] ?? row.status)}</span>
-                {row.reason && <span className={styles.reason}>{row.reason}</span>}
+                {row.reason && (row.status === "skipped" || row.status === "failed") && <span className={styles.reason}>{reasonLabel(tx, row.reason)}</span>}
                 {row.unfilled.length > 0 && <span className={styles.unfilled}>{tx("Ficou sem: {fields}", { fields: row.unfilled.map(labelOf).join(", ") })}</span>}
               </li>
             ))}

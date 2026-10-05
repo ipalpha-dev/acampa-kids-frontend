@@ -42,7 +42,10 @@ export interface ImportBatchEvent {
   batch: number;
   rows: number;
   applied: number;
+  skipped: number;
   unfilled: number;
+  /** import values kept aside because someone changed that field by hand (decision 78) — decided on the campers / team page */
+  conflicts: number;
 }
 
 /** Fired on `window` with `detail: ImportProgressEvent`. */
