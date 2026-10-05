@@ -536,12 +536,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: ". Publier plus de photos après ne renvoie pas de SMS, et masquer les photos n'avise personne. Désactiver puis réactiver cette alerte débloque un nouvel envoi pour tous.",
     de: ". Werden später weitere Fotos veröffentlicht, geht keine neue SMS raus, und wenn Fotos ausgeblendet werden, wird niemand benachrichtigt. Schaltest du diese Benachrichtigung aus und wieder ein, wird ein neuer Versand an alle möglich.",
   },
-  ": nenhum aviso (nem código de login) chega à equipe ou aos pais — tudo vai para os celulares de teste. ": {
-    en: ": no alert (not even login codes) reaches staff or parents — everything goes to the test phones. ",
-    es: ": ningún aviso (ni código de acceso) llega al equipo o a los padres — todo va a los celulares de prueba. ",
-    fr: " : aucune alerte (même pas les codes de connexion) n'atteint l'équipe ou les parents — tout va vers les portables de test. ",
-    de: ": Keine Benachrichtigung (nicht einmal Anmeldecodes) erreicht Mitarbeitende oder Eltern — alles geht an die Testhandys. ",
-  },
   "um e-mail de cada tipo": {
     en: "one email of each type",
     es: "un correo de cada tipo",

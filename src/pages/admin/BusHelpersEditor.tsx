@@ -85,7 +85,7 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
               .filter((h) => h.vehicleId === v.id)
               .map((h) => {
                 const s = staffById.get(h.personId);
-                return { id: h.personId, name: s?.name || nameOf(h.personId), aiReviewStatus: s?.aiReviewStatus ?? null, onTeam: !!s };
+                return { id: h.personId, name: s?.name || nameOf(h.personId), onTeam: !!s };
               })
               .sort(compareByName);
             return (
@@ -98,7 +98,7 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
                 </header>
                 <ul className="staff-card__tags helpers-list" aria-label={tx("Na porta: {label}", { label: v.label })}>
                   {people.map((s) => (
-                    <li key={s.id} className={`staff-tag helpers-tag ${s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? tx("Cadastro em revisão pela IA") : undefined}>
+                    <li key={s.id} className={`staff-tag helpers-tag`}>
                       <span className="helpers-tag__name" title={s.onTeam ? undefined : tx("Não está mais na equipe")}>{shownName(s.name)}</span>
                       <button type="button" className="helpers-tag__x" aria-label={tx("Remover {name}", { name: shownName(s.name) })} title={tx("Remover")} disabled={disabled} onClick={() => remove(s.id)}>
                         ✕

@@ -117,7 +117,6 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
 
   const age = ageOf(k.birthDate ?? null);
   const sex = kidIconSex(bedroom?.group, k.sex);
-  const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
   const isCoordination = activeRole === "coordenacao";
   // the health pencil: the care team (in place), or the coordenação on its own page
   const mayEditHealth = (!!canEditHealth || (!!onEdit && isCoordination)) && health !== undefined && !camperOverride && !healthForbidden;
@@ -258,9 +257,9 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
             {healthBlock}
           </div>
         )}
-        {(k.generalNotes || reviewing) && (
-          <p className={`detail-note ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
-            📝 {k.generalNotes || tx("Observações em revisão pela IA…")}
+        {k.generalNotes && (
+          <p className="detail-note">
+            📝 {k.generalNotes}
           </p>
         )}
       </section>

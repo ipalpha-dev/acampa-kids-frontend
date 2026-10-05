@@ -49,11 +49,6 @@ export interface CamperRecord {
   /** ISO — when a responsável last edited the kid's health / notes; null until they do */
   parentEditedAt: string | null;
   importId: string | null;
-  /** Pending/processing imported campers pulse subtly while the worker reviews observations. */
-  aiReviewStatus: "pending" | "processing" | "structured" | "reviewed" | "error" | null;
-  aiReviewError: string;
-  aiReviewStartedAt: string | null;
-  aiReviewFinishedAt: string | null;
   updatedAt: string;
 }
 

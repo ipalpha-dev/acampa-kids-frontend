@@ -161,7 +161,6 @@ export default function StaffDetail({
   const vestReturned = !!s.vest?.delivered && !!s.vest.returned;
   const vestLate = campOver && !vestReturned;
   const adultIcon = staffSex(s, bedroom ? [bedroom] : []) === "M" ? "man" : "woman";
-  const reviewing = s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured";
 
   /** "Cleves (auxiliar) está no mesmo quarto: 403 (Meninos)" — the colleagues and the room are links */
   const roomSentence = bedroom && (
@@ -328,7 +327,7 @@ export default function StaffDetail({
             </>
           )}
         </dl>
-        <div className={reviewing ? "camper-ai-observation" : ""} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
+        <div>
           {health && (
             <div className={css.healthLive}>
               <HealthAlerts person={health} labelOf={healthLabelOf} boxed />
@@ -336,7 +335,6 @@ export default function StaffDetail({
           )}
           {live.loading && s.hasHealth && <p className="cat-hint">{tx("Carregando informações de saúde…")}</p>}
           {live.error && s.hasHealth && <p className="cat-hint">{tx("Não foi possível ler as informações de saúde agora.")}</p>}
-          {reviewing && !health?.healthNotes && <p className="detail-note">{tx("Observações em revisão pela IA…")}</p>}
         </div>
       </section>
 

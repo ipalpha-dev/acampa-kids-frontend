@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { confirmCampDelete, fetchCamps, requestCampDelete, updateCamp, type CampRow } from "../../api/camps";
 import { ApiError } from "../../api/client";
-import { fetchImportCacheCount, wipeImportCache } from "../../api/super";
 import type { CampSummary } from "../../auth/store";
 import AdminsEditor from "../../components/AdminsEditor";
 import { useConfirm } from "../../components/ConfirmDialog";
@@ -13,7 +12,6 @@ import { useCollection } from "../../store";
 import { ICONS } from "../../icons";
 import type { LoggedUser } from "../../roles";
 import { useI18n } from "../../i18n";
-import styles from "./data.module.scss";
 
 interface SuperPageProps {
   token: string;
@@ -25,7 +23,7 @@ interface SuperPageProps {
 /**
  * ⚙️ → Superusuário (Acampamentos, for a plain admin): the camp registry for
  * everyone who reaches this page, plus — deployment owner only — the admin
- * list, the import cache and a link to the assistant's seed templates.
+ * list and a link to the assistant's seed templates.
  */
 export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPageProps) {
   const { tx } = useI18n();
@@ -104,54 +102,6 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
     setReload((r) => r + 1);
   }
 
-  const [importCache, setImportCache] = useState<{ count: number; staff: number; campers: number } | null>(null);
-  const [cacheBusy, setCacheBusy] = useState(false);
-  const [cacheError, setCacheError] = useState<string | null>(null);
-  const [cacheDone, setCacheDone] = useState<string | null>(null);
-  const [cacheReload, setCacheReload] = useState(0);
-
-  useEffect(() => {
-    if (!isSuper) return;
-    let alive = true;
-    fetchImportCacheCount(token)
-      .then((r) => alive && setImportCache(r))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [token, isSuper, cacheReload]);
-
-  async function cleanCache() {
-    if (cacheBusy) return;
-    const n = importCache?.count ?? 0;
-    const ok = await confirm({
-      emoji: "🧹",
-      title: tx("Limpar o cache de importação?"),
-      message: (
-        <>
-          {tx("Apaga as {n} correspondências que a importação de equipe e de acampantes guardou (coluna da planilha → valor do app).", { n })}
-          <br />
-          {tx("A próxima importação vai remontar o mapeamento do zero. Não apaga nenhum cadastro.")}
-        </>
-      ),
-      confirmLabel: tx("Limpar cache"),
-      danger: true,
-    });
-    if (!ok) return;
-    setCacheBusy(true);
-    setCacheError(null);
-    setCacheDone(null);
-    try {
-      const { removed } = await wipeImportCache(token);
-      setCacheReload((r) => r + 1);
-      setCacheDone(tx("{n} correspondência(s) do cache apagada(s).", { n: removed }));
-    } catch (e) {
-      setCacheError(e instanceof Error ? e.message : tx("Algo deu errado."));
-    } finally {
-      setCacheBusy(false);
-    }
-  }
-
   return (
     <div className="admin-page">
       <header className="admin-head">
@@ -219,29 +169,6 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
         <section className="cat-form">
           <h2 className="cat-form__title">🔑 {tx("Administradores")}</h2>
           <AdminsEditor token={token} user={user} />
-        </section>
-      )}
-
-      {isSuper && (
-        <section className="cat-form">
-          <h2 className="cat-form__title">
-            <img className="admin-title__icon" src={ICONS.importCampers} alt="" aria-hidden="true" /> {tx("Cache de importação")}
-          </h2>
-          <p className="cat-hint">
-            {tx("As correspondências que a importação de equipe e de acampantes guarda (coluna da planilha → valor do app). Limpar não apaga nenhum cadastro.")}
-          </p>
-          {cacheError && <p className="message message--error">{cacheError}</p>}
-          {cacheDone && <p className="message message--ok">✅ {cacheDone}</p>}
-          <p className={`cat-form__title ${styles.cacheCount}`}>
-            {importCache == null
-              ? "…"
-              : tx("{n} {unit}", { n: importCache.count, unit: tx(importCache.count === 1 ? "correspondência" : "correspondências") })}
-          </p>
-          <div className="cat-form__actions">
-            <button type="button" className="button button--danger" disabled={cacheBusy || importCache?.count === 0} onClick={() => void cleanCache()}>
-              {cacheBusy ? tx("Limpando…") : importCache?.count === 0 ? tx("Já está limpo") : tx("🧹 Limpar cache")}
-            </button>
-          </div>
         </section>
       )}
 

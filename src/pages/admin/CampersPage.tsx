@@ -540,13 +540,12 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
               const orphan = !k.caretakerId;
               const noRoom = !k.bedroom;
               const showAttention = attentionEnabled && (orphan || noRoom);
-              const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
               const detail = detailOf(k.id);
               const shownName = k.name || tx("Carregando nome…");
 
               return (
                 // `staff-card--cover`: every blank spot of the row opens the kid — only the family button keeps its own action
-                <li key={k.id} className={`staff-card staff-card--clickable staff-card--cover ${showAttention ? "staff-card--orphan" : ""} ${reviewing ? "camper-ai-review" : ""}`} title={reviewing ? tx("Cadastro em revisão pela IA") : undefined}>
+                <li key={k.id} className={`staff-card staff-card--clickable staff-card--cover ${showAttention ? "staff-card--orphan" : ""}`}>
                   <div
                     className="staff-card__body"
                     role="link"

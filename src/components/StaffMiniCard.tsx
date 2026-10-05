@@ -27,9 +27,8 @@ export default function StaffMiniCard({ staff: s, onOpen }: StaffMiniCardProps) 
   const open = onOpen ? () => onOpen(s.id) : undefined;
   const token = loadAuth()?.token ?? "";
   const bedrooms = useCollectionOrEmpty("bedrooms");
-  const reviewing = s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured";
   return (
-    <li className={`staff-card staff-card--compact staff-card--cover ${open ? "staff-card--clickable" : ""} ${s.active ? "" : "staff-card--inactive"} ${reviewing ? "camper-ai-review" : ""}`} title={reviewing ? tx("Cadastro em revisão pela IA") : undefined}>
+    <li className={`staff-card staff-card--compact staff-card--cover ${open ? "staff-card--clickable" : ""} ${s.active ? "" : "staff-card--inactive"}`}>
       <div
         className="staff-card__body"
         role={open ? "link" : undefined}

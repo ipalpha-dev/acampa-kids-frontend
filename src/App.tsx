@@ -34,7 +34,7 @@ import type { CoreRole } from "./roles";
 import { clearRoomsDraft } from "./roomDraft";
 import { navigate } from "./router";
 import { endOfflineSession, startOfflineSession } from "./store";
-import { connectRealtime, disconnectRealtime, IMPORT_NEEDS_SIGN_IN_EVENT } from "./store/realtime";
+import { connectRealtime, disconnectRealtime } from "./store/realtime";
 
 type Session = AuthState;
 
@@ -187,14 +187,8 @@ export default function App() {
   // IPAlpha in maintenance while signed in: a gentle toast, the camp keeps working with what is on the device
   useEffect(() => {
     const onCoreDown = () => setCampToast(tx("O IPAlpha está em manutenção agora. O acampamento continua funcionando com o que já está no aparelho."));
-    // decision 50: an import I started paused its health pass — resume it in Configurações → Geral
-    const onImportPaused = () => setCampToast(tx("Uma importação sua pausou as informações de saúde. Abra Configurações → Geral para continuar."));
     window.addEventListener(CORE_UNAVAILABLE_EVENT, onCoreDown);
-    window.addEventListener(IMPORT_NEEDS_SIGN_IN_EVENT, onImportPaused);
-    return () => {
-      window.removeEventListener(CORE_UNAVAILABLE_EVENT, onCoreDown);
-      window.removeEventListener(IMPORT_NEEDS_SIGN_IN_EVENT, onImportPaused);
-    };
+    return () => window.removeEventListener(CORE_UNAVAILABLE_EVENT, onCoreDown);
   }, [tx]);
 
   useEffect(() => {

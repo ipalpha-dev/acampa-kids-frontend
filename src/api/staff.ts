@@ -29,10 +29,6 @@ export interface StaffRecord {
   /** CARETAKER ("líder"): looks after specific kids; HELPER ("auxiliar"): only helps out in the room */
   roomRole: RoomRole;
   generalNotes: string;
-  aiReviewStatus?: "pending" | "processing" | "structured" | "reviewed" | "error" | null;
-  aiReviewError?: string;
-  aiReviewStartedAt?: string | null;
-  aiReviewFinishedAt?: string | null;
   /** set when the person arrived on departure day */
   checkin: import("./campers").CamperCheckin | null;
   /** the team vest (colete): handed out, then taken back */

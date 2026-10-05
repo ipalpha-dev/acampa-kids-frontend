@@ -595,23 +595,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Enregistrer le lieu",
     de: "Ort speichern",
   },
-  "Sem celular de teste: preencha o “Redirecionar SMS” acima para poder ligar as notificações com segurança.": {
-    en: "No test phone: fill in “Redirect SMS” above to turn notifications on safely.",
-    es: "Sin celular de prueba: rellena “Redirigir SMS” arriba para poder encender las notificaciones con seguridad.",
-    fr: "Pas de portable de test : renseignez « Rediriger SMS » ci-dessus pour activer les notifications en toute sécurité.",
-    de: "Kein Testhandy: Trag oben bei „SMS umleiten“ eine Nummer ein, damit du die Benachrichtigungen sicher einschalten kannst.",
-  },
   "Solteiras": {
     en: "Singles",
     es: "Individuales",
     fr: "Simples",
     de: "Einzelbetten",
-  },
-  "tem celular de teste preenchido — enquanto não tiver, tudo continua desligado (ninguém recebe SMS de mentira). Ligue-as aqui ou uma a uma em Notificações.": {
-    en: "has a test phone filled in — until then everything stays off (nobody gets fake SMS). Turn them on here or one by one in Notifications.",
-    es: "tiene celular de prueba rellenado — mientras no lo tenga, todo sigue apagado (nadie recibe SMS de mentira). Enciéndelas aquí o una a una en Notificaciones.",
-    fr: "a un portable de test renseigné — sinon tout reste désactivé (personne ne reçoit de faux SMS). Activez-les ici ou une par une dans Notifications.",
-    de: "ein Testhandy eingetragen hat — bis dahin bleibt alles aus (niemand bekommt Test-SMS). Schalte sie hier ein oder einzeln unter Benachrichtigungen.",
   },
   "Tirar da importação": {
     en: "Remove from import",

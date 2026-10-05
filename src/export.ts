@@ -444,10 +444,6 @@ const BLANK_CAMPER: Camper = {
   busReturnCheckin: null,
   parentEditedAt: null,
   importId: null,
-  aiReviewStatus: null,
-  aiReviewError: "",
-  aiReviewStartedAt: null,
-  aiReviewFinishedAt: null,
   createdAt: "",
   updatedAt: "",
 };

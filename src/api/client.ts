@@ -8,12 +8,14 @@ export class ApiError extends Error {
   closesAt?: string | null;
   /** access-window errors: who the window is for */
   audience?: "staff" | "parent";
+  /** core's refusal detail (403 CORE_FORBIDDEN / 409 CORE_REJECTED), e.g. "decisionsPending" */
+  reason?: string;
 
   constructor(
     status: number,
     code: string,
     message: string,
-    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent" },
+    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent"; reason?: string },
   ) {
     super(message);
     this.status = status;
@@ -24,6 +26,7 @@ export class ApiError extends Error {
     this.opensAt = extra?.opensAt;
     this.closesAt = extra?.closesAt;
     this.audience = extra?.audience;
+    this.reason = extra?.reason;
   }
 }
 
@@ -104,6 +107,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         opensAt: err?.opensAt as string | null | undefined,
         closesAt: err?.closesAt as string | null | undefined,
         audience: err?.audience as "staff" | "parent" | undefined,
+        reason: typeof err?.reason === "string" ? err.reason : undefined,
       },
     );
   }

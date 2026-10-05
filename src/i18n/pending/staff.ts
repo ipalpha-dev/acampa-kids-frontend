@@ -313,18 +313,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "✅ Rendu {when} · {by}",
     de: "✅ Zurückgegeben {when} · {by}",
   },
-  "Este campo está sendo revisado pela IA": {
-    en: "This field is under AI review",
-    es: "Este campo está siendo revisado por la IA",
-    fr: "Ce champ est en révision par l'IA",
-    de: "Dieses Feld wird gerade von der KI geprüft",
-  },
-  "Observações em revisão pela IA…": {
-    en: "Notes under AI review…",
-    es: "Observaciones en revisión por la IA…",
-    fr: "Notes en révision par l'IA…",
-    de: "Notizen werden von der KI geprüft…",
-  },
   "Funções": {
     en: "Roles",
     es: "Funciones",

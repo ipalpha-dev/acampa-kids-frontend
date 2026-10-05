@@ -3,7 +3,6 @@ import { useI18n } from "../../i18n";
 import AccessWindowCard from "./AccessWindowCard";
 import CheckinReminderCard from "./CheckinReminderCard";
 import ForeignLookupsCard from "./ForeignLookupsCard";
-import ImportHealthCard from "./ImportHealthCard";
 import KidsRoomsDraftCard from "./KidsRoomsDraftCard";
 
 interface GeneralSettingsPageProps {
@@ -48,7 +47,6 @@ export default function GeneralSettingsPage({ token }: GeneralSettingsPageProps)
 
       <ForeignLookupsCard token={token} />
 
-      <ImportHealthCard token={token} />
     </div>
   );
 }

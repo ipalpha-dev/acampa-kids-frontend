@@ -63,7 +63,7 @@ function TeamContact({ token, staff: s, title, about }: { token: string; staff: 
 }
 
 /** "Informações de saúde": read live from IPAlpha (the responsável's own kid), edited in AttentionEditDialog. */
-function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; reviewing: boolean }) {
+function KidHealth({ token, kid }: { token: string; kid: Camper }) {
   const { tx } = useI18n();
   const live = useCamperLive(token, kid.id);
   const healthLabel = useHealthLabel(token);
@@ -84,7 +84,7 @@ function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; revi
           <span className="pencil" aria-hidden="true">✏️</span> {tx("Editar")}
         </button>
       </div>
-      <div className={`detail-card ${styles.reveal} ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
+      <div className={`detail-card ${styles.reveal}`}>
         {!h ? (
           forbidden ? (
             <p className="cat-hint">{tx("As informações de saúde de {name} não estão disponíveis para o seu perfil agora. Se precisar, fale com a coordenação — ela pode ajudar.", { name: first })}</p>
@@ -111,7 +111,7 @@ function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; revi
             {empty && <p className="cat-hint">{tx("Nenhuma alergia, condição ou medicação informada.")}</p>}
           </>
         )}
-        <p className="detail-note">📝 {notes || (reviewing ? tx("Observações em revisão pela IA…") : <em className="staff-card__missing">{tx("sem observações")}</em>)}</p>
+        <p className="detail-note">📝 {notes || <em className="staff-card__missing">{tx("sem observações")}</em>}</p>
       </div>
       {editing && h && (
         <AttentionEditDialog
@@ -137,7 +137,6 @@ function KidSection({ kid, token, showTeam }: { kid: MyKid; token: string; showT
   const sex = kidIconSex(bedroom?.group, k.sex);
   const first = k.name.split(" ")[0] || tx("sua criança");
   const bedLabel = labelOf(k.bed);
-  const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
 
   return (
     <section className="detail-section parent-kid">
@@ -188,7 +187,7 @@ function KidSection({ kid, token, showTeam }: { kid: MyKid; token: string; showT
         </div>
       )}
 
-      <KidHealth token={token} kid={k} reviewing={reviewing} />
+      <KidHealth token={token} kid={k} />
 
       <div className="detail-section parent-qr">
         <h3 className="detail-h2">{tx("🎟️ QR code de {name}", { name: first })}</h3>

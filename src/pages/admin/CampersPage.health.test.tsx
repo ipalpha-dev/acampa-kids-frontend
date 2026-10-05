@@ -12,7 +12,7 @@ const PEANUT = "opt-peanut";
 const HEALTH = { allergies: [PEANUT], drugAllergies: [], healthIssues: [], neurodivergent: false, medications: [], foodRestrictions: "", healthNotes: "", weightKg: null, insurance: "", insuranceCard: "" };
 
 function record(id: string) {
-  return { id, personId: id, invitedBy: "", caretakerId: null, qrToken: "", team: null, transportation: null, bed: null, bedroom: null, generalNotes: "", bedroomPreference: "", checkin: null, busCheckin: null, busReturnCheckin: null, createdAt: "", parentEditedAt: null, importId: null, aiReviewStatus: null, aiReviewError: "", aiReviewStartedAt: null, aiReviewFinishedAt: null, updatedAt: "" };
+  return { id, personId: id, invitedBy: "", caretakerId: null, qrToken: "", team: null, transportation: null, bed: null, bedroom: null, generalNotes: "", bedroomPreference: "", checkin: null, busCheckin: null, busReturnCheckin: null, createdAt: "", parentEditedAt: null, importId: null, updatedAt: "" };
 }
 
 /** 8 kids; "Ana Paz" and "Ana Rios" have health info. */

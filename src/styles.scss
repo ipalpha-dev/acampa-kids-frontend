@@ -286,11 +286,6 @@ button, input { font: inherit; }
   .import-phone-conflict__row { grid-template-columns:1fr; grid-template-areas:"label" "field" "toggle" "hint"; }
 }
 
-/* Pending imported campers pulse very softly on every shared camper list. */
-.camper-ai-review { animation: camper-ai-pulse 2.4s ease-in-out infinite; }
-@keyframes camper-ai-pulse { 0%, 100% { background-color: var(--paper); } 50% { background-color: #e8f1fb; } }
-.camper-ai-observation { padding: 12px 14px; border-radius: 14px; animation: camper-ai-observation 2.4s ease-in-out infinite; }
-@keyframes camper-ai-observation { 0%, 100% { background: #f4f8fd; } 50% { background: #dceafb; } }
 
 /* tabs — one per category, scrollable on phones */
 .cat-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }

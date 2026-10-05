@@ -73,18 +73,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Chargement des réglages… ⚙️",
     de: "Einstellungen werden geladen… ⚙️",
   },
-  "Celular de teste da equipe": {
-    en: "Staff test phone",
-    es: "Celular de prueba del equipo",
-    fr: "Portable de test de l'équipe",
-    de: "Testhandy für Mitarbeitende",
-  },
-  "Celular de teste dos pais": {
-    en: "Parents test phone",
-    es: "Celular de prueba de los padres",
-    fr: "Portable de test des parents",
-    de: "Testhandy für Eltern",
-  },
   "Check-ins zerados: {kids} criança(s), {staff} pessoa(s) da equipe e {vests} colete(s).": {
     en: "Check-ins reset: {kids} child(ren), {staff} staff member(s) and {vests} vest(s).",
     es: "Check-ins reiniciados: {kids} niño(s), {staff} persona(s) del equipo y {vests} chaleco(s).",

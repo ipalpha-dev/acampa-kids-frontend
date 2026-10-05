@@ -16,7 +16,7 @@ const USER: LoggedUser = { id: "p1", personId: "p1", name: "Rosa Paz", roles: ["
 const ACCESS = { open: false, checkin: false, opensAt: null, closesAt: null };
 
 function record(id: string) {
-  return { id, personId: id, invitedBy: "", caretakerId: null, qrToken: "", team: null, transportation: null, bed: null, bedroom: null, generalNotes: "", bedroomPreference: "", checkin: null, busCheckin: null, busReturnCheckin: null, createdAt: "", parentEditedAt: null, importId: null, aiReviewStatus: null, aiReviewError: "", aiReviewStartedAt: null, aiReviewFinishedAt: null, updatedAt: "" };
+  return { id, personId: id, invitedBy: "", caretakerId: null, qrToken: "", team: null, transportation: null, bed: null, bedroom: null, generalNotes: "", bedroomPreference: "", checkin: null, busCheckin: null, busReturnCheckin: null, createdAt: "", parentEditedAt: null, importId: null, updatedAt: "" };
 }
 
 function signIn() {

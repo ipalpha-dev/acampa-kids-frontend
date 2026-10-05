@@ -103,12 +103,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Nous enverrons un code de confirmation par SMS à votre téléphone.",
     de: "Wir schicken dir einen Bestätigungscode per SMS auf dein Handy.",
   },
-  " (modo dev: o código aparece no console do servidor)": {
-    en: " (dev mode: the code shows up in the server console)",
-    es: " (modo dev: el código aparece en la consola del servidor)",
-    fr: " (mode dev : le code apparaît dans la console du serveur)",
-    de: " (Dev-Modus: Der Code erscheint in der Serverkonsole)",
-  },
   "Mandamos um código por SMS para {phone}": {
     en: "We texted a code to {phone}",
     es: "Enviamos un código por SMS a {phone}",

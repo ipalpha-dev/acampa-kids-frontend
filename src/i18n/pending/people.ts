@@ -139,10 +139,4 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "IPAlpha est en maintenance pour le moment. Le camp continue de fonctionner avec ce qui est déjà sur l'appareil.",
     de: "IPAlpha wird gerade gewartet. Das Camp läuft mit dem weiter, was schon auf dem Gerät ist.",
   },
-  "Uma importação sua pausou as informações de saúde. Abra Configurações → Geral para continuar.": {
-    en: "One of your imports paused the health information. Open Settings → General to continue.",
-    es: "Una importación tuya pausó la información de salud. Abre Ajustes → General para continuar.",
-    fr: "Un de vos imports a mis en pause les informations de santé. Ouvrez Réglages → Général pour continuer.",
-    de: "Einer deiner Importe hat die Gesundheitsangaben pausiert. Öffne Einstellungen → Allgemein, um fortzufahren.",
-  },
 };
