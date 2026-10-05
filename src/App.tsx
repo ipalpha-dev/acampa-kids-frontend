@@ -337,7 +337,15 @@ export default function App() {
       <>
         <VersionMark />
         <CampingLayout>
-          <RestoringSession offline={restoreFailed === "offline"} onRetry={() => setRestoreNonce((n) => n + 1)} onSignOut={() => endSession(null)} />
+          <RestoringSession
+            offline={restoreFailed === "offline"}
+            onRetry={() => setRestoreNonce((n) => n + 1)}
+            onSignOut={() => {
+              // best effort: revoke the stored session on the server too (it may be unreachable now)
+              void logout(restoring.token);
+              endSession(null);
+            }}
+          />
         </CampingLayout>
       </>
     );

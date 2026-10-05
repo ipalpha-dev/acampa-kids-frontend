@@ -93,14 +93,6 @@ export function loadStoredSession(): StoredSession | null {
   }
 }
 
-/** Sliding expiry: a newer `tokenExpiresAt` (from /me, a role / camp switch) replaces the kept one. Absent → unchanged. */
-export function touchExpiry(tokenExpiresAt: string | null | undefined): void {
-  if (!tokenExpiresAt) return;
-  if (current) current = { ...current, tokenExpiresAt };
-  const token = current?.token ?? loadStoredSession()?.token;
-  if (token) writeStored({ token, tokenExpiresAt });
-}
-
 export function clearAuth(): void {
   current = null;
   try {
