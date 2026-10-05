@@ -3,10 +3,11 @@ import { MEDICATION_PRESETS } from "../components/MedicationsEditor";
 import { fetchPrescriptionsPage, medKeyOf, prescriptionHealth, SOS_SLOT, type MedicationDose, type Prescription } from "../api/medications";
 import type { Camper, HealthInfo, Medication } from "../api/campers";
 import { applyServerData, getState, useCollection, useCollectionOrEmpty, useConnection } from "../store";
-import { rememberPeople } from "../store/people";
+import { peopleEpoch, rememberPeople } from "../store/people";
+import { loadAuth } from "../auth/store";
 import { fetchAllPages } from "./usePagedList";
 
-let prescriptionsRun: Promise<void> | null = null;
+const prescriptionsRuns = new Map<string, Promise<void>>();
 
 /**
  * Reads the kids' medicines live from IPAlpha (`GET /api/medications/prescriptions`,
@@ -16,19 +17,32 @@ let prescriptionsRun: Promise<void> | null = null;
  */
 export function usePrescriptionsSync(token: string): void {
   const connection = useConnection();
+  const epoch = peopleEpoch();
   useEffect(() => {
-    if (connection !== "online" || prescriptionsRun) return;
+    const session = loadAuth();
+    if (connection !== "online" || !session || session.token !== token) return;
+    const role = session.user.activeRole;
+    const campId = session.camp.id;
+    const scope = `${token}|${role}|${campId}|${epoch}`;
+    if (prescriptionsRuns.has(scope)) return;
+    const alive = () => {
+      const current = loadAuth();
+      return peopleEpoch() === epoch && current?.token === token && current.user.activeRole === role && current.camp.id === campId;
+    };
     const all: Prescription[] = [];
-    prescriptionsRun = fetchAllPages((cursor) => fetchPrescriptionsPage(token, cursor), (items) => {
+    const run = fetchAllPages((cursor) => fetchPrescriptionsPage(token, cursor), (items) => {
       all.push(...items);
       rememberPeople(items.map((p) => ({ personId: p.personId, name: p.name })));
-    })
-      .then(() => applyServerData({ prescriptions: all }, getState().syncedAt ?? new Date().toISOString()))
+    }, alive)
+      .then(() => {
+        if (alive()) applyServerData({ prescriptions: all }, getState().syncedAt ?? new Date().toISOString());
+      })
       .catch(() => {})
       .finally(() => {
-        prescriptionsRun = null;
+        prescriptionsRuns.delete(scope);
       });
-  }, [token, connection]);
+    prescriptionsRuns.set(scope, run);
+  }, [token, connection, epoch]);
 }
 
 /**
