@@ -10,7 +10,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Nenhum responsável cadastrado ainda.": { en: "No guardian registered yet.", es: "Aún no hay ningún responsable registrado.", fr: "Aucun responsable enregistré pour l'instant.", de: "Noch keine Bezugsperson eingetragen." },
 
   // ── a second responsável (decision 38) ──
-  "Adicionar outro responsável": { en: "Add another guardian", es: "Agregar otro responsable", fr: "Ajouter un autre responsable", de: "Weitere Bezugsperson hinzufügen" },
   "Mais alguém cuida de {name}?": { en: "Does someone else also care for {name}?", es: "¿Alguien más cuida de {name}?", fr: "Quelqu'un d'autre prend-il aussi soin de {name} ?", de: "Kümmert sich noch jemand um {name}?" },
   "Esta pessoa também fica como responsável pela mesma criança no IPAlpha e poderá acompanhá-la no Acampa.": {
     en: "This person also becomes a guardian of the same child in IPAlpha and can follow them in Acampa.",
@@ -90,4 +89,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Preparando a planilha… {done} de {total}": { en: "Preparing the spreadsheet… {done} of {total}", es: "Preparando la planilla… {done} de {total}", fr: "Préparation du tableau… {done} sur {total}", de: "Tabelle wird vorbereitet … {done} von {total}" },
   "Preparando a planilha com os dados de agora…": { en: "Preparing the spreadsheet with the current data…", es: "Preparando la planilla con los datos actuales…", fr: "Préparation du tableau avec les données actuelles…", de: "Tabelle wird mit den aktuellen Daten vorbereitet …" },
   "Não foi possível aplicar este filtro agora.": { en: "We couldn't apply this filter right now.", es: "No fue posible aplicar este filtro ahora.", fr: "Impossible d'appliquer ce filtre pour l'instant.", de: "Dieser Filter konnte gerade nicht angewendet werden." },
+  // a 2nd responsável comes with a registration / import (decision 57)
+  "Outro responsável por esta criança? Inclua o nome e o celular dele na planilha de importação (colunas do 2º responsável), ou peça a quem cuida do IPAlpha para ligá-lo.": {
+    en: "Another guardian for this child? Add their name and mobile to the import spreadsheet (second guardian columns), or ask whoever looks after IPAlpha to link them.",
+    es: "¿Otro responsable de este niño o niña? Incluye su nombre y celular en la planilla de importación (columnas del 2.º responsable), o pide a quien cuida IPAlpha que lo vincule.",
+    fr: "Un autre responsable pour cet enfant ? Ajoutez son nom et son portable dans le tableau d'import (colonnes du 2e responsable), ou demandez à qui s'occupe d'IPAlpha de le relier.",
+    de: "Eine weitere Bezugsperson für dieses Kind? Trag Name und Handynummer in die Importtabelle ein (Spalten der zweiten Bezugsperson) oder bitte die IPAlpha-Verantwortlichen, sie zu verbinden.",
+  },
 };

@@ -3,7 +3,6 @@ import AssignLeaderDialog from "./AssignLeaderDialog";
 import ChangeRoomDialog from "./ChangeRoomDialog";
 import CamperHistoryDialog from "./CamperHistoryDialog";
 import CamperFieldDialog, { type CamperQuickField } from "./CamperFieldDialog";
-import CamperResponsibleDialog from "./CamperResponsibleDialog";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import HealthAlerts, { healthLines, useHealthLabelOf } from "../../components/HealthAlerts";
 import HealthEditDialog from "../../components/HealthEditDialog";
@@ -67,7 +66,6 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
   const [historyOpen, setHistoryOpen] = useState(false);
   const [fieldOpen, setFieldOpen] = useState<CamperQuickField | null>(null);
   const [healthOpen, setHealthOpen] = useState(false);
-  const [responsibleOpen, setResponsibleOpen] = useState(false);
   // camp ops joined locally from the store — works offline and updates live
   const data = useCamperDetail(camperId);
   // the kid's page read live: name, health (roles allowed) and responsáveis — an emergency lookup already brought its own
@@ -120,6 +118,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
   const isCoordination = activeRole === "coordenacao";
   // the health pencil: the care team (in place), or the coordenação on its own page
   const mayEditHealth = (!!canEditHealth || (!!onEdit && isCoordination)) && health !== undefined && !camperOverride && !healthForbidden;
+  /** decision 57: a responsável is linked only inside a registration / import — the coordenação gets a gentle pointer instead of a form */
   const mayAddResponsible = !!onEdit && isCoordination && !camperOverride;
   const caretakerName = caretaker ? caretaker.name || nameOf(caretaker.id) : "";
   const healthLoading = !camperOverride && live.loading && !live.data;
@@ -286,11 +285,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
                 })}
               </ul>
             )}
-            {mayAddResponsible && (
-              <button type="button" className={`button button--secondary button--small ${styles.addResponsible}`} onClick={() => setResponsibleOpen(true)}>
-                + {tx("Adicionar outro responsável")}
-              </button>
-            )}
+            {mayAddResponsible && <p className={`cat-hint ${styles.addResponsible}`}>{tx("Outro responsável por esta criança? Inclua o nome e o celular dele na planilha de importação (colunas do 2º responsável), ou peça a quem cuida do IPAlpha para ligá-lo.")}</p>}
           </div>
         </section>
       )}
@@ -331,7 +326,6 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
       {onEdit && <AssignLeaderDialog token={token} open={leaderOpen} camper={k} onClose={() => setLeaderOpen(false)} />}
       {onEdit && fieldOpen && <CamperFieldDialog token={token} open camper={k} field={fieldOpen} onClose={() => setFieldOpen(null)} />}
       {onEdit && <CamperHistoryDialog token={token} open={historyOpen} camperId={k.id} camperName={k.name} onClose={() => setHistoryOpen(false)} />}
-      {mayAddResponsible && <CamperResponsibleDialog token={token} open={responsibleOpen} camperId={k.id} camperName={k.name} onClose={() => setResponsibleOpen(false)} onAdded={() => live.reload()} />}
       {/* mounted only while open, so it starts from the health read just now */}
       {mayEditHealth && healthOpen && <HealthEditDialog token={token} open camperId={k.id} name={k.name} health={health ?? null} onClose={() => setHealthOpen(false)} onSaved={() => live.reload()} />}
       <PlayScene sex={sex} />

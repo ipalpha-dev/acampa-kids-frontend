@@ -196,11 +196,6 @@ export async function registerCamper(token: string, input: CamperRegistration & 
   return command("/api/campers/register", { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["campers", "bedrooms"]);
 }
 
-/** One more responsável for a kid (coordenação; decision 38 — linked in IPAlpha). */
-export async function addResponsible(token: string, camperId: string, input: { name: string; phone: string; email?: string }): Promise<{ responsible: Responsible; linked: boolean }> {
-  return api(`/api/campers/${encodeURIComponent(camperId)}/responsibles`, { method: "POST", headers: json(token), body: JSON.stringify(input) });
-}
-
 export async function updateCamper(token: string, id: string, patch: CamperOpsInput): Promise<CamperRecord> {
   const res = await command<{ camper: CamperRecord }>(`/api/campers/${id}`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers", "bedrooms"]);
   return res.camper;
