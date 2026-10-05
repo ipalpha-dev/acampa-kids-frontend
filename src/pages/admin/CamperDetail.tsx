@@ -96,6 +96,8 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
 
   /** undefined = this role does not see health; null = nothing declared */
   const health: HealthInfo | null | undefined = camperOverride ? camperOverride.health : live.data ? live.data.health : undefined;
+  /** core refused this role the kid's health (health: null) — never "nothing declared" */
+  const healthForbidden = !camperOverride && !!live.data?.healthForbidden;
   const responsibles = live.data?.responsibles ?? [];
   const nameOf = useNames([...responsibles.map((r) => r.personId), caretaker?.id]);
 
@@ -118,7 +120,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
   const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
   const isCoordination = activeRole === "coordenacao";
   // the health pencil: the care team (in place), or the coordenação on its own page
-  const mayEditHealth = (!!canEditHealth || (!!onEdit && isCoordination)) && health !== undefined && !camperOverride;
+  const mayEditHealth = (!!canEditHealth || (!!onEdit && isCoordination)) && health !== undefined && !camperOverride && !healthForbidden;
   const mayAddResponsible = !!onEdit && isCoordination && !camperOverride;
   const caretakerName = caretaker ? caretaker.name || nameOf(caretaker.id) : "";
   const healthLoading = !camperOverride && live.loading && !live.data;
@@ -126,6 +128,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
   const healthBlock = (() => {
     if (healthLoading) return <p className="cat-hint">{tx("Carregando informações de saúde…")}</p>;
     if (health === undefined) return null;
+    if (healthForbidden) return <p className="staff-card__alert staff-card__alert--soft">{tx("Não disponível para o seu perfil.")}</p>;
     const hasLines = !!health && healthLines(health, healthLabelOf).length > 0;
     const extras = health && (health.weightKg != null || health.insurance || health.insuranceCard);
     return (

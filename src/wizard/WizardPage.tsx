@@ -5,7 +5,8 @@ import { createEvent, createRole } from "../api/schedule";
 import { createInstruction } from "../api/instructions";
 import { createPrepSection } from "../api/preparation";
 import { fetchSeeds, type SeedBus, type SeedDocs, type Seeds } from "../api/seeds";
-import { loadSampleCamp, type SampleLoad } from "../api/wizard";
+import { fetchSampleEnabled, loadSampleCamp, type SampleLoad } from "../api/wizard";
+import { ApiError } from "../api/client";
 import { applySampleSchedule } from "./sampleSchedule";
 import { sampleSchedulePlan } from "./sampleScheduleDates";
 import { mapsLink, updateSettings, type NotificationSettings } from "../api/settings";
@@ -224,8 +225,17 @@ export default function WizardPage({ token, user, camp, camps, onExit }: WizardP
 
 // ── intro ───────────────────────────────────────────────────────────────────
 
-function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => void; onSkip: () => void }) {
+export function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => void; onSkip: () => void }) {
   const { tx } = useI18n();
+  /** the fictional sample exists only in preview / dev (GET /api/wizard/sample → {enabled}) */
+  const [sampleEnabled, setSampleEnabled] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void fetchSampleEnabled(token).then((on) => alive && setSampleEnabled(on));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<(SampleLoad & { events: number }) | null>(null);
@@ -241,7 +251,9 @@ function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => voi
       const applied = await applySampleSchedule(token, sampleSchedulePlan(), { roles, events });
       setLoaded({ ...r, events: applied.events });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      // the server says the sample is off here after all: the option simply goes away
+      if (e instanceof ApiError && e.code === "SAMPLE_DISABLED") setSampleEnabled(false);
+      else setError(e instanceof Error ? e.message : tx("Algo deu errado."));
     } finally {
       setTesting(false);
     }
@@ -275,11 +287,13 @@ function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => voi
       <h2 className="wizard-card__title">{tx("Vamos montar o acampamento! 🏕️")}</h2>
       {error && <p className="message message--error">{error}</p>}
       <div className="wizard-choice">
-        <button type="button" className="wizard-choice__card" disabled={testing} onClick={() => void loadSample()}>
-          <img className="wizard-choice__art" src={ICONS.wizardSample} alt="" aria-hidden="true" />
-          <span className="wizard-choice__title">{testing ? tx("Carregando… 🧪") : tx("Ver funcionando")}</span>
-          <span className="wizard-choice__hint">{tx("Um acampamento de exemplo, fictício")}</span>
-        </button>
+        {sampleEnabled && (
+          <button type="button" className="wizard-choice__card" disabled={testing} onClick={() => void loadSample()}>
+            <img className="wizard-choice__art" src={ICONS.wizardSample} alt="" aria-hidden="true" />
+            <span className="wizard-choice__title">{testing ? tx("Carregando… 🧪") : tx("Ver funcionando")}</span>
+            <span className="wizard-choice__hint">{tx("Um acampamento de exemplo, fictício")}</span>
+          </button>
+        )}
         <button type="button" className="wizard-choice__card" disabled={testing} onClick={onNext}>
           <img className="wizard-choice__art" src={ICONS.wizard} alt="" aria-hidden="true" />
           <span className="wizard-choice__title">{tx("Montar do zero")}</span>

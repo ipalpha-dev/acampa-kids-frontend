@@ -27,6 +27,9 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Les informations de santé de {name} ne sont pas disponibles pour votre profil pour le moment. Si besoin, parlez-en à la coordination : elle peut vous aider.",
     de: "Die Gesundheitsangaben von {name} sind für dein Profil gerade nicht verfügbar. Wenn du sie brauchst, sprich mit der Lagerleitung – sie hilft gern.",
   },
+  "Não disponível para o seu perfil.": { en: "Not available to your profile.", es: "No disponible para tu perfil.", fr: "Pas disponible pour votre profil.", de: "Für dein Profil nicht verfügbar." },
+  "não disponível para o seu perfil": { en: "not available to your profile", es: "no disponible para tu perfil", fr: "pas disponible pour votre profil", de: "für dein Profil nicht verfügbar" },
+  "🩺 Saúde: não disponível para o seu perfil.": { en: "🩺 Health: not available to your profile.", es: "🩺 Salud: no disponible para tu perfil.", fr: "🩺 Santé : pas disponible pour votre profil.", de: "🩺 Gesundheit: für dein Profil nicht verfügbar." },
   "Não disponível para o seu perfil agora": { en: "Not available to your profile right now", es: "No disponible para tu perfil ahora", fr: "Pas disponible pour votre profil pour le moment", de: "Für dein Profil gerade nicht verfügbar" },
   "O IPAlpha não deixou salvar as informações de saúde pelo seu perfil. Nada foi alterado — fale com a coordenação, que pode ajudar.": {
     en: "IPAlpha didn't let your profile save the health details. Nothing was changed — talk to the coordinators, they can help.",

@@ -295,12 +295,14 @@ interface CheckItem {
  * from IPAlpha (never in the list — decision 31) so the helper confirms each
  * item with the family; the responsável's phone only on tap.
  */
-function CheckinDialog({ token, camper: k, bedroom, sex, labelOf, busy, onConfirm, onCancel }: CheckinDialogProps) {
+export function CheckinDialog({ token, camper: k, bedroom, sex, labelOf, busy, onConfirm, onCancel }: CheckinDialogProps) {
   const { tx } = useI18n();
   const live = useCamperLive(token, k.id);
   const healthLabel = useHealthLabel(token);
   const labelHealth = (id: string | null | undefined) => (id ? healthLabel(id) || labelOf(id) : null);
-  const health = live.data ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
+  /** core refused this role the kid's health: say so gently — never "nothing declared" */
+  const healthForbidden = !!live.data?.healthForbidden;
+  const health = live.data && !healthForbidden ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
   const responsibles = live.data?.responsibles ?? [];
   const name = k.name || live.data?.name || "";
   const checkedBy = usePersonName(k.checkin?.byPersonId);
@@ -364,7 +366,7 @@ function CheckinDialog({ token, camper: k, bedroom, sex, labelOf, busy, onConfir
 
       <dl className="detail-grid">
         <dt>{tx("Peso")}</dt>
-        <dd>{health?.weightKg != null ? `${String(health.weightKg).replace(".", ",")} kg` : "—"}</dd>
+        <dd>{healthForbidden ? <span className="cat-hint">{tx("não disponível para o seu perfil")}</span> : health?.weightKg != null ? `${String(health.weightKg).replace(".", ",")} kg` : "—"}</dd>
         <dt>{tx("Transporte")}</dt>
         <dd>{k.transportation ? <TransportTag transportId={k.transportation} /> : "—"}</dd>
         {k.bedroomPreference && (
@@ -382,6 +384,8 @@ function CheckinDialog({ token, camper: k, bedroom, sex, labelOf, busy, onConfir
           <button type="button" className="link-btn" onClick={live.reload}>{tx("Tentar de novo")}</button>
         </p>
       )}
+
+      {healthForbidden && <p className={`staff-card__alert staff-card__alert--soft ${styles.reveal}`}>{tx("🩺 Saúde: não disponível para o seu perfil.")}</p>}
 
       <ul className={`checkin-list ${live.data ? styles.reveal : ""}`}>
         {items.map((i) => {
