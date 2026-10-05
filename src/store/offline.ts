@@ -141,12 +141,12 @@ const HEALTH_KEYS = ["health", "hasHealth"] as const;
 /**
  * Removes health from a snapshot of the collections + people cache before it
  * is written for a role that may not keep health offline: the `health` /
- * `hasHealth` of every record and the medication checklist.
+ * `hasHealth` of every record, the medication checklist and the prescriptions.
  */
 export function stripHealth<T extends Record<string, unknown>>(snapshot: T): T {
   const out: Record<string, unknown> = { ...snapshot };
   for (const [name, value] of Object.entries(out)) {
-    if (name === "medications") {
+    if (name === "medications" || name === "prescriptions") {
       out[name] = [];
       continue;
     }

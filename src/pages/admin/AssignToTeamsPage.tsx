@@ -16,6 +16,7 @@ import { ICONS } from "../../icons";
 import { GROUP_META, type Bedroom } from "../../api/bedrooms";
 import SearchField from "../../components/SearchField";
 import { useI18n } from "../../i18n";
+import { compareByName } from "./staffNames";
 
 interface Props { token: string; onBack: () => void; onScoreboard?: () => void }
 type GroupMode = "leader" | "preference" | "ungrouped";
@@ -55,7 +56,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
   const showStaff = audience !== "campers";
   const peopleByTeam = (teamId: string | null) => ({
     campers: campers.filter((camper) => camper.team === teamId && (!q || normName(camper.name).includes(q))),
-    staff: staff.filter((member) => member.team === teamId && (!q || normName(member.name).includes(q))),
+    staff: staff.filter((member) => member.team === teamId && (!q || normName(member.name).includes(q))).sort(compareByName),
   });
 
   async function move(unit: DragUnit, teamId: string | null) {

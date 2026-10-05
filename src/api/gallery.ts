@@ -17,7 +17,8 @@ export interface GalleryPhoto {
   order: number;
   /** id of the programme event this photo belongs to; null = general photo */
   eventId: string | null;
-  byName: string;
+  /** who sent it (person id — name read live) */
+  byPersonId: string;
   createdAt: string;
 }
 

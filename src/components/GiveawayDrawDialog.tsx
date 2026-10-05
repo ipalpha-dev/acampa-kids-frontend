@@ -3,6 +3,7 @@ import Dialog from "./Dialog";
 import GroupIcon from "./GroupIcon";
 import { ICONS } from "../icons";
 import { useI18n } from "../i18n";
+import styles from "../styles/ops.module.scss";
 import type { BedroomGroup } from "../api/bedrooms";
 
 export interface DrawEntry {
@@ -25,6 +26,7 @@ interface GiveawayDrawDialogProps {
 }
 
 const COLORS = ["#e7a44e", "#d84a3a", "#2e6652", "#8fc1e3", "#f4d35e", "#e98973", "#a9c2a0"];
+/** keep in sync with `.reel` in styles/ops.module.scss (the reel's transition) */
 const ROLL_MS = 1100;
 /** how many numbers scroll past before landing (≈ 3 loops of a 40-entry list) */
 const REEL_STEPS = 120;
@@ -92,9 +94,9 @@ export default function GiveawayDrawDialog({ open, onClose, entries, onRedraw, w
                 width: c.size,
                 height: c.round ? c.size : c.size * 1.6,
                 background: c.color,
-                borderRadius: c.round ? "50%" : 2,
                 ["--spin" as string]: c.spin,
               }}
+              className={c.round ? styles.confettiRound : styles.confettiStrip}
             />
           ))}
         </div>
@@ -104,8 +106,8 @@ export default function GiveawayDrawDialog({ open, onClose, entries, onRedraw, w
         <p className="draw__label">{rolling ? tx("Sorteando…") : tx("🎉 E o número sorteado é…")}</p>
         <div className="draw__number" aria-live="polite" aria-label={rolling ? tx("Sorteando") : String(winner + 1)}>
           <div
-            className={`draw__reel ${spun ? "draw__reel--spun" : ""}`}
-            style={{ transform: `translateY(${spun ? -(reel.length - 1) * 1.2 : 0}em)`, transitionDuration: `${ROLL_MS}ms` }}
+            className={`draw__reel ${styles.reel} ${spun ? "draw__reel--spun" : ""}`}
+            style={{ transform: `translateY(${spun ? -(reel.length - 1) * 1.2 : 0}em)` }}
           >
             {reel.map((n, i) => (
               <span key={i} className="draw__cell" aria-hidden={i !== reel.length - 1}>{n}</span>
@@ -115,7 +117,7 @@ export default function GiveawayDrawDialog({ open, onClose, entries, onRedraw, w
         <div className="draw__winner" aria-live="assertive">
           {!rolling && person && (
             <>
-              <strong className="draw__name">{person.name}</strong>
+              <strong className="draw__name">{person.name || "…"}</strong>
               <span className="draw__room">
                 {person.group ? <GroupIcon group={person.group} face size={18} /> : null} {person.room}
               </span>

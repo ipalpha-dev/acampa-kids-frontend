@@ -1,0 +1,94 @@
+// Camp operations screens (parent area, check-in, medications, occurrences,
+// scores, team home): the bits added by the people-in-IPAlpha rewrite. Global
+// look stays in ../styles.scss; this module holds only what those screens add.
+
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+// data read live from IPAlpha glides in when it arrives
+.reveal {
+  animation: reveal .24s $ease both;
+}
+
+// "Carregando…" while a live read is on its way
+.loading {
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+// the "show it" button of data read only on tap
+.askButton {
+  margin-top: 10px;
+}
+
+// a kid opened in the check-in list: responsáveis with their contact on tap
+.family {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: reveal .24s $ease both;
+}
+
+.familyRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.familyName {
+  font-weight: 700;
+}
+
+// team home: a contact card whose phone is read on tap
+.contactRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+// staff check-in header icon (was an inline height)
+.headIcon {
+  height: 36px;
+  width: auto;
+}
+
+// scoreboard team heading: the team colour comes as `--team` (runtime value)
+.teamTitle {
+  border-left: 8px solid var(--team, #cfd8d2);
+  padding-left: 12px;
+}
+
+// giveaway draw: the reel spins for ROLL_MS (GiveawayDrawDialog.tsx — keep in sync)
+.reel {
+  transition-duration: 1100ms;
+}
+
+// giveaway confetti shapes (size / colour / timing stay runtime values)
+.confettiRound {
+  border-radius: 50%;
+}
+
+.confettiStrip {
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .family,
+  .loading {
+    animation: none;
+  }
+}

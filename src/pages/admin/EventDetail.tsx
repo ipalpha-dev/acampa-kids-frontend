@@ -17,6 +17,7 @@ import AssignRoleDialog from "./AssignRoleDialog";
 import RoleDocEditor, { type RoleDocField } from "./RoleDocEditor";
 import RoleForm from "./RoleForm";
 import { useI18n } from "../../i18n";
+import { firstNameOf, shownName } from "./staffNames";
 
 interface EventDetailProps {
   token: string;
@@ -242,16 +243,16 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
                     <span
                       key={s.id}
                       className={`staff-tag staff-tag--soft staff-tag--person ${busy === s.id ? "staff-tag--busy" : ""}`}
-                      title={tx("{name} foi escalado(a) à mão", { name: s.name })}
+                      title={tx("{name} foi escalado(a) à mão", { name: shownName(s.name) })}
                     >
-                      <button type="button" className="staff-tag__open" title={tx("Ver {name}", { name: s.name })} onClick={() => onOpenStaff(s.id)}>
-                        {s.name}
+                      <button type="button" className="staff-tag__open" title={tx("Ver {name}", { name: shownName(s.name) })} onClick={() => onOpenStaff(s.id)}>
+                        {shownName(s.name)}
                       </button>
                       {r.hasDetail && r.detailFromTeam && (
                         <span
                           className={`staff-tag__detail ${detail ? "staff-tag__detail--tinted" : "staff-tag__detail--empty"}`}
                           style={detailColor ? { background: detailColor, color: contrastText(detailColor) } : undefined}
-                          title={detail ? tx("Time de {name}", { name: s.name }) : tx("{name} não tem time", { name: s.name })}
+                          title={detail ? tx("Time de {name}", { name: shownName(s.name) }) : tx("{name} não tem time", { name: shownName(s.name) })}
                         >
                           {detail || <span aria-hidden="true">{tx("sem time")}</span>}
                         </span>
@@ -261,8 +262,8 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
                           type="button"
                           className={`staff-tag__detail ${detail ? "" : "staff-tag__detail--empty"} ${detailColor ? "staff-tag__detail--tinted" : ""}`}
                           style={detailColor ? { background: detailColor, color: contrastText(detailColor) } : undefined}
-                          title={detail ? tx("Mudar o detalhe de {name}", { name: s.name }) : tx("Preencher o detalhe de {name}", { name: s.name })}
-                          aria-label={detail ? tx("Mudar o detalhe de {name}: {detail}", { name: s.name, detail }) : tx("Preencher o detalhe de {name}", { name: s.name })}
+                          title={detail ? tx("Mudar o detalhe de {name}", { name: shownName(s.name) }) : tx("Preencher o detalhe de {name}", { name: shownName(s.name) })}
+                          aria-label={detail ? tx("Mudar o detalhe de {name}: {detail}", { name: shownName(s.name), detail }) : tx("Preencher o detalhe de {name}", { name: shownName(s.name) })}
                           disabled={!!busy}
                           onClick={() => setEditDetail({ role: r, staffId: s.id, value: assignment?.detail ?? "", color: assignment?.detailColor ?? "" })}
                         >
@@ -272,8 +273,8 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
                       <button
                         type="button"
                         className="staff-tag__x"
-                        title={tx("Tirar {person} de {role}", { person: s.name, role: r.name })}
-                        aria-label={tx("Tirar {person} de {role}", { person: s.name, role: r.name })}
+                        title={tx("Tirar {person} de {role}", { person: shownName(s.name), role: r.name })}
+                        aria-label={tx("Tirar {person} de {role}", { person: shownName(s.name), role: r.name })}
                         disabled={!!busy}
                         onClick={() => handleRemove(s.id)}
                       >
@@ -355,7 +356,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
         {editDetail && (
           <form className="cat-form cat-form--embedded" onSubmit={handleSaveDetail}>
             <h2 className="cat-form__title change-room__title">
-              {tx("🏷️ Detalhe — {name}", { name: staffById.get(editDetail.staffId)?.name.split(" ")[0] ?? "" })}
+              {tx("🏷️ Detalhe — {name}", { name: firstNameOf(staffById.get(editDetail.staffId)?.name) })}
             </h2>
             <label className="cat-field">
               <span className="cat-field__label">{tx("Detalhe")}</span>

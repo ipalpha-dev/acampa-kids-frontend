@@ -15,7 +15,9 @@ import { useCollection, useCollectionOrEmpty } from "./index";
  * Each function mirrors its backend counterpart in routes/*.ts.
  */
 
+/** alphabetical; a person whose live name has not arrived yet ("") goes last instead of first */
 const byName = <T extends { name: string }>(a: T, b: T) =>
+  Number(!a.name) - Number(!b.name) ||
   a.name.localeCompare(b.name, typeof document !== "undefined" ? document.documentElement.lang || "pt-BR" : "pt-BR", { sensitivity: "base" });
 
 /** `null` while the collections haven't arrived; `undefined` when the id doesn't exist. */

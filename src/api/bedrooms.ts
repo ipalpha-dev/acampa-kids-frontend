@@ -96,8 +96,11 @@ export async function applyRooms(token: string, input: RoomsApplyInput, notify =
 
 /** One team member who would be texted by an apply, and the exact SMS they'd get. */
 export interface RoomsAppliedMessage {
+  /** the team member (person id — name read live) */
   staffId: string;
-  name: string;
+  /** template keys + variables of each SMS */
+  messages: { key: string; variables: Record<string, string | number> }[];
+  /** the rendered text (pt-BR) */
   text: string;
 }
 

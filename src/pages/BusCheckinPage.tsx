@@ -6,6 +6,7 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import QrScannerDialog from "../components/QrScannerDialog";
 import ScanFab from "../components/ScanFab";
 import BusLogo from "../components/BusLogo";
+import HealthHeart from "../components/HealthHeart";
 import CarLogo from "../components/CarLogo";
 import TeamTag from "../components/TeamTag";
 import TransportTag from "../components/TransportTag";
@@ -176,9 +177,9 @@ export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false,
       if (trip === "return" && !camper.busCheckin) throw new Error(tx("{name} não fez o check-in do ônibus na ida.", { name: camper.name }));
       if (trip === "outbound" && !camper.checkin) throw new Error(tx("{name} ainda não fez check-in na igreja.", { name: camper.name }));
 
-      const updated = await checkinCamper(token, camper.id, checkinKind);
+      await checkinCamper(token, camper.id, checkinKind);
       setScannerOpen(false);
-      setScanNotice({ kind: "ok", text: tx("✅ {name} entrou no ônibus da {trip}.", { name: updated.name, trip: tripShort }) });
+      setScanNotice({ kind: "ok", text: tx("✅ {name} entrou no ônibus da {trip}.", { name: camper.name || "…", trip: tripShort }) });
     } catch (e) {
       setScannerOpen(false);
       setScanNotice({ kind: "error", text: e instanceof Error ? e.message : tx("Não foi possível ler este QR code.") });
@@ -290,7 +291,7 @@ export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false,
           const locked = !on && !prerequisite;
           const busy = pending.has(k.id);
           const room = k.bedroom ? roomById.get(k.bedroom) : null;
-          const age = ageOf(k.birthDate);
+          const age = ageOf(k.birthDate ?? null);
           return (
             <li key={k.id}>
               <button
@@ -306,7 +307,8 @@ export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false,
                 </span>
                 <span className="bus-row__body">
                   <span className="bus-row__name">
-                    <span className={`strike ${on ? "strike--on" : ""}`}>{k.name}</span>
+                    <span className={`strike ${on ? "strike--on" : ""}`}>{k.name || "…"}</span>
+                    <HealthHeart show={k.hasHealth} />
                     {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
                   </span>
                   <span className="bus-row__meta">

@@ -112,7 +112,7 @@ export default function GiveawayPage({ who, crumbs }: GiveawayPageProps) {
           {rows.map((r, i) => (
             <li key={r.id} className="opt-item">
               <span className="opt-item__num">{i + 1}</span>
-              <span className="opt-item__label">{r.name}</span>
+              <span className="opt-item__label">{r.name || "…"}</span>
               {r.leader && (
                 <span className="opt-item__badge opt-item__badge--icon" title={tx("Líder da criança")}>
                   <StaffIcon size={16} /> {r.leader}

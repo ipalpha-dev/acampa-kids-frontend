@@ -8,15 +8,19 @@ import ScanFab from "../components/ScanFab";
 import { camperIdFromQr } from "../print/camperLabels";
 import { type Bedroom } from "../api/bedrooms";
 import BedroomTag from "../components/BedroomTag";
-import { ageOf, checkinCamper, undoCheckinCamper, type Camper } from "../api/campers";
+import { ageOf, checkinCamper, EMPTY_HEALTH, undoCheckinCamper, type Camper } from "../api/campers";
 import { useConfirm } from "../components/ConfirmDialog";
 import Dialog from "../components/Dialog";
 import Breadcrumbs from "../components/Breadcrumbs";
 import { healthLines } from "../components/HealthAlerts";
+import HealthHeart from "../components/HealthHeart";
+import PersonContact from "../components/PersonContact";
+import { useCamperLive, useHealthLabel } from "../hooks/usePersonData";
+import { usePersonName } from "../store/people";
+import styles from "../styles/ops.module.scss";
 import KidIcon from "../components/KidIcon";
 import ParentIcon from "../components/ParentIcon";
 import { ICONS, kidIconSex } from "../icons";
-import { formatBrazilPhoneClient } from "../phoneFormat";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import { useLabelOf } from "../store/derive";
 import { useRoute } from "../router";
@@ -188,7 +192,7 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
       <ul className="staff-list">
         {visible.map((k) => {
           const room = k.bedroom ? roomById.get(k.bedroom) : null;
-          const age = ageOf(k.birthDate);
+          const age = ageOf(k.birthDate ?? null);
           const done = !!k.checkin;
           return (
             <li key={k.id} className={`staff-card staff-card--clickable ${done ? "checkin-card--done" : ""}`}>
@@ -207,7 +211,8 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
               >
                 <h3 className="staff-card__name">
                   {done && <span aria-hidden="true">✅ </span>}
-                  {k.name}
+                  {k.name || "…"}
+                  <HealthHeart show={k.hasHealth} />
                   {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
                 </h3>
                 <p className="staff-card__meta">
@@ -241,9 +246,10 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
         {open && (
           <CheckinDialog
             key={open.id}
+            token={token}
             camper={open}
             bedroom={openRoom}
-            sex={kidIconSex(openRoom?.group, open?.sex, open?.probableGender)}
+            sex={kidIconSex(openRoom?.group, open?.sex)}
             labelOf={labelOf}
             busy={busy}
             onConfirm={() => handleConfirm(open)}
@@ -265,6 +271,7 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
 // ── the dialog ─────────────────────────────────────────────────────────
 
 interface CheckinDialogProps {
+  token: string;
   camper: Camper;
   bedroom: Bedroom | null;
   sex: "girl" | "boy" | null;
@@ -279,21 +286,41 @@ interface CheckItem {
   icon: ReactNode;
   title: string;
   text: string;
+  /** e.g. the responsável's contact, read on tap */
+  extra?: ReactNode;
 }
 
-function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCancel }: CheckinDialogProps) {
+/**
+ * The kid opened at the door: the health and the responsáveis are read LIVE
+ * from IPAlpha (never in the list — decision 31) so the helper confirms each
+ * item with the family; the responsável's phone only on tap.
+ */
+function CheckinDialog({ token, camper: k, bedroom, sex, labelOf, busy, onConfirm, onCancel }: CheckinDialogProps) {
   const { tx } = useI18n();
-  const items: CheckItem[] = [
-    ...healthLines(k, labelOf).map((l) => ({ key: l.title, icon: l.icon, title: l.title, text: l.text })),
-    {
-      key: "guardian",
-      icon: <ParentIcon size={18} />,
-      title: tx("Responsável"),
-      text: [k.guardianName || tx("nome não informado"), k.guardianPhone ? formatBrazilPhoneClient(k.guardianPhone) : tx("celular não informado")].join(" · "),
-    },
-  ];
+  const live = useCamperLive(token, k.id);
+  const healthLabel = useHealthLabel(token);
+  const labelHealth = (id: string | null | undefined) => (id ? healthLabel(id) || labelOf(id) : null);
+  const health = live.data ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
+  const responsibles = live.data?.responsibles ?? [];
+  const name = k.name || live.data?.name || "";
+  const checkedBy = usePersonName(k.checkin?.byPersonId);
+  const items: CheckItem[] = !live.data
+    ? []
+    : [
+        ...(health ? healthLines(health, labelHealth).map((l) => ({ key: l.title, icon: l.icon, title: l.title, text: l.text })) : []),
+        ...(responsibles.length
+          ? responsibles.map((r) => ({
+              key: `responsible:${r.personId}`,
+              icon: <ParentIcon size={18} />,
+              title: tx("Responsável"),
+              text: r.name || "…",
+              extra: <PersonContact token={token} personId={r.personId} name={r.name} about={name} />,
+            }))
+          : [{ key: "responsible", icon: <ParentIcon size={18} />, title: tx("Responsável"), text: tx("nome não informado") }]),
+      ];
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const allChecked = items.every((i) => checked.has(i.key));
+  const ready = !!live.data || !!live.error;
+  const allChecked = ready && items.every((i) => checked.has(i.key));
   const already = !!k.checkin;
 
   function toggle(key: string) {
@@ -305,7 +332,7 @@ function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCa
     });
   }
 
-  const age = ageOf(k.birthDate);
+  const age = ageOf(k.birthDate ?? null);
 
   return (
     <form
@@ -317,13 +344,13 @@ function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCa
     >
       <h2 className="cat-form__title detail-title">
         <KidIcon sex={sex} size={36} />
-        {k.name}
+        {name || "…"}
         {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
       </h2>
 
       {already && k.checkin && (
         <p className="message message--ok">
-          {tx("✅ Já fez check-in às {time} com {who}.", { time: speakTime(k.checkin.at), who: k.checkin.byName.split(" ")[0] })}
+          {tx("✅ Já fez check-in às {time} com {who}.", { time: speakTime(k.checkin.at), who: checkedBy.split(" ")[0] || "…" })}
           {k.checkin.note && ` 🤖 ${k.checkin.note}.`}
         </p>
       )}
@@ -337,7 +364,7 @@ function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCa
 
       <dl className="detail-grid">
         <dt>{tx("Peso")}</dt>
-        <dd>{k.weightKg != null ? `${String(k.weightKg).replace(".", ",")} kg` : "—"}</dd>
+        <dd>{health?.weightKg != null ? `${String(health.weightKg).replace(".", ",")} kg` : "—"}</dd>
         <dt>{tx("Transporte")}</dt>
         <dd>{k.transportation ? <TransportTag transportId={k.transportation} /> : "—"}</dd>
         {k.bedroomPreference && (
@@ -348,7 +375,15 @@ function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCa
         )}
       </dl>
 
-      <ul className="checkin-list">
+      {!live.data && !live.error && <p className={`cat-hint ${styles.loading}`}>{tx("Lendo as informações de saúde e da família…")}</p>}
+      {live.error && (
+        <p className="message message--error">
+          {tx("Não conseguimos ler as informações de saúde e da família agora.")}{" "}
+          <button type="button" className="link-btn" onClick={live.reload}>{tx("Tentar de novo")}</button>
+        </p>
+      )}
+
+      <ul className={`checkin-list ${live.data ? styles.reveal : ""}`}>
         {items.map((i) => {
           const on = checked.has(i.key);
           return (
@@ -361,6 +396,7 @@ function CheckinDialog({ camper: k, bedroom, sex, labelOf, busy, onConfirm, onCa
                   {i.title}
                 </span>
                 <span className="checkin-item__text">{i.text}</span>
+                {i.extra}
               </div>
               <label className="checkin-check">
                 <input type="checkbox" checked={on} disabled={already || busy} onChange={() => toggle(i.key)} />

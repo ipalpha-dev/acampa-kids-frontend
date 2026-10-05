@@ -15,6 +15,7 @@ import TransportForm from "./TransportForm";
 import { useCollection, useCollectionOrEmpty } from "../../store";
 import { ICONS } from "../../icons";
 import { collatorLocale, useI18n } from "../../i18n";
+import { compareByName, firstNameOf, shownName } from "./staffNames";
 
 /** which side of the board the filter is focused on */
 type ScopeFilter = "all" | "campers" | "staff";
@@ -38,7 +39,8 @@ interface Crew {
   members: Camper[];
 }
 
-const firstName = (name: string) => name.split(" ")[0];
+/** names come live from IPAlpha ("…" while one is on its way) */
+const firstName = firstNameOf;
 
 /** saving-set key for a staff member ("s:" so it never collides with a camper id) */
 const staffKey = (id: string) => `s:${id}`;
@@ -88,7 +90,7 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
 
   const bedrooms = useMemo(() => (storedBedrooms ? sortRooms(storedBedrooms) : null), [storedBedrooms]);
   const vehicles = useMemo(() => (storedTransports ? storedTransports.slice().sort((a, b) => a.order - b.order) : null), [storedTransports]);
-  const kids = useMemo(() => campers.slice().sort((a, b) => a.name.localeCompare(b.name, collatorLocale())), [campers]);
+  const kids = useMemo(() => campers.slice().sort(compareByName), [campers]);
 
   const vehicleIds = useMemo(() => new Set(vehicles?.map((v) => v.id) ?? []), [vehicles]);
   /** a transportation id that matches no vehicle (deleted) counts as "sem ônibus" */
@@ -96,14 +98,14 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
   const waitingAll = kids.filter((k) => !isPlaced(k));
   const placedCount = kids.length - waitingAll.length;
   /** the team travels too — one by one, never dragged along by their crew */
-  const team = staff.filter((s) => s.active).sort((a, b) => a.name.localeCompare(b.name, collatorLocale()));
+  const team = staff.filter((s) => s.active).sort(compareByName);
   const teamWaiting = team.filter((s) => !(s.transportation && vehicleIds.has(s.transportation)));
 
   // ── who looks after whom ──
 
   /** the líderes of a room, in a stable order (their colour index) */
   function caretakersOf(roomId: string): Staff[] {
-    return staff.filter((s) => s.bedroom === roomId && s.roomRole === "caretaker").sort((a, b) => a.name.localeCompare(b.name, collatorLocale()));
+    return staff.filter((s) => s.bedroom === roomId && s.roomRole === "caretaker").sort(compareByName);
   }
 
   /** a crew's colour: their líder's colour in the room (null = no líder) */
@@ -124,9 +126,7 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
       if (!byLead.has(key)) byLead.set(key, { key, lead: k.caretakerId ? staff.find((s) => s.id === k.caretakerId) ?? null : null, members: [] });
       byLead.get(key)!.members.push(k);
     }
-    return [...byLead.values()].sort((a, b) =>
-      (a.lead?.name ?? a.members[0].name).localeCompare(b.lead?.name ?? b.members[0].name, collatorLocale()),
-    );
+    return [...byLead.values()].sort((a, b) => compareByName({ name: a.lead?.name ?? a.members[0].name }, { name: b.lead?.name ?? b.members[0].name }));
   }
 
   // ── drag & drop (pointer events: mouse AND touch) ──
@@ -721,7 +721,7 @@ function StaffChip({
       data-bus-staff={s.id}
       className={`assign-chip assign-chip--staff${saving ? " assign-chip--saving" : ""}${picked ? " assign-chip--picked" : ""}`}
       onPointerDown={onBeginDrag}
-      aria-label={s.name}
+      aria-label={shownName(s.name)}
     >
       <RoomRoleIcon role={s.roomRole} size={16} sex={staffSex(s, bedrooms)} />
       {firstName(s.name)}

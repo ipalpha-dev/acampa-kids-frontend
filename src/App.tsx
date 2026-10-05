@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
-import { ApiError, SESSION_ENDED_EVENT } from "./api/client";
+import { ApiError, CORE_UNAVAILABLE_EVENT, SESSION_ENDED_EVENT } from "./api/client";
 import CampingLayout from "./components/CampingLayout";
 import IpalphaOneTap from "./components/ipalpha/IpalphaOneTap";
 import MaintenanceScene from "./components/MaintenanceScene";
@@ -29,9 +29,10 @@ import OtpStep from "./pages/OtpStep";
 import PhoneStep from "./pages/PhoneStep";
 import { useI18n } from "./i18n";
 import type { CoreRole } from "./roles";
+import { clearRoomsDraft } from "./roomDraft";
 import { navigate } from "./router";
 import { endOfflineSession, startOfflineSession } from "./store";
-import { connectRealtime, disconnectRealtime } from "./store/realtime";
+import { connectRealtime, disconnectRealtime, IMPORT_NEEDS_SIGN_IN_EVENT } from "./store/realtime";
 
 type Session = AuthState;
 
@@ -78,6 +79,8 @@ export default function App() {
   const endSession = useCallback((note: string | null) => {
     clearAuth();
     clearPendingOtp();
+    // the unsaved room plan holds person ids of this session's camp: it goes with the session
+    clearRoomsDraft();
     disconnectRealtime();
     void endOfflineSession();
     setSession(null);
@@ -123,6 +126,19 @@ export default function App() {
     window.addEventListener(SESSION_ENDED_EVENT, onEnded);
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
   }, [session, endSession, t]);
+
+  // IPAlpha in maintenance while signed in: a gentle toast, the camp keeps working with what is on the device
+  useEffect(() => {
+    const onCoreDown = () => setCampToast(tx("O IPAlpha está em manutenção agora. O acampamento continua funcionando com o que já está no aparelho."));
+    // decision 50: an import I started paused its health pass — resume it in Configurações → Geral
+    const onImportPaused = () => setCampToast(tx("Uma importação sua pausou as informações de saúde. Abra Configurações → Geral para continuar."));
+    window.addEventListener(CORE_UNAVAILABLE_EVENT, onCoreDown);
+    window.addEventListener(IMPORT_NEEDS_SIGN_IN_EVENT, onImportPaused);
+    return () => {
+      window.removeEventListener(CORE_UNAVAILABLE_EVENT, onCoreDown);
+      window.removeEventListener(IMPORT_NEEDS_SIGN_IN_EVENT, onImportPaused);
+    };
+  }, [tx]);
 
   useEffect(() => {
     function onCampError(e: Event) {

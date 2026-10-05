@@ -86,8 +86,8 @@ export default function CheckinQrDialog({ kids, active }: CheckinQrDialogProps) 
                     requestAnimationFrame(() => document.getElementById(`checkin-qr-tab-${next}`)?.focus());
                   }}
                 >
-                  <KidIcon sex={kidIconSex(undefined, kid.sex, kid.probableGender) ?? "girl"} size={26} />
-                  <span>{kid.name}</span>
+                  <KidIcon sex={kidIconSex(undefined, kid.sex) ?? "girl"} size={26} />
+                  <span>{kid.name.split(" ")[0] || "…"}</span>
                 </button>
               );
             })}

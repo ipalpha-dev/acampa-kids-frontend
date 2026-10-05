@@ -6,6 +6,7 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import SearchField from "../components/SearchField";
 import ScanFab from "../components/ScanFab";
 import ScanPointsDialog, { currentEvent, defaultEvent } from "../components/ScanPointsDialog";
+import { useNames } from "../store/people";
 import { collatorLocale, useI18n } from "../i18n";
 
 interface BulkPointsPageProps {
@@ -74,6 +75,8 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
   const eventScans = useMemo(() => scores.filter((s) => s.eventId === eventId && s.camperId), [scores, eventId]);
   const scannedIds = useMemo(() => new Set(eventScans.map((s) => s.camperId as string)), [eventScans]);
   const eventPoints = eventScans[0]?.points ?? null;
+  /** score lines carry person ids only (the kid, who launched it): names read live */
+  const nameOf = useNames(eventScans.flatMap((s) => [s.camperId, s.byPersonId]));
 
   // the page may open before the programme arrives: adopt the default once it does
   const defaulted = useRef(!!initial);
@@ -227,7 +230,7 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
                     return (
                       <li key={c.id} className={undoing ? "bulk-points__item--undoing" : "bulk-points__item--leaving"}>
                         <div className="bulk-points__kid bulk-points__kid--cheer" style={{ borderLeftColor: team?.color ?? "#ccc" }}>
-                          <span className="bulk-points__name">{c.name}</span>
+                          <span className="bulk-points__name">{c.name || "…"}</span>
                           <small className="bulk-points__team">
                             {team?.name ?? tx("sem time")} · +{points}
                           </small>
@@ -255,7 +258,7 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
                   return (
                     <li key={c.id}>
                       <button type="button" className="bulk-points__kid" disabled={!!busyId || !pointsValid || !team} onClick={() => void give(c.id)} style={{ borderLeftColor: team?.color ?? "#ccc" }}>
-                        <span className="bulk-points__name">{c.name}</span>
+                        <span className="bulk-points__name">{c.name || "…"}</span>
                         <small className="bulk-points__team">{team ? team.name : tx("sem time")}</small>
                         <span className="bulk-points__plus" aria-hidden="true">
                           {busyId === c.id ? "…" : `+${pointsValid ? points : "—"}`}
@@ -277,9 +280,9 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
                       const team = teamById.get(s.teamId);
                       return (
                         <li key={s.id} className="bulk-points__kid bulk-points__kid--done" style={{ borderLeftColor: team?.color ?? "#ccc" }}>
-                          <span className="bulk-points__name">{s.camperName}</span>
+                          <span className="bulk-points__name">{nameOf(s.camperId) || "…"}</span>
                           <small className="bulk-points__team">
-                            {team?.name ?? tx("Time removido")} · +{s.points} · {s.by.name.split(" ")[0]}
+                            {team?.name ?? tx("Time removido")} · +{s.points} · {nameOf(s.byPersonId).split(" ")[0] || "…"}
                           </small>
                           <button type="button" className="link-btn bulk-points__undo" disabled={!!undoingId} onClick={() => void undo(s.id)}>
                             {undoingId === s.id ? "…" : tx("↩︎ Desfazer")}

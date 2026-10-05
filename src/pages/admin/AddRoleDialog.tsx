@@ -93,14 +93,14 @@ export default function AddRoleDialog({ token, open, roles, excludeIds, where, o
           <div className="big-options">
             <button type="button" className="big-option" disabled={busy} onClick={() => setStep("pick")}>
               <span className="big-option__emoji" aria-hidden="true">
-                <img src={ICONS.chooseExisting} alt="" style={{ width: 34, height: 34 }} />
+                <img className="option-icon-34" src={ICONS.chooseExisting} alt="" />
               </span>
               <span className="big-option__label">{tx("Escolher existente")}</span>
               <span className="big-option__hint">{tx("do catálogo de funções do acampamento")}</span>
             </button>
             <button type="button" className="big-option" disabled={busy} onClick={() => setStep("create")}>
               <span className="big-option__emoji" aria-hidden="true">
-                <img src={ICONS.createNew} alt="" style={{ width: 34, height: 34 }} />
+                <img className="option-icon-34" src={ICONS.createNew} alt="" />
               </span>
               <span className="big-option__label">{tx("Criar nova")}</span>
               <span className="big-option__hint">{tx("instruções e preparação ficam para depois")}</span>

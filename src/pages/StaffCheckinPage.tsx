@@ -8,6 +8,9 @@ import { ICONS } from "../icons";
 import { useRoute } from "../router";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import { collatorLocale, useI18n } from "../i18n";
+import { speakTime } from "../dates";
+import { useNames } from "../store/people";
+import styles from "../styles/ops.module.scss";
 
 interface StaffCheckinPageProps {
   token: string;
@@ -48,6 +51,9 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
       // a row fading out keeps its place until the animation is over
       .sort((a, b) => Number(!!a.checkin && !leaving.has(a.id)) - Number(!!b.checkin && !leaving.has(b.id)) || a.name.localeCompare(b.name, collatorLocale(), { sensitivity: "base" }));
   }, [staff, search, leaving, busIds]);
+
+  /** who stamped each arrival (person ids — names read live) */
+  const nameOf = useNames(people.map((s) => s.checkin?.byPersonId));
 
   const counts = useMemo(() => {
     const active = staff?.filter((s) => s.active && onBus(s)) ?? [];
@@ -135,7 +141,7 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
       tick(s);
       return;
     }
-    if (!(await confirm({ emoji: <UndoGlyph />, title: tx("Desfazer o check-in de {name}?", { name: s.name.split(" ")[0] }), confirmLabel: tx("Desfazer"), danger: true }))) return;
+    if (!(await confirm({ emoji: <UndoGlyph />, title: tx("Desfazer o check-in de {name}?", { name: s.name.split(" ")[0] || "…" }), confirmLabel: tx("Desfazer"), danger: true }))) return;
     void run(s, true);
   }
 
@@ -155,7 +161,7 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
       {checkinHomePath && <Breadcrumbs items={[{ label: tx("Check-in"), onClick: () => navigate(checkinHomePath) }, { label: tx("Equipe") }]} />}
       <header className="admin-head">
         <h1 className="admin-title detail-title">
-          <img className="audience-icon" src={ICONS.staff} alt="" aria-hidden="true" style={{ height: 36, width: "auto" }} />
+          <img className={`audience-icon ${styles.headIcon}`} src={ICONS.staff} alt="" aria-hidden="true" />
           {tx("Check-in da equipe")}
         </h1>
         <span className="checkin-progress" title={tx("Pessoas da equipe que já chegaram")}>
@@ -182,7 +188,8 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
           const going = leaving.has(s.id);
           const on = !!s.checkin || armed.has(s.id) || going;
           const busy = pending.has(s.id) && !going;
-          const first = s.name.split(" ")[0];
+          const first = s.name.split(" ")[0] || "…";
+          const by = s.checkin && s.checkin.byPersonId !== s.id ? nameOf(s.checkin.byPersonId).split(" ")[0] : "";
           const label = s.checkin ? tx("Desfazer o check-in de {name}", { name: first }) : on ? tx("Desfazer: {name}", { name: first }) : tx("{name} chegou", { name: first });
           return (
             <li key={s.id} className={`${going ? "bus-item--leaving" : ""} ${s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? tx("Cadastro em revisão pela IA") : undefined}>
@@ -200,8 +207,14 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
                 </span>
                 <span className="bus-row__body">
                   <span className="bus-row__name">
-                    <span className={`strike ${on ? "strike--on" : ""}`}>{s.name}</span>
+                    <span className={`strike ${on ? "strike--on" : ""}`}>{s.name || "…"}</span>
                   </span>
+                  {s.checkin && (
+                    <span className="bus-row__meta">
+                      {tx("chegou às {time}", { time: speakTime(s.checkin.at) })}
+                      {by && ` · ${tx("com {name}", { name: by })}`}
+                    </span>
+                  )}
                 </span>
               </button>
             </li>

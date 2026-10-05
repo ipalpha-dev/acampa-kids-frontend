@@ -270,13 +270,6 @@ export async function aiDedupField(token: string, field: DedupField, value: stri
   return api("/api/ai/dedup-field", { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ field, value }), signal });
 }
 
-/**
- * Hidden sex field for a new camper: Jev 1.13 guesses F/M from the
- * (Brazilian) first name. Best-effort — `sex: null` on any failure.
- */
-export async function aiGuessSex(token: string, name: string, signal?: AbortSignal): Promise<{ sex: "F" | "M" | null }> {
-  return api("/api/ai/guess-sex", { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ name }), signal });
-}
 
 /** Models sometimes wrap the answer in ```html fences even when told not to. */
 export function stripCodeFences(text: string): string {

@@ -5,6 +5,7 @@ import Breadcrumbs from "../../components/Breadcrumbs";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollectionOrEmpty } from "../../store";
 import { canDeleteLine, fmtPoints, KIND_META, lineKind, ScoreLogList, summarizeEvents, useEventMap, useTeamMap, type KindFilter, type LineKind } from "./scoreLog";
+import { namesFor } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 interface Props {
@@ -62,7 +63,8 @@ export default function TeamScorePage({ token, teamId, userId, canEdit, canScan,
   const filtered = useMemo(() => (kind === "all" ? mine : mine.filter((e) => lineKind(e) === kind)), [mine, kind]);
 
   async function remove(e: ScoreEntry) {
-    const who = e.camperName ? `${e.camperName}` : team?.name ?? tx("o time");
+    const kid = e.camperId ? (await namesFor([e.camperId]))[0] : "";
+    const who = kid || (team?.name ?? tx("o time"));
     if (
       !(await confirm({
         title: tx("Apagar este lançamento?"),

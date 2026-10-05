@@ -6,14 +6,15 @@ import ScoreDraftCard from "./ScoreDraftCard";
 
 interface TrialsPageProps {
   token: string;
-  /** the real admin: may set the SMS redirect (organizers only get the rehearsal switches) */
+  /** coordenação (kept for the router; every switch here is shared with organização) */
   isAdmin: boolean;
 }
 
 /**
  * Settings → Testes: everything used to REHEARSE before the camp, in one
  * place — the kids' rooms draft (also on Geral), the scoreboard rehearsal,
- * the check-in test mode + reset, and the SMS redirect (admin only).
+ * the check-in test mode + reset. (The SMS redirect is gone: messages go
+ * through IPAlpha's templates.)
  * Every switch here must be OFF when the camp starts.
  */
 export default function TrialsPage({ token }: TrialsPageProps) {

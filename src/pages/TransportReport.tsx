@@ -6,10 +6,8 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import CamperIcon from "../components/CamperIcon";
 import StaffIcon from "../components/StaffIcon";
 import BusLogo from "../components/BusLogo";
-import WhatsAppButton from "../components/WhatsAppButton";
-import { formatBrazilPhoneClient } from "../phoneFormat";
+import OpsFamilyContact from "../components/OpsFamilyContact";
 import { useCollection, useCollectionOrEmpty } from "../store";
-import { staffGreeting, whatsappLink } from "../whatsapp";
 import { speakTime } from "../dates";
 import { ICONS } from "../icons";
 import { useDefaultBusTrip } from "../hooks/useDefaultBusTrip";
@@ -23,8 +21,6 @@ interface TransportReportProps {
   onOpenStaff?: (staffId: string) => void;
   /** when set, kid names navigate to the kid */
   onOpenCamper?: (camperId: string) => void;
-  /** the logged-in person — signs the WhatsApp greeting to the guardian */
-  myName?: string;
   /** which check-in opened this report — only changes the middle breadcrumb */
   via?: "church" | "bus";
 }
@@ -68,7 +64,7 @@ interface Vehicle {
  *
  * Only buses are listed: a car is just a family dropping their own kid off.
  */
-export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCamper, myName = "", via = "church" }: TransportReportProps) {
+export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCamper, via = "church" }: TransportReportProps) {
   const { tx } = useI18n();
   const campers = useCollection("campers");
   const staff = useCollectionOrEmpty("staff");
@@ -238,7 +234,7 @@ export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCam
                   <ul className="vehicle__list">
                     {listed.map((k) => {
                       const room = k.bedroom ? roomById.get(k.bedroom) : null;
-                      const age = ageOf(k.birthDate);
+                      const age = ageOf(k.birthDate ?? null);
                       const done = stamp(k);
                       return (
                         <li key={k.id} className={`vehicle__person ${done ? "vehicle__person--ok" : ""}`} title={done ? tx("Embarcou às {time}", { time: speakTime(done.at) }) : undefined}>
@@ -247,22 +243,16 @@ export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCam
                             {(done || all) && <span aria-hidden="true">{done ? "✅" : "⏳"}</span>}
                             {onOpenCamper ? (
                               <button type="button" className="link-btn" onClick={() => onOpenCamper(k.id)}>
-                                {k.name}
+                                {k.name || "…"}
                               </button>
                             ) : (
-                              k.name
+                              k.name || "…"
                             )}
                             {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
                           </span>
                           <span className="vehicle__person-meta">
                             {room ? <BedroomTag bedroom={room} className="staff-tag--inline" /> : tx("sem quarto")}
-                            {k.guardianPhone && (
-                              <WhatsAppButton
-                                className="wa-btn--sm"
-                                href={whatsappLink(k.guardianPhone, staffGreeting({ toName: k.guardianName, fromName: myName, about: k.name }))}
-                                label={tx("Falar com {name} no WhatsApp · {phone}", { name: k.guardianName.split(" ")[0] || tx("o responsável"), phone: formatBrazilPhoneClient(k.guardianPhone) })}
-                              />
-                            )}
+                            {!done && !k.redacted && <OpsFamilyContact camperId={k.id} kidName={k.name} />}
                           </span>
                         </li>
                       );
@@ -283,15 +273,14 @@ export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCam
               ) : (
                 <div className="staff-card__tags">
                   {v.staff.map((s) => {
-                    const phone = s.phone ? ` · ${formatBrazilPhoneClient(s.phone)}` : "";
-                    const hint = tx("Vai neste veículo na {leg}{phone}", { leg: legLabelLower, phone });
+                    const hint = tx("Vai neste veículo na {leg}{phone}", { leg: legLabelLower, phone: "" });
                     return onOpenStaff ? (
-                      <button key={s.id} type="button" className="staff-tag staff-tag--link" title={tx("{hint} — ver {name}", { hint, name: s.name })} onClick={() => onOpenStaff(s.id)}>
-                        {s.name} ›
+                      <button key={s.id} type="button" className="staff-tag staff-tag--link" title={tx("{hint} — ver {name}", { hint, name: s.name || "…" })} onClick={() => onOpenStaff(s.id)}>
+                        {s.name || "…"} ›
                       </button>
                     ) : (
                       <span key={s.id} className="staff-tag" title={hint}>
-                        {s.name}
+                        {s.name || "…"}
                       </span>
                     );
                   })}
@@ -319,14 +308,14 @@ export default function TransportReport({ onBack, onHome, onOpenStaff, onOpenCam
             {none.kids.map((k) => (
               <li key={k.id} className={`vehicle__person ${stamp(k) ? "vehicle__person--ok" : ""}`}>
                 <span className="vehicle__person-name">
-                  <CamperIcon size={16} /> {k.name}
+                  <CamperIcon size={16} /> {k.name || "…"}
                 </span>
               </li>
             ))}
             {none.staff.map((s) => (
               <li key={s.id} className="vehicle__person">
                 <span className="vehicle__person-name">
-                  <StaffIcon size={16} /> {s.name}
+                  <StaffIcon size={16} /> {s.name || "…"}
                 </span>
               </li>
             ))}

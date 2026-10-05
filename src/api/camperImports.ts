@@ -1,4 +1,4 @@
-import { api, command } from "./client";
+import { ApiError, api, command } from "./client";
 import { bearer } from "../auth/store";
 
 export type ImportField =
@@ -43,7 +43,7 @@ export interface CamperImport {
   id: string;
   fileName: string;
   fileType: string;
-  status: "needs_mapping" | "analyzing" | "panic" | "review" | "ready" | "importing" | "completed" | "error";
+  status: ImportJobStatus;
   dryRun: boolean;
   columns: ImportColumn[];
   dictionaries: { field: string; raw: string; normalized: string; value: unknown; label: string; draft: boolean; kind: string }[];
@@ -55,6 +55,19 @@ export interface CamperImport {
   startedAt: string;
   finishedAt: string | null;
   error: string;
+  /** the importer's IPAlpha sign-in ended while the AI health pass ran: paused until they sign in again (decision 50) */
+  needsSignIn?: boolean;
+  pausedAt?: string | null;
+}
+
+/** Job statuses of both import routers; `needsSignIn` = paused, waiting for the importer's new sign-in. */
+export type ImportJobStatus = "needs_mapping" | "analyzing" | "panic" | "review" | "ready" | "importing" | "completed" | "error" | "needsSignIn";
+
+/** One import I started that waits for my new sign-in (`GET …/needs-sign-in`). */
+export interface PausedImport {
+  id: string;
+  fileName: string;
+  pausedAt: string | null;
 }
 
 export async function listImportFields(token: string): Promise<{ key: ImportField; label: string }[]> {
@@ -71,15 +84,15 @@ export async function analyzeCamperFile(token: string, file: File, mapping?: Rec
   return res.import;
 }
 
-export async function createImportLeader(token: string, importId: string, reviewId: string, phone: string): Promise<{ staff: { id: string; name: string; phone: string }; import: CamperImport }> {
-  return command<{ staff: { id: string; name: string; phone: string }; import: CamperImport }>(`/api/camper-imports/${importId}/leaders`, {
+export async function createImportLeader(token: string, importId: string, reviewId: string, phone: string): Promise<{ staff: { id: string; name: string }; import: CamperImport }> {
+  return command<{ staff: { id: string; name: string }; import: CamperImport }>(`/api/camper-imports/${importId}/leaders`, {
     method: "POST",
     headers: { ...bearer(token), "content-type": "application/json" },
     body: JSON.stringify({ reviewId, phone }),
   }, ["staff"]);
 }
 
-export async function applyCamperImport(token: string, importId: string, file: File, delta: Record<string, { value?: string; skip?: boolean }>, declinedCategoryIds: string[] = [], duplicateChoice:"update"|"keep"|"merge"|""=""): Promise<{ inserted: number; updated:number; skipped: number; import: CamperImport }> {
+export async function applyCamperImport(token: string, importId: string, file: File, delta: Record<string, { value?: string; skip?: boolean }>, declinedCategoryIds: string[] = [], duplicateChoice:"update"|"keep"|"merge"|""=""): Promise<{ inserted: number; updated?: number; skipped: number; import: CamperImport }> {
   const data = new FormData();
   data.append("file", file);
   data.append("delta", JSON.stringify(delta));
@@ -98,4 +111,22 @@ export interface ImportPhaseInfo { key: string; pct: number }
 export async function getCamperImportProgress(tokenId: string, progressId: string): Promise<ImportPhaseInfo | null> {
   const res = await api<{ progress: ImportPhaseInfo | null }>(`/api/camper-imports/progress/${progressId}`, { headers: bearer(tokenId) });
   return res.progress;
+}
+
+/** The camper imports I started whose AI health pass waits for my new sign-in (decision 50). */
+export async function listPausedCamperImports(token: string): Promise<PausedImport[]> {
+  const res = await api<{ imports: PausedImport[] }>("/api/camper-imports/needs-sign-in", { headers: bearer(token), cache: "no-store" });
+  return res.imports;
+}
+
+/** Resumes a paused camper import with my fresh coordenação sign-in (only the importer). */
+export async function resumeCamperImport(token: string, id: string): Promise<CamperImport> {
+  const res = await api<{ import: CamperImport }>(`/api/camper-imports/${encodeURIComponent(id)}/resume`, { method: "POST", headers: bearer(token) });
+  return res.import;
+}
+
+/** Apply needs the coordenação role (it registers people in IPAlpha) — said gently, with the way forward. */
+export function importErrorMessage(e: unknown, fallback: string, tx: (pt: string) => string): string {
+  if (e instanceof ApiError && (e.code === "COORDINATION_REQUIRED" || e.code === "CORE_FORBIDDEN")) return tx("Só quem serve na coordenação pode gravar a importação no IPAlpha. Troque para o perfil de coordenação e tente de novo — nada foi perdido.");
+  return e instanceof Error ? e.message : fallback;
 }

@@ -301,7 +301,7 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
     <section className="wizard-card">
       <h2 className="wizard-card__title">{tx("🔑 Administradores")}</h2>
       <p className="admin-intro">
-        {tx("Quem administra o app convida quem mais vai cuidar da configuração. A pessoa entra com o")} <strong>{tx("próprio celular")}</strong> {tx("(código por SMS) — mande o link para ela.")}
+        {tx("Quem serve na coordenação recebe esse papel no IPAlpha (Mordomia). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.")}
       </p>
       <AdminsEditor token={token} user={user} />
     </section>
@@ -879,7 +879,7 @@ function DoneStep({ onExit }: { onExit: () => void }) {
   const transports = useCollectionOrEmpty("transports");
   const settings = useCollection("settings");
 
-  const team = staff.filter((s) => s.active && !s.admin).length;
+  const team = staff.filter((s) => s.active).length;
   const placed = campers.filter((k) => k.transportation).length;
   const rows: { label: string; value: string; ok: boolean }[] = [
     { label: tx("Equipe importada"), value: tx("{n} pessoa(s)", { n: team }), ok: team > 0 },

@@ -1,12 +1,16 @@
 import { useConfirm } from "../../components/ConfirmDialog";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ICONS, kidFaceSrc } from "../../icons";
-import { ageOf, createCamper, deleteCamper, updateCamper, type Camper, type CamperInput, type CamperSex } from "../../api/campers";
+import { addCamper, ageOf, deleteCamper, registerCamper, updateCamper, type Camper, type HealthInfo } from "../../api/campers";
+import { fetchCampersPage, fetchHealthCounts, HEALTH_DETAIL_MAX, type CamperListItem, type HealthCounts } from "../../api/people";
 import { useRoute } from "../../router";
 import { useCollection, useCollectionOrEmpty } from "../../store";
+import { rememberPeople } from "../../store/people";
 import { useCategories, useLabelOf } from "../../store/derive";
-import HealthAlerts from "../../components/HealthAlerts";
-import HealthFilter, { CAMPER_HEALTH_KEYS, matchesHealth, hasHealth, type HealthKey } from "../../components/HealthFilter";
+import HealthAlerts, { useHealthLabelOf } from "../../components/HealthAlerts";
+import HealthHeart from "../../components/HealthHeart";
+import HealthTagFilter from "../../components/HealthTagFilter";
+import GuardianWhatsApp from "../../components/GuardianWhatsApp";
 import { downloadCampersXlsx, downloadMedicalCampersXlsx } from "../../export";
 import PrintLabelsDialog from "../../components/PrintLabelsDialog";
 import BedroomTag from "../../components/BedroomTag";
@@ -17,14 +21,13 @@ import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
 import TransportTag from "../../components/TransportTag";
 import Toast from "../../components/Toast";
-import WhatsAppButton from "../../components/WhatsAppButton";
 import { loadAuth, type CampSummary } from "../../auth/store";
-import { staffGreeting, whatsappLink } from "../../whatsapp";
 import { ROOM_ROLE_META, staffSex } from "../../api/staff";
 import { takePendingToast } from "../../pendingToast";
+import { usePagedList } from "../../hooks/usePagedList";
 
 import Breadcrumbs from "../../components/Breadcrumbs";
-import CamperForm from "./CamperForm";
+import CamperForm, { type CamperFormAction } from "./CamperForm";
 import DetailStack from "./DetailStack";
 import GiveawayPage from "../GiveawayPage";
 import CamperImportPage from "./CamperImportPage";
@@ -33,15 +36,16 @@ import { DownloadGlyph } from "../../components/Glyph";
 import SearchField from "../../components/SearchField";
 import { setPendingImportFile, useWindowFileDrop } from "../../hooks/useFileDrop";
 import { collatorLocale, useI18n } from "../../i18n";
+import styles from "../../components/campers.module.scss";
 
 interface CampersPageProps {
   token: string;
   camp: CampSummary;
   /** every camp this session may switch into — empty when it can't switch years */
   camps: CampSummary[];
-  /** medical team: see everything, filter and open kids, but no create / edit / delete / Excel / print — and the health block is still editable in place */
+  /** care team: see everything, filter and open kids, but no create / edit / delete / print — the health block is still editable on the kid's page */
   readOnly?: boolean;
-  /** a history session (archived year): nobody edits anything, not even health — unlike `readOnly`, the admin's own filters/UI stay (never the medical health view) */
+  /** a history session (archived year): nobody edits anything, not even health — unlike `readOnly`, the admin's own filters/UI stay (never the care-team view) */
   locked?: boolean;
 }
 
@@ -60,17 +64,28 @@ function modeOf(segments: string[]): Mode {
 
 type Wing = "all" | "girls" | "boys";
 
-/** Admin: the campers (kids) — searchable list, detail view and create/edit form; read-only for the medical team. */
+/** roles the server answers health to in lists (♥, tag filter, name filter ≤ 6) — decision 31 */
+const HEALTH_ROLES = new Set(["coordenacao", "organizacao", "saude", "checkin"]);
+/** the care team's at-a-glance numbers (count endpoint — anonymized) */
+const SUMMARY_TAGS = ["medications", "foodRestrictions"] as const;
+const NAME_HEALTH_DEBOUNCE_MS = 400;
+
+/** Admin: the campers (kids) — one continuous list, detail view and create/edit form; read-only for the care team. */
 export default function CampersPage({ token, camp, camps, readOnly = false, locked = false }: CampersPageProps) {
   const { tx } = useI18n();
   const otherCamps = useMemo(() => camps.filter((c) => c.id !== camp.id), [camps, camp.id]);
   const [importSheetOpen, setImportSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(() => takePendingToast());
-  // everything comes from the local store (localStorage + live WebSocket feed)
+  // camp ops from the local store (live WebSocket feed), joined with the live names
   const campers = useCollection("campers");
   const categories = useCategories("camper");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const labelOf = useLabelOf();
+  const healthLabelOf = useHealthLabelOf(token);
+  const user = loadAuth()?.user;
+  const activeRole = user?.activeRole ?? "";
+  const audience = user?.audience ?? "staff";
+  const mayHealth = HEALTH_ROLES.has(activeRole);
   const { segments, navigate } = useRoute();
   const rawMode = modeOf(segments);
   // read-only viewers can't reach the forms even by URL
@@ -84,34 +99,39 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
     navigate(to);
   }
   const [wing, setWing] = useState<Wing>("all");
-  /** team ids to show — empty = every team (the medical team never filters by team / wing) */
+  /** team ids to show — empty = every team (the care team never filters by team / wing) */
   const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set());
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [health, setHealth] = useState<Set<HealthKey>>(new Set());
+  /** the health tag picked (`allergies:<id>`, `medications`…) — the server answers that list WITH details */
+  const [tag, setTag] = useState<string | null>(null);
   /** During a large import, missing allocations are expected; show warnings only when the counter is pressed. */
   const [showImportAttention, setShowImportAttention] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
-  const [createSex, setCreateSex] = useState<CamperSex | null>(null);
-  const [createSexBusy, setCreateSexBusy] = useState(false);
-  const onCreateSex = useCallback((sex: CamperSex | null, guessing: boolean) => {
-    setCreateSex(sex);
-    setCreateSexBusy(guessing);
-  }, []);
-  useEffect(() => {
-    if (mode.kind !== "create") {
-      setCreateSex(null);
-      setCreateSexBusy(false);
-    }
-  }, [mode.kind]);
+  const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
 
   const roomById = useMemo(() => new Map(bedrooms.map((b) => [b.id, b])), [bedrooms]);
   const teams = useCollectionOrEmpty("teams");
   const staff = useCollectionOrEmpty("staff");
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
-  const myName = loadAuth()?.user.name ?? "";
+
+  // ── health-tag filter: the server's filtered list, paged in the background, carries the details ──
+  const tagged = usePagedList<CamperListItem>(tag && mayHealth ? `tag:${tag}` : null, (cursor) => fetchCampersPage(token, { cursor, tag: tag! }));
+
+  // ── the care team's summary chips (anonymized counts) ──
+  const [summary, setSummary] = useState<HealthCounts | null>(null);
+  useEffect(() => {
+    if (!readOnly || !mayHealth) return;
+    let alive = true;
+    fetchHealthCounts(token, [...SUMMARY_TAGS])
+      .then((c) => alive && setSummary(c))
+      .catch(() => alive && setSummary(null));
+    return () => {
+      alive = false;
+    };
+  }, [token, readOnly, mayHealth, campers?.length]);
 
   async function withBusy<T>(fn: () => Promise<T>): Promise<T> {
     setBusy(true);
@@ -123,24 +143,50 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
     }
   }
 
-  async function handleCreate(input: CamperInput) {
-    const created = await withBusy(() => createCamper(token, input));
-    navigate(`/campers/${created.id}`, { replace: true });
-  }
-
-  async function handleEdit(input: CamperInput) {
-    if (mode.kind !== "edit") return;
-    const updated = await withBusy(() => updateCamper(token, mode.id, input));
-    navigate(`/campers/${updated.id}`, { replace: true });
+  async function handleSubmit(action: CamperFormAction) {
+    if (action.kind === "add") {
+      const added = await withBusy(() => addCamper(token, action.personId, action.ops));
+      navigate(`/campers/${added.id}`, { replace: true });
+    } else if (action.kind === "register") {
+      const res = await withBusy(() => registerCamper(token, action.input));
+      rememberPeople([{ personId: res.camper.id, name: res.camper.name }]);
+      navigate(`/campers/${res.camper.id}`, { replace: true });
+    } else if (mode.kind === "edit") {
+      const updated = await withBusy(() => updateCamper(token, mode.id, action.patch));
+      navigate(`/campers/${updated.id}`, { replace: true });
+    }
   }
 
   async function handleDelete(k: Camper) {
-    if (!(await confirm({ emoji: "🗑️", title: tx("Excluir {name}?", { name: k.name }), message: tx("Isso não pode ser desfeito."), confirmLabel: tx("Excluir"), danger: true }))) return;
+    const first = k.name.split(" ")[0] || tx("esta criança");
+    if (!(await confirm({ emoji: "🏕️", title: tx("Tirar {name} do acampamento?", { name: first }), message: tx("A criança deixa de aparecer neste acampamento. O cadastro dela e da família no IPAlpha continua."), confirmLabel: tx("Tirar do acampamento"), danger: true }))) return;
     try {
       await withBusy(() => deleteCamper(token, k.id));
       navigate("/campers", { replace: true });
+      setToast(tx("{name} não está mais neste acampamento.", { name: first }));
     } catch (e) {
       setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+    }
+  }
+
+  /** Excel: everything is read live from IPAlpha right now (only what this role may see) — progress while it reads. */
+  async function handleExport(kind: "campers" | "medical") {
+    if (!campers || exporting) return;
+    setError(null);
+    setExporting({ done: 0, total: campers.length });
+    const ctx = {
+      token,
+      healthAllowed: audience === "admin" || activeRole === "saude",
+      contactsAllowed: audience === "admin",
+      onProgress: (done: number, total: number) => setExporting({ done, total }),
+    };
+    try {
+      if (kind === "medical") await downloadMedicalCampersXlsx(ctx, campers, bedrooms, labelOf, staff);
+      else await downloadCampersXlsx(ctx, campers, bedrooms, labelOf, staff);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : tx("Não foi possível preparar a planilha agora."));
+    } finally {
+      setExporting(null);
     }
   }
 
@@ -153,34 +199,60 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
     if (!importingMode) setShowImportAttention(false);
   }, [importingMode]);
 
-  const visible = useMemo(() => {
-    if (!campers) return [];
-    const q = normalize(search);
-    const attentionFirst = (a: Camper, b: Camper) =>
-      Number(!!a.caretakerId && !!a.bedroom) - Number(!!b.caretakerId && !!b.bedroom);
-    return sortByName(campers).sort(attentionFirst).filter((k) => {
-      const room = k.bedroom ? roomById.get(k.bedroom) : null;
-      if (wing !== "all" && room?.group !== wing) return false;
-      if (teamFilter.size > 0 && !(k.team && teamFilter.has(k.team))) return false;
-      if (!matchesHealth(k, health)) return false;
-      if (!q) return true;
-      const hay = normalize([k.name, k.guardianName, labelOf(k.team), room?.name, labelOf(k.transportation), staffById.get(k.caretakerId ?? "")?.name].filter(Boolean).join(" "));
-      return hay.includes(q);
+  /** the list this screen filters: the store's kids, or — with a health tag — the server's tagged kids (kept live from the store) */
+  const source = useMemo((): { list: Camper[]; health: Map<string, HealthInfo> } => {
+    const health = new Map<string, HealthInfo>();
+    if (!tag || !mayHealth) return { list: campers ?? [], health };
+    const byId = new Map((campers ?? []).map((k) => [k.id, k]));
+    const list = tagged.items.map((it) => {
+      if (it.health) health.set(it.id, it.health);
+      const rec = byId.get(it.id);
+      return rec ? { ...rec, name: rec.name || it.name, hasHealth: it.hasHealth ?? rec.hasHealth } : (it as Camper);
     });
-  }, [campers, wing, teamFilter, search, health, labelOf, roomById, staffById]);
+    return { list, health };
+  }, [tag, mayHealth, campers, tagged.items]);
 
-  /** how many kids have each health thing (within the other filters, so the chips stay honest) */
-  const healthCounts = useMemo(() => {
-    const c: Partial<Record<HealthKey, number>> = {};
-    for (const key of CAMPER_HEALTH_KEYS) c[key] = 0;
-    for (const k of campers ?? []) {
-      const room = k.bedroom ? roomById.get(k.bedroom) : null;
-      if (wing !== "all" && room?.group !== wing) continue;
-      if (teamFilter.size > 0 && !(k.team && teamFilter.has(k.team))) continue;
-      for (const key of CAMPER_HEALTH_KEYS) if (hasHealth(k, key)) c[key]!++;
+  const visible = useMemo(() => {
+    const q = normalize(search);
+    const attentionFirst = (a: Camper, b: Camper) => Number(!!a.caretakerId && !!a.bedroom) - Number(!!b.caretakerId && !!b.bedroom);
+    return sortByName(source.list)
+      .sort(attentionFirst)
+      .filter((k) => {
+        const room = k.bedroom ? roomById.get(k.bedroom) : null;
+        if (wing !== "all" && room?.group !== wing) return false;
+        if (teamFilter.size > 0 && !(k.team && teamFilter.has(k.team))) return false;
+        if (!q) return true;
+        const hay = normalize([k.name, k.nickname, labelOf(k.team), room?.name, labelOf(k.transportation), staffById.get(k.caretakerId ?? "")?.name].filter(Boolean).join(" "));
+        return hay.includes(q);
+      });
+  }, [source.list, wing, teamFilter, search, labelOf, roomById, staffById]);
+
+  // ── a NAME filter down to ≤ 6 kids: ask the server for those kids' health (decision 31) ──
+  const [nameHealth, setNameHealth] = useState<{ q: string; health: Map<string, HealthInfo> } | null>(null);
+  const nameQuery = search.trim();
+  const wantNameHealth = mayHealth && !tag && nameQuery.length >= 2 && visible.length > 0 && visible.length <= HEALTH_DETAIL_MAX;
+  useEffect(() => {
+    if (!wantNameHealth) {
+      setNameHealth(null);
+      return;
     }
-    return c;
-  }, [campers, wing, teamFilter, roomById]);
+    let alive = true;
+    const t = setTimeout(() => {
+      fetchCampersPage(token, { q: nameQuery, limit: HEALTH_DETAIL_MAX })
+        .then((page) => {
+          if (!alive) return;
+          const health = new Map<string, HealthInfo>();
+          for (const it of page.items) if (it.health) health.set(it.id, it.health);
+          setNameHealth({ q: nameQuery, health });
+        })
+        .catch(() => alive && setNameHealth(null));
+    }, NAME_HEALTH_DEBOUNCE_MS);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [wantNameHealth, nameQuery, token]);
+  const detailOf = (id: string): HealthInfo | undefined => source.health.get(id) ?? (nameHealth && nameHealth.q === nameQuery ? nameHealth.health.get(id) : undefined);
 
   /** kids per team (for the chips in the team dialog) */
   const teamCounts = useMemo(() => {
@@ -233,25 +305,27 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
         current={{ kind: "camper", id: mode.id }}
         rootCrumbs={[{ label: tx("Acampantes"), onClick: () => navigate("/campers") }]}
         onEditCamper={readOnly || locked ? undefined : (camper) => navigate(`/campers/${camper.id}/edit`)}
-        // read-only here = the medical team: they still edit the kids' HEALTH block in place — never during a locked history session
+        // read-only here = the care team: they still edit the kids' HEALTH block in place — never during a locked history session
         canEditHealth={readOnly && !locked}
       />
     );
   }
 
   const editing = mode.kind === "edit" ? campers.find((k) => k.id === mode.id) : undefined;
+  const exportPct = exporting && exporting.total > 0 ? Math.round((exporting.done / exporting.total) * 100) : 0;
+  const listTotal = tag && mayHealth ? (tagged.total ?? tagged.items.length) : campers.length;
 
   return (
     <div className="admin-page admin-page--campers">
       {mode.kind === "create" && <Breadcrumbs items={[{ label: tx("Acampantes"), onClick: () => guardedNav("/campers") }, { label: tx("Novo") }]} />}
       {mode.kind === "edit" && editing && (
-        <Breadcrumbs items={[{ label: tx("Acampantes"), onClick: () => guardedNav("/campers") }, { label: editing.name.split(" ")[0], onClick: () => guardedNav(`/campers/${editing.id}`) }, { label: tx("Editar") }]} />
+        <Breadcrumbs items={[{ label: tx("Acampantes"), onClick: () => guardedNav("/campers") }, { label: editing.name.split(" ")[0] || "…", onClick: () => guardedNav(`/campers/${editing.id}`) }, { label: tx("Editar") }]} />
       )}
       <header className="admin-head">
         <h1 className="admin-title">
           {mode.kind === "create" ? (
             <>
-              <img className={`admin-title__icon${createSexBusy ? " admin-title__icon--busy" : ""}`} src={createSex ? kidFaceSrc(createSex) : ICONS.camper} alt="" aria-hidden="true" /> {tx("Novo acampante")}
+              <img className="admin-title__icon" src={ICONS.camper} alt="" aria-hidden="true" /> {tx("Novo acampante")}
             </>
           ) : mode.kind === "edit" ? (
             tx("✏️ Editar acampante")
@@ -261,13 +335,7 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
         </h1>
         {mode.kind === "view" && !readOnly && !locked && (
           <div className="admin-head__actions admin-head__actions--icons">
-            <button
-              type="button"
-              className="button button--secondary admin-head__new"
-              title={tx("Sorteio")}
-              aria-label={tx("Sorteio")}
-              onClick={() => navigate("/campers/giveaway")}
-            >
+            <button type="button" className="button button--secondary admin-head__new" title={tx("Sorteio")} aria-label={tx("Sorteio")} onClick={() => navigate("/campers/giveaway")}>
               <img className="admin-head__action-icon" src={ICONS.giveaway} alt="" aria-hidden="true" />
               <span className="admin-head__action-label">{tx("Sorteio")}</span>
             </button>
@@ -284,49 +352,38 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
             <button
               type="button"
               className="button button--secondary admin-head__new"
-              disabled={busy || campers.length === 0}
+              disabled={busy || !!exporting || campers.length === 0}
+              aria-busy={!!exporting}
               title={tx("Baixar todos os acampantes em Excel")}
               aria-label={tx("Baixar todos os acampantes em Excel")}
-              onClick={() => downloadCampersXlsx(campers, bedrooms, labelOf, staff)}
+              onClick={() => void handleExport("campers")}
             >
               <DownloadGlyph />
-              <span className="admin-head__action-label">{tx("Download")}</span>
+              <span className="admin-head__action-label">{exporting ? tx("Preparando…") : tx("Download")}</span>
             </button>
-            <button
-              type="button"
-              className="button button--secondary admin-head__new admin-head__print"
-              disabled={busy || campers.length === 0}
-              title={tx("Imprimir crachás ou pulseiras")}
-              onClick={() => setPrintOpen(true)}
-            >
+            <button type="button" className="button button--secondary admin-head__new admin-head__print" disabled={busy || campers.length === 0} title={tx("Imprimir crachás ou pulseiras")} onClick={() => setPrintOpen(true)}>
               🖨️ <span className="admin-head__action-label">{tx("Imprimir")}</span>
             </button>
-            <button
-              type="button"
-              className="button button--primary admin-head__new"
-              disabled={busy}
-              title={tx("Novo acampante")}
-              aria-label={tx("Novo acampante")}
-              onClick={() => navigate("/campers/new")}
-            >
+            <button type="button" className="button button--primary admin-head__new" disabled={busy} title={tx("Novo acampante")} aria-label={tx("Novo acampante")} onClick={() => navigate("/campers/new")}>
               <span className="admin-head__action-plus" aria-hidden="true">+</span>
               <span className="admin-head__action-label">{tx("Novo")}</span>
             </button>
           </div>
         )}
-        {/* medical team: the health sheet of every camper (no documents / bus roll calls) */}
+        {/* care team: the health sheet of every camper (no documents / bus roll calls) */}
         {mode.kind === "view" && readOnly && (
           <div className="admin-head__actions admin-head__actions--icons">
             <button
               type="button"
               className="button button--secondary admin-head__new"
-              disabled={campers.length === 0}
+              disabled={!!exporting || campers.length === 0}
+              aria-busy={!!exporting}
               title={tx("Baixar a planilha de saúde de todos os acampantes")}
               aria-label={tx("Baixar a planilha de saúde de todos os acampantes")}
-              onClick={() => downloadMedicalCampersXlsx(campers, bedrooms, labelOf, staff)}
+              onClick={() => void handleExport("medical")}
             >
               <DownloadGlyph />
-              <span className="admin-head__action-label">{tx("Download")}</span>
+              <span className="admin-head__action-label">{exporting ? tx("Preparando…") : tx("Download")}</span>
             </button>
           </div>
         )}
@@ -334,8 +391,8 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
           <button
             type="button"
             className="icon-btn icon-btn--lg icon-btn--danger"
-            title={tx("Excluir {name}", { name: editing.name })}
-            aria-label={tx("Excluir {name}", { name: editing.name })}
+            title={tx("Tirar {name} do acampamento", { name: editing.name.split(" ")[0] || tx("esta criança") })}
+            aria-label={tx("Tirar {name} do acampamento", { name: editing.name.split(" ")[0] || tx("esta criança") })}
             disabled={busy}
             onClick={() => handleDelete(editing)}
           >
@@ -344,44 +401,47 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
         )}
       </header>
 
+      {exporting && (
+        <div className={styles.exportProgress} role="status" aria-live="polite">
+          <span>
+            {exporting.done > 0 ? tx("Preparando a planilha… {done} de {total}", { done: exporting.done, total: exporting.total }) : tx("Preparando a planilha com os dados de agora…")}
+          </span>
+          <span className={styles.exportBar} aria-hidden="true">
+            {/* the width follows the live progress (runtime value) */}
+            <span className={styles.exportBarFill} style={{ "--progress": `${exportPct}%` } as CSSProperties} />
+          </span>
+        </div>
+      )}
       {error && <p className="message message--error">{error}</p>}
 
-      {mode.kind === "view" && !readOnly && !locked && (
-        <PrintLabelsDialog open={printOpen} onClose={() => setPrintOpen(false)} campers={visible} allCampers={sortByName(campers)} bedrooms={bedrooms} labelOf={labelOf} />
-      )}
+      {mode.kind === "view" && !readOnly && !locked && <PrintLabelsDialog open={printOpen} onClose={() => setPrintOpen(false)} campers={visible} allCampers={sortByName(campers)} bedrooms={bedrooms} labelOf={labelOf} />}
       {mode.kind === "view" && !readOnly && !locked && (
         <ImportSourceDialog
           open={importSheetOpen}
           onClose={() => setImportSheetOpen(false)}
           sheetIcon={ICONS.importCampers}
-          onPickSheet={() => { setImportSheetOpen(false); navigate("/campers/import"); }}
-          onPickYear={() => { setImportSheetOpen(false); navigate("/campers/import-year"); }}
+          onPickSheet={() => {
+            setImportSheetOpen(false);
+            navigate("/campers/import");
+          }}
+          onPickYear={() => {
+            setImportSheetOpen(false);
+            navigate("/campers/import-year");
+          }}
         />
       )}
       <Toast message={toast} onClose={() => setToast(null)} />
 
-      {mode.kind === "create" && (
-        <CamperForm token={token} categories={categories} busy={busy} onSubmit={handleCreate} onSexChange={onCreateSex} leaveGuardRef={leaveGuardRef} />
-      )}
+      {mode.kind === "create" && <CamperForm token={token} categories={categories} busy={busy} onSubmit={handleSubmit} leaveGuardRef={leaveGuardRef} />}
       {mode.kind === "edit" && !editing && <p className="opt-empty">{tx("Acampante não encontrado.")}</p>}
-      {mode.kind === "edit" && editing && (
-        <CamperForm
-          key={editing.id}
-          token={token}
-          camper={editing}
-          categories={categories}
-          busy={busy}
-          onSubmit={handleEdit}
-          leaveGuardRef={leaveGuardRef}
-        />
-      )}
+      {mode.kind === "edit" && editing && <CamperForm key={editing.id} token={token} camper={editing} categories={categories} busy={busy} onSubmit={handleSubmit} leaveGuardRef={leaveGuardRef} />}
 
       {mode.kind === "view" && (
         <>
           <div className="staff-toolbar">
             <SearchField placeholder={tx("Buscar por nome, líder, time, quarto…")} value={search} onChange={setSearch} aria-label={tx("Buscar")} />
           </div>
-          {/* wing + team chips, in the same row as the health chips; the medical team gets health only */}
+          {/* wing + team chips, in the same row as the health chips; the care team gets health only */}
           {!readOnly && (
             <div className="health-filter" role="group" aria-label={tx("Ala e time")}>
               {(
@@ -398,44 +458,37 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
                 </button>
               ))}
               {teams.length > 0 && (
-                <button
-                  type="button"
-                  className={`chip-toggle chip-toggle--small ${teamFilter.size > 0 ? "chip-toggle--on" : ""}`}
-                  aria-pressed={teamFilter.size > 0}
-                  title={tx("Filtrar por time")}
-                  onClick={() => setTeamDialogOpen(true)}
-                >
+                <button type="button" className={`chip-toggle chip-toggle--small ${teamFilter.size > 0 ? "chip-toggle--on" : ""}`} aria-pressed={teamFilter.size > 0} title={tx("Filtrar por time")} onClick={() => setTeamDialogOpen(true)}>
                   🚩 {teamChipLabel}
-                  {teamFilter.size > 0 && (
-                    <span className="cat-tab__count">{visible.length}</span>
-                  )}
+                  {teamFilter.size > 0 && <span className="cat-tab__count">{visible.length}</span>}
                 </button>
               )}
             </div>
           )}
-          {/* medical team: the big picture at a glance (tap = filter) */}
-          {readOnly && (
+          {/* care team: the big picture at a glance (anonymized counts; tap = filter) */}
+          {readOnly && mayHealth && (
             <div className="stat-grid" role="group" aria-label={tx("Resumo de saúde")}>
               {(
                 [
                   [null, <img src={kidFaceSrc()} alt="" />, tx("Crianças"), campers.length],
-                  ["medicines", "💊", tx("Tomam medicação"), healthCounts.medicines ?? 0],
-                  ["allergies", "🤮", tx("Têm alergias"), healthCounts.allergies ?? 0],
-                  ["foodRestrictions", "🍽️", tx("Restrição alimentar"), healthCounts.foodRestrictions ?? 0],
-                ] as [HealthKey | null, ReactNode, string, number][]
+                  ["medications", "💊", tx("Tomam medicação"), summary?.byTag.medications],
+                  ["foodRestrictions", "🍽️", tx("Restrição alimentar"), summary?.byTag.foodRestrictions],
+                ] as [string | null, ReactNode, string, number | undefined][]
               ).map(([key, emoji, label, n]) => {
-                const on = key ? health.has(key) : health.size === 0;
+                const on = key ? tag === key : tag === null;
                 return (
-                  <button key={label} type="button" className={`stat-card ${on ? "stat-card--on" : ""}`} aria-pressed={on} onClick={() => setHealth(key ? new Set(health.has(key) ? [] : [key]) : new Set())}>
-                    <span className="stat-card__emoji" aria-hidden="true">{emoji}</span>
-                    <span className="stat-card__n">{n}</span>
+                  <button key={label} type="button" className={`stat-card ${on ? "stat-card--on" : ""}`} aria-pressed={on} onClick={() => setTag(key && tag !== key ? key : null)}>
+                    <span className="stat-card__emoji" aria-hidden="true">
+                      {emoji}
+                    </span>
+                    <span className="stat-card__n">{n ?? "…"}</span>
                     <span className="stat-card__label">{label}</span>
                   </button>
                 );
               })}
             </div>
           )}
-          <HealthFilter keys={CAMPER_HEALTH_KEYS} value={health} onChange={setHealth} counts={healthCounts} />
+          {mayHealth && <HealthTagFilter token={token} value={tag} onChange={setTag} />}
           <TeamFilterDialog open={teamDialogOpen} teams={teams} value={teamFilter} counts={teamCounts} onChange={setTeamFilter} onClose={() => setTeamDialogOpen(false)} />
 
           {campers.length === 0 && (
@@ -449,36 +502,56 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
               )}
             </div>
           )}
-          {campers.length > 0 && visible.length === 0 && <p className="opt-empty">{tx("Nenhum resultado. 🔍")}</p>}
+          {tag && tagged.error && <p className="message message--error">{tx("Não foi possível aplicar este filtro agora.")}</p>}
+          {campers.length > 0 && visible.length === 0 && (!tag || tagged.done) && <p className="opt-empty">{tx("Nenhum resultado. 🔍")}</p>}
 
           <p className="admin-intro">
-            {visible.length === campers.length ? tx("{n} crianças", { n: campers.length }) : tx("{visible} de {total} crianças", { visible: visible.length, total: campers.length })}
-            {orphanCount > 0 && (
-              importingMode ? <>{" · "}<button type="button" className={`orphan-tag orphan-tag--btn ${showImportAttention ? "orphan-tag--on" : ""}`} aria-pressed={showImportAttention} title={showImportAttention ? tx("Ocultar alertas de alocação") : tx("Mostrar alertas de alocação")} onClick={() => setShowImportAttention((v) => !v)}>⚠️ {tx("{n} sem líder", { n: orphanCount })}</button></> : <span className="orphan-tag"> · ⚠️ {tx("{n} sem líder", { n: orphanCount })}</span>
-            )}
-            {noRoomCount > 0 && (
-              importingMode ? <>{" · "}<button type="button" className={`orphan-tag orphan-tag--btn ${showImportAttention ? "orphan-tag--on" : ""}`} aria-pressed={showImportAttention} title={showImportAttention ? tx("Ocultar alertas de alocação") : tx("Mostrar alertas de alocação")} onClick={() => setShowImportAttention((v) => !v)}>⚠️ {tx("{n} sem quarto", { n: noRoomCount })}</button></> : <span className="orphan-tag"> · ⚠️ {tx("{n} sem quarto", { n: noRoomCount })}</span>
-            )}
+            {visible.length === listTotal && !tag ? tx("{n} crianças", { n: campers.length }) : tx("{visible} de {total} crianças", { visible: visible.length, total: campers.length })}
+            {tag && tagged.loading && <span className="cat-hint"> · {tx("Carregando…")}</span>}
+            {orphanCount > 0 &&
+              (importingMode ? (
+                <>
+                  {" · "}
+                  <button type="button" className={`orphan-tag orphan-tag--btn ${showImportAttention ? "orphan-tag--on" : ""}`} aria-pressed={showImportAttention} title={showImportAttention ? tx("Ocultar alertas de alocação") : tx("Mostrar alertas de alocação")} onClick={() => setShowImportAttention((v) => !v)}>
+                    ⚠️ {tx("{n} sem líder", { n: orphanCount })}
+                  </button>
+                </>
+              ) : (
+                <span className="orphan-tag"> · ⚠️ {tx("{n} sem líder", { n: orphanCount })}</span>
+              ))}
+            {noRoomCount > 0 &&
+              (importingMode ? (
+                <>
+                  {" · "}
+                  <button type="button" className={`orphan-tag orphan-tag--btn ${showImportAttention ? "orphan-tag--on" : ""}`} aria-pressed={showImportAttention} title={showImportAttention ? tx("Ocultar alertas de alocação") : tx("Mostrar alertas de alocação")} onClick={() => setShowImportAttention((v) => !v)}>
+                    ⚠️ {tx("{n} sem quarto", { n: noRoomCount })}
+                  </button>
+                </>
+              ) : (
+                <span className="orphan-tag"> · ⚠️ {tx("{n} sem quarto", { n: noRoomCount })}</span>
+              ))}
           </p>
 
           <ul className="staff-list">
             {visible.map((k) => {
               const room = k.bedroom ? roomById.get(k.bedroom) : null;
-              const age = ageOf(k.birthDate);
+              const age = ageOf(k.birthDate ?? null);
               const caretaker = k.caretakerId ? staffById.get(k.caretakerId) : undefined;
               const orphan = !k.caretakerId;
               const noRoom = !k.bedroom;
-              const attention = orphan || noRoom;
-              const showAttention = attentionEnabled && attention;
+              const showAttention = attentionEnabled && (orphan || noRoom);
+              const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
+              const detail = detailOf(k.id);
+              const shownName = k.name || tx("Carregando nome…");
 
               return (
-                // `staff-card--cover`: every blank spot of the row opens the kid — only the WhatsApp button keeps its own action
-                <li key={k.id} className={`staff-card staff-card--clickable staff-card--cover ${showAttention ? "staff-card--orphan" : ""} ${k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured" ? tx("Cadastro em revisão pela IA") : undefined}>
+                // `staff-card--cover`: every blank spot of the row opens the kid — only the family button keeps its own action
+                <li key={k.id} className={`staff-card staff-card--clickable staff-card--cover ${showAttention ? "staff-card--orphan" : ""} ${reviewing ? "camper-ai-review" : ""}`} title={reviewing ? tx("Cadastro em revisão pela IA") : undefined}>
                   <div
                     className="staff-card__body"
                     role="link"
                     tabIndex={0}
-                    title={tx("Ver {name}", { name: k.name })}
+                    title={tx("Ver {name}", { name: shownName })}
                     onClick={() => navigate(`/campers/${k.id}`)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -488,7 +561,8 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
                     }}
                   >
                     <h3 className="staff-card__name">
-                      {k.name}
+                      <span className={k.name ? undefined : styles.pendingName}>{shownName}</span>
+                      {!detail && <HealthHeart show={k.hasHealth} />}
                       {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
                     </h3>
                     {showAttention && (
@@ -496,31 +570,30 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
                         ⚠️ {orphan && noRoom ? tx("Esta criança está sem líder e sem quarto.") : orphan ? tx("Esta criança está sem líder.") : tx("Esta criança está sem quarto.")}
                       </p>
                     )}
-                    {k.guardianName && (
-                      <p className="staff-card__meta">
-                        {tx("Resp.:")} {k.guardianName}
-                      </p>
-                    )}
                     {(room || k.team || caretaker || k.transportation) && (
                       <div className="staff-card__tags">
                         {room && <BedroomTag bedroom={room} />}
                         {caretaker && (
                           <span className="staff-tag" title={ROOM_ROLE_META.caretaker.label}>
-                            <RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {caretaker.name.split(" ")[0]}
+                            <RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {caretaker.name.split(" ")[0] || "…"}
                           </span>
                         )}
                         <TeamTag teamId={k.team} />
                         <TransportTag transportId={k.transportation} short className="staff-tag--pill" />
                       </div>
                     )}
-                    <HealthAlerts person={k} labelOf={labelOf} />
+                    {detail && (
+                      <div className={styles.healthReveal}>
+                        <div>
+                          <HealthAlerts person={detail} labelOf={healthLabelOf} />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {k.guardianPhone && (
-                    <WhatsAppButton
-                      className="wa-btn--sm staff-card__wa"
-                      href={whatsappLink(k.guardianPhone, staffGreeting({ toName: k.guardianName, fromName: myName, about: k.name }))}
-                      label={k.guardianName.split(" ")[0] ? tx("Falar com {name} no WhatsApp", { name: k.guardianName.split(" ")[0] }) : tx("Falar com o responsável no WhatsApp")}
-                    />
+                  {audience === "admin" && !locked && (
+                    <span className="staff-card__wa">
+                      <GuardianWhatsApp camper={k} className="wa-btn--sm" />
+                    </span>
                   )}
                 </li>
               );
@@ -535,10 +608,11 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
 function normalize(s: string): string {
   return s
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 }
 
+/** by name; kids whose name is still on its way go last (never a blank row on top) */
 function sortByName(list: Camper[]): Camper[] {
-  return list.slice().sort((a, b) => a.name.localeCompare(b.name, collatorLocale(), { sensitivity: "base" }));
+  return list.slice().sort((a, b) => (!a.name !== !b.name ? (a.name ? -1 : 1) : a.name.localeCompare(b.name, collatorLocale(), { sensitivity: "base" })));
 }

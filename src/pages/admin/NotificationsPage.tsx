@@ -16,7 +16,7 @@ interface NotificationsPageProps {
 }
 
 const BUS_SMS_EXAMPLE = "AcampaKids: Marcela, a Ana está a caminho de um fim de semana incrível para aprender sobre Jesus! Aproveite o fim de semana livre: vamos cuidar muito bem dela.";
-const BIRTHDAY_SMS_EXAMPLE = "AcampaKids: João, hoje é aniversário da Ana (8 anos), do quarto 103! 🎂 Vamos fazer o dia dela especial.";
+const BIRTHDAY_SMS_EXAMPLE = "AcampaKids: João, hoje é aniversário da Ana, do quarto 103! 🎂 Vamos fazer o dia dela especial.";
 const PARENT_WELCOME_EXAMPLE = "AcampaKids: Marcela, a Ana está inscrita no Acampa Kids! Acompanhe tudo pelo app. Entre com o celular (11) 99999-9999 em <link do app>";
 const PHOTOS_SMS_EXAMPLE = "AcampaKids: Marcela, as fotos do acampamento já estão no app \u{1F4F7}. <link do app>";
 
@@ -55,8 +55,8 @@ function buildGroups(tx: Tx): NotifGroup[] {
         {
           key: "enrolments",
           icon: ICONS.staff,
-          title: tx("Boas-vindas e novas responsabilidades"),
-          text: tx("Quando o app é liberado para a equipe (início do período de acesso) cada pessoa recebe, uma única vez, um SMS de boas-vindas com o link do app. Quem vira organizador (da programação ou dos jogos / placar), ajudante do placar, ajudante do check-in / ônibus, equipe médica, responsável pelos coletes ou contato dos pais recebe o SMS na hora."),
+          title: tx("Boas-vindas da equipe"),
+          text: tx("Quando o app é liberado para a equipe (início do período de acesso) cada pessoa recebe, uma única vez, um SMS de boas-vindas com o link do app. Os papéis de cada pessoa (organização, saúde, check-in…) são definidos no IPAlpha."),
           welcome: "staff",
         },
         {
@@ -107,14 +107,14 @@ function buildGroups(tx: Tx): NotifGroup[] {
         {
           key: "parentEdits",
           icon: ICONS.health,
-          title: tx("Pais alteraram os pontos de atenção"),
-          text: tx("Quando um pai ou mãe altera os dados médicos da criança (alergias, medicação, convênio…), a equipe médica, os administradores e o líder do quarto recebem um SMS. Se mudar só as observações, apenas o líder do quarto é avisado."),
+          title: tx("A família alterou os pontos de atenção"),
+          text: tx("Quando um responsável altera as informações de saúde da criança (alergias, medicação, convênio…), a equipe de cuidado, a coordenação e o líder do quarto recebem um SMS. Se mudar só as observações, apenas o líder do quarto é avisado."),
         },
         {
           key: "occurrences",
           emoji: "📋",
           title: tx("Ocorrência registrada"),
-          text: tx("Quando uma ocorrência é registrada (pela organização ou pela equipe médica), o admin recebe um SMS — a não ser que tenha sido ele quem registrou."),
+          text: tx("Quando uma ocorrência é registrada (pela organização ou pela equipe de cuidado), a coordenação recebe um SMS — a não ser que tenha sido quem registrou."),
         },
       ],
     },
@@ -171,7 +171,7 @@ function buildGroups(tx: Tx): NotifGroup[] {
           title: tx("Fotos publicadas"),
           text: (
             <>
-              {tx("Quando o fotógrafo liga")}{" "}
+              {tx("Quando quem serve na fotografia liga")}{" "}
               <strong>{tx("Publicadas")}</strong>{" "}
               {tx("na aba Fotos, a equipe e os responsáveis recebem um SMS avisando —")}{" "}
               <strong>{tx("uma única vez por acampamento")}</strong>
@@ -336,7 +336,7 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
         ))}
 
       <PageFooter>
-        {tx('Só recebe SMS quem tem celular cadastrado. O e-mail equivalente sai só para quem tem endereço. Os pais só recebem o que está em “Para os pais” (e as fotos publicadas) — nunca avisos de quarto, função ou cadastro da equipe.')}
+        {tx('Só recebe SMS quem tem celular no IPAlpha. O e-mail equivalente sai só para quem tem endereço. Os pais só recebem o que está em “Para os pais” (e as fotos publicadas) — nunca avisos de quarto, função ou cadastro da equipe.')}
       </PageFooter>
     </div>
   );

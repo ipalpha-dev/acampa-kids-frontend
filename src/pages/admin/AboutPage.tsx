@@ -6,6 +6,7 @@ import { AiGlyph } from "../../components/Glyph";
 import { speakStamp } from "../../dates";
 import { useI18n } from "../../i18n";
 import { useUsdtBrl } from "../../usdtRate";
+import styles from "./data.module.scss";
 
 interface AboutPageProps {
   token: string;
@@ -24,18 +25,8 @@ const VENDOR_NAMES: Record<string, string> = {
   typesafe: "TypeSafe AI",
 };
 
-/** slice colour per lab, from the app palette */
-const VENDOR_COLORS: Record<string, string> = {
-  anthropic: "var(--sun)",
-  openai: "var(--panel)",
-  openai_api: "var(--forest-dark)",
-  xai: "var(--red)",
-  meta: "var(--pine)",
-  zhipu: "var(--sage)",
-  google: "var(--sky)",
-  alibaba: "var(--orange, #e08a1e)",
-  typesafe: "var(--teal, #0f9a8a)",
-};
+/** slice colour per lab / per request kind: a tone class of data.module.scss (palette lives in SCSS) */
+const VENDOR_TONES = new Set(["anthropic", "openai", "openai_api", "xai", "meta", "zhipu", "google", "alibaba", "typesafe"]);
 
 /** the kinds of AI request the backend records (AiUsageEntry.kind) */
 const KIND_LABELS: Record<string, string> = {
@@ -50,25 +41,25 @@ const KIND_LABELS: Record<string, string> = {
   assistant_chat: "Assistente escrito",
   assistant_voice: "Assistente por voz",
 };
-const KIND_COLORS: Record<string, string> = {
-  edit: "var(--sun)",
-  suggest: "var(--panel)",
-  image: "var(--red)",
-  camper_notes: "var(--pine)",
-  structure_health: "var(--teal, #0f9a8a)",
-  normalize_observations: "var(--orange, #e08a1e)",
-  dedup_field: "var(--sage)",
-  guess_sex: "var(--sky)",
-  assistant_chat: "var(--forest)",
-  assistant_voice: "var(--forest-dark)",
-};
+const KIND_TONES = new Set(Object.keys(KIND_LABELS));
 
-/** backup format of backend/scripts/backup.ts — keep both numbers in sync */
-const BACKUP_VERSION = 1;
+/** module class of a tone key ("vendor-anthropic", "kind-edit"…); unknown keys fall back to the muted tone */
+function toneClass(prefix: "vendor" | "kind", key: string): string {
+  const known = prefix === "vendor" ? VENDOR_TONES.has(key) : KIND_TONES.has(key);
+  return styles[known ? `${prefix}-${key}` : "tone-muted"] ?? "";
+}
+
+/**
+ * Backup format of backend/scripts/backup.ts — keep both numbers in sync.
+ * v3 = people live in IPAlpha: a backup holds camp operations only (never
+ * sessions, sign-ins in flight nor person data) and only v3 files restore.
+ */
+const BACKUP_VERSION = 3;
 
 interface Slice {
   label: string;
-  color: string;
+  /** tone class (see toneClass) */
+  tone: string;
   value: number;
 }
 
@@ -93,11 +84,10 @@ function PieChart({ title, slices, total, format }: { title: string; slices: Sli
           {segs.map((s) => (
             <circle
               key={s.label}
-              className={`about-pie__slice${hot === s.label ? " is-hot" : ""}`}
+              className={`about-pie__slice ${styles.slice} ${s.tone}${hot === s.label ? " is-hot" : ""}`}
               cx="21"
               cy="21"
               r="15.9155"
-              style={{ stroke: s.color }}
               strokeDasharray={`${s.pct} ${100 - s.pct}`}
               strokeDashoffset={25 - s.from}
               onMouseEnter={() => setHot(s.label)}
@@ -126,7 +116,7 @@ function PieChart({ title, slices, total, format }: { title: string; slices: Sli
             onMouseEnter={() => setHot(s.label)}
             onMouseLeave={() => setHot(null)}
           >
-            <span className="about-pie__dot" style={{ background: s.color }} />
+            <span className={`about-pie__dot ${styles.dot} ${s.tone}`} />
             <span className="about-pie__name">{s.label}</span>
             <span className="about-pie__val">{format(s.value)}</span>
             <span className="about-pie__pct">{total ? Math.round((s.value / total) * 100) : 0}%</span>
@@ -171,7 +161,7 @@ export default function AboutPage({ token }: AboutPageProps) {
       (vendors ?? []).map((v) => ({
         ...v,
         name: VENDOR_NAMES[v.vendor] ?? v.vendor,
-        color: VENDOR_COLORS[v.vendor] ?? "var(--muted)",
+        tone: toneClass("vendor", v.vendor),
         tokens: v.promptTokens + v.completionTokens,
         cost: v.models.reduce((n, m) => n + (estimateCostUsd(m.model, m.promptTokens, m.completionTokens) ?? 0), 0),
       })),
@@ -223,6 +213,9 @@ export default function AboutPage({ token }: AboutPageProps) {
             <dd>{sms ? brl.format(sms.costBrl) : "…"}</dd>
           </div>
         </dl>
+        <p className="cat-hint">
+          {tx("Só cópias no formato v{n} podem ser restauradas. Elas guardam apenas a operação do acampamento — nunca sessões nem dados pessoais, que ficam no IPAlpha.", { n: BACKUP_VERSION })}
+        </p>
       </section>
 
       <section className="cat-form">
@@ -243,17 +236,17 @@ export default function AboutPage({ token }: AboutPageProps) {
         {rows.length > 0 && (
           <>
             <div className="about-pies">
-              <PieChart title={tx("Tokens por empresa")} slices={rows.map((r) => ({ label: r.name, color: r.color, value: r.tokens }))} total={totalTokens} format={num.format} />
+              <PieChart title={tx("Tokens por empresa")} slices={rows.map((r) => ({ label: r.name, tone: r.tone, value: r.tokens }))} total={totalTokens} format={num.format} />
               {totalCost > 0 && (
-                <PieChart title={tx("Custo por empresa")} slices={rows.map((r) => ({ label: r.name, color: r.color, value: r.cost }))} total={totalCost} format={fmtCost} />
+                <PieChart title={tx("Custo por empresa")} slices={rows.map((r) => ({ label: r.name, tone: r.tone, value: r.cost }))} total={totalCost} format={fmtCost} />
               )}
-              <PieChart title={tx("Chamadas por empresa")} slices={rows.map((r) => ({ label: r.name, color: r.color, value: r.calls }))} total={totalCalls} format={num.format} />
+              <PieChart title={tx("Chamadas por empresa")} slices={rows.map((r) => ({ label: r.name, tone: r.tone, value: r.calls }))} total={totalCalls} format={num.format} />
               {kinds && kinds.length > 0 && (
                 <PieChart
                   title={tx("Chamadas por pedido")}
                   slices={kinds.map((k) => ({
                     label: KIND_LABELS[k.kind] ? tx(KIND_LABELS[k.kind]) : k.kind,
-                    color: KIND_COLORS[k.kind] ?? "var(--muted)",
+                    tone: toneClass("kind", k.kind),
                     value: k.calls,
                   }))}
                   total={totalCalls}

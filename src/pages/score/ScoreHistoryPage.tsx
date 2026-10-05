@@ -5,6 +5,7 @@ import SearchField from "../../components/SearchField";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollectionOrEmpty } from "../../store";
 import { canDeleteLine, eventLabel, fmtPoints, KIND_META, lineKind, normalize, ScoreLogList, useEventMap, useTeamMap, type KindFilter, type LineKind } from "./scoreLog";
+import { useNames } from "../../store/people";
 import { collatorLocale, useI18n } from "../../i18n";
 
 interface Props {
@@ -42,11 +43,13 @@ export default function ScoreHistoryPage({ token, userId, canEdit, canScan, onBa
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /** the lines hold person ids (who launched, the kid scanned): names read live */
+  const nameOf = useNames(scores.flatMap((e) => [e.byPersonId, e.camperId]));
   const people = useMemo(() => {
     const m = new Map<string, string>();
-    for (const e of scores) if (e.by.id && !m.has(e.by.id)) m.set(e.by.id, e.by.name);
+    for (const e of scores) if (e.byPersonId && !m.has(e.byPersonId)) m.set(e.byPersonId, nameOf(e.byPersonId) || "…");
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], collatorLocale()));
-  }, [scores]);
+  }, [scores, nameOf]);
   const eventsWithScans = useMemo(() => {
     const ids = new Set(scores.map((e) => e.eventId).filter(Boolean));
     return events.filter((e) => ids.has(e.id)).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
@@ -64,21 +67,22 @@ export default function ScoreHistoryPage({ token, userId, canEdit, canScan, onBa
       if (kind !== "all" && lineKind(e) !== kind) return false;
       if (teamId && e.teamId !== teamId) return false;
       if (eventId && e.eventId !== eventId) return false;
-      if (byId && e.by.id !== byId) return false;
+      if (byId && e.byPersonId !== byId) return false;
       if (q) {
         const ev = e.eventId ? eventMap.get(e.eventId) : undefined;
-        const hay = normalize([e.camperName, e.note, e.by.name, teamMap.get(e.teamId)?.name ?? "", ev?.title ?? ""].join(" "));
+        const hay = normalize([nameOf(e.camperId), e.note, nameOf(e.byPersonId), teamMap.get(e.teamId)?.name ?? "", ev?.title ?? ""].join(" "));
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [scores, kind, teamId, eventId, byId, search, eventMap, teamMap]);
+  }, [scores, kind, teamId, eventId, byId, search, eventMap, teamMap, nameOf]);
   const net = useMemo(() => filtered.reduce((s, e) => s + e.points, 0), [filtered]);
   const filtering = kind !== "all" || !!teamId || !!eventId || !!byId || !!search.trim();
 
   async function remove(e: ScoreEntry) {
     const team = teamMap.get(e.teamId)?.name ?? tx("o time");
-    const who = e.camperName ? `${e.camperName} (${team})` : team;
+    const kid = nameOf(e.camperId);
+    const who = kid ? `${kid} (${team})` : team;
     if (
       !(await confirm({
         title: tx("Apagar este lançamento?"),

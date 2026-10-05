@@ -1,15 +1,15 @@
 import { bearer } from "../auth/store";
-import { command } from "./client";
+import { api, command } from "./client";
 
 /**
- * The medical team's medication checklist. The PRESCRIPTION lives on the
- * camper (`Camper.medications`, written by the parents / admin); each record
- * here is ONE dose the team ticked as given.
+ * The care team's medication checklist. The PRESCRIPTION lives in IPAlpha
+ * (the kid's health block — `GET /api/medications/prescriptions`, read live);
+ * each record here is ONE dose the team ticked as given.
  */
 export interface MedicationDose {
   id: string;
-  camperId: string;
-  camperName: string;
+  /** the kid (person id) */
+  personId: string;
   /** normalized medicine name — links the tick to the prescription */
   medKey: string;
   medName: string;
@@ -19,8 +19,21 @@ export interface MedicationDose {
   /** "HH:MM" of the prescribed moment, or "sos" (quando necessário) */
   slot: string;
   givenAt: string;
-  by: { id: string; name: string };
+  /** who ticked it (person id — name read live) */
+  byPersonId: string;
   note: string;
+}
+
+/** One kid who takes medicines (live from IPAlpha). */
+export interface Prescription {
+  personId: string;
+  name: string;
+  medications: import("./campers").Medication[];
+}
+
+/** `GET /api/medications/prescriptions?cursor` — one page (≤ 200) of the kids with medicines. */
+export function fetchPrescriptionsPage(token: string, cursor: string | null): Promise<{ items: Prescription[]; nextCursor: string | null }> {
+  return api(`/api/medications/prescriptions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { headers: bearer(token) });
 }
 
 /** "quando necessário" doses: no fixed time, may repeat in the same day */
@@ -37,7 +50,8 @@ export function medKeyOf(name: string): string {
 }
 
 export interface MedicationDoseInput {
-  camperId: string;
+  /** the kid (person id) */
+  personId: string;
   medName: string;
   /** "YYYY-MM-DD" — defaults to today (camp time zone) on the server */
   day?: string;

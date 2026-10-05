@@ -13,6 +13,7 @@ import { useCollection } from "../../store";
 import { ICONS } from "../../icons";
 import type { LoggedUser } from "../../roles";
 import { useI18n } from "../../i18n";
+import styles from "./data.module.scss";
 
 interface SuperPageProps {
   token: string;
@@ -231,7 +232,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
           </p>
           {cacheError && <p className="message message--error">{cacheError}</p>}
           {cacheDone && <p className="message message--ok">✅ {cacheDone}</p>}
-          <p className="cat-form__title" style={{ fontSize: "1.4rem" }}>
+          <p className={`cat-form__title ${styles.cacheCount}`}>
             {importCache == null
               ? "…"
               : tx("{n} {unit}", { n: importCache.count, unit: tx(importCache.count === 1 ? "correspondência" : "correspondências") })}
@@ -341,13 +342,13 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
   const [step, setStep] = useState<DeleteStep>("confirm");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [phone, setPhone] = useState("");
-  const [delivery, setDelivery] = useState<"sms" | "mock">("sms");
   const [code, setCode] = useState("");
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!camp) return;
+    setExpiresAt(null);
     setStep("confirm");
     setError(null);
     setCode("");
@@ -360,8 +361,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
     setError(null);
     try {
       const res = await requestCampDelete(token, camp.id);
-      setPhone(res.phone);
-      setDelivery(res.delivery);
+      setExpiresAt(res.expiresAt);
       setStep("code");
     } catch (e) {
       setError(e instanceof Error ? e.message : tx("Algo deu errado."));
@@ -399,7 +399,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           <span className="sheet__handle" aria-hidden="true" />
           <h2 className="cat-form__title">{tx('Apagar "{label}"?', { label: camp.label })}</h2>
           <p className="cat-hint">
-            {tx("Isso apaga para sempre {campers} acampante(s), {staff} pessoa(s) da equipe e {photos} foto(s) de {label}. Não pode ser desfeito.", {
+            {tx("Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins) e {photos} foto(s). Os cadastros das pessoas continuam no IPAlpha. Não pode ser desfeito.", {
               campers: camp.counts.campers,
               staff: camp.counts.staff,
               photos: camp.counts.photos,
@@ -423,7 +423,9 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           <span className="sheet__handle" aria-hidden="true" />
           <h2 className="cat-form__title">{tx("Confirme o código")}</h2>
           <p className="cat-hint">
-            {delivery === "mock" ? tx(" (modo dev: o código aparece no console do servidor)") : tx("Mandamos um código por SMS para {phone}", { phone })}
+            {expiresAt
+              ? tx("Mandamos um código por SMS para o seu celular cadastrado no IPAlpha. Ele vale até {time}.", { time: new Date(expiresAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) })
+              : tx("Mandamos um código por SMS para o seu celular cadastrado no IPAlpha.")}
           </p>
           <OtpInput value={code} onChange={setCode} onComplete={(v) => void confirmDelete(v)} disabled={busy} autoFocus invalid={!!error} />
           {error && (

@@ -6,6 +6,7 @@ import Breadcrumbs from "../../components/Breadcrumbs";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollectionOrEmpty } from "../../store";
 import { canDeleteLine, fmtPoints, ScoreLogList, useEventMap, useTeamMap } from "./scoreLog";
+import { useNames } from "../../store/people";
 import { collatorLocale, useI18n } from "../../i18n";
 
 interface Props {
@@ -43,9 +44,11 @@ export default function EventScorePage({ token, eventId, userId, canEdit, canSca
   const perKid = scans[0]?.points ?? 0;
   const total = useMemo(() => lines.reduce((s, e) => s + e.points, 0), [lines]);
   const scannedIds = useMemo(() => new Set(scans.map((s) => s.camperId as string)), [scans]);
+  /** who read the badges (person ids — names read live) */
+  const nameOf = useNames([...scans.map((s) => s.byPersonId), ...scans.map((s) => s.camperId)]);
   const readers = useMemo(() => {
     const m = new Map<string, number>();
-    for (const s of scans) m.set(s.by.name || "—", (m.get(s.by.name || "—") ?? 0) + 1);
+    for (const s of scans) m.set(s.byPersonId, (m.get(s.byPersonId) ?? 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [scans]);
 
@@ -69,7 +72,7 @@ export default function EventScorePage({ token, eventId, userId, canEdit, canSca
       !(await confirm({
         title: tx("Apagar esta leitura?"),
         message: tx("{name} volta para a lista de quem ainda não recebeu; {pts} sai do time.", {
-          name: e.camperName || tx("A criança"),
+          name: nameOf(e.camperId) || tx("A criança"),
           pts: fmtPoints(e.points),
         }),
         confirmLabel: tx("Apagar"),
@@ -125,10 +128,10 @@ export default function EventScorePage({ token, eventId, userId, canEdit, canSca
       {readers.length > 0 && (
         <p className="admin-intro">
           {tx("Lido por")}{" "}
-          {readers.map(([name, n], i) => (
-            <span key={name}>
+          {readers.map(([personId, n], i) => (
+            <span key={personId}>
               {i > 0 && ", "}
-              <strong>{name}</strong> ({n})
+              <strong>{nameOf(personId) || "…"}</strong> ({n})
             </span>
           ))}
           .
@@ -151,7 +154,7 @@ export default function EventScorePage({ token, eventId, userId, canEdit, canSca
                   {missing.length > 0 && (
                     <>
                       {" "}
-                      · {tx("faltam:")} <MissingNames names={missing.map((c) => c.name)} />
+                      · {tx("faltam:")} <MissingNames names={missing.map((c) => c.name || "…")} />
                     </>
                   )}
                 </small>

@@ -6,10 +6,21 @@
  *   ⚠️ chronic conditions   🤮 allergies   🚫💊 drug allergies (must NOT take)
  *   💊 medication (per medicine, with times)   🍽️ food restrictions   🩺 extra medical notes
  */
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { medicationLine, type Medication } from "../api/campers";
+import { useHealthLabel } from "../hooks/usePersonData";
 import { useI18n } from "../i18n";
 import NoPillIcon from "./NoPillIcon";
+
+/**
+ * `labelOf` for `<HealthAlerts>` over the church health lists (+ Acampa's old
+ * import categories): option id → label, null when unknown (the line is
+ * skipped rather than showing a raw id).
+ */
+export function useHealthLabelOf(token: string): (id: string | null | undefined) => string | null {
+  const label = useHealthLabel(token);
+  return useMemo(() => (id: string | null | undefined) => (id ? label(id) || null : null), [label]);
+}
 
 export interface HealthLike {
   allergies: string[];

@@ -3,20 +3,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GROUP_META, bedroomLabel } from "../../api/bedrooms";
 import {
   ROOM_ROLE_META,
-  createStaff,
+  addStaff,
   deleteStaff,
+  registerStaff,
   staffSex,
   updateStaff,
   type Staff,
   type StaffInput,
+  type StaffRegistration,
 } from "../../api/staff";
 import { useCollection, useCollectionOrEmpty } from "../../store";
-import { useCategories, useLabelOf } from "../../store/derive";
-import { formatBrazilPhoneClient } from "../../phoneFormat";
+import { rememberPeople } from "../../store/people";
+import { useLabelOf } from "../../store/derive";
 import DetailStack from "./DetailStack";
 import { useRoute } from "../../router";
-import HealthAlerts from "../../components/HealthAlerts";
-import HealthFilter, { matchesHealth, hasHealth, type HealthKey } from "../../components/HealthFilter";
+import HealthHeart from "../../components/HealthHeart";
+import PersonContact from "../../components/PersonContact";
 import { downloadStaffXlsx } from "../../export";
 import type { CamperSex } from "../../api/campers";
 import { ICONS } from "../../icons";
@@ -35,13 +37,13 @@ import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
 import TransportTag from "../../components/TransportTag";
 import Toast from "../../components/Toast";
-import WhatsAppButton from "../../components/WhatsAppButton";
 import { loadAuth, type CampSummary } from "../../auth/store";
-import { staffGreeting, whatsappLink } from "../../whatsapp";
 import StaffImportPage from "./StaffImportPage";
 import { setPendingImportFile, useWindowFileDrop } from "../../hooks/useFileDrop";
 import { takePendingToast } from "../../pendingToast";
-import { collatorLocale, useI18n } from "../../i18n";
+import { useI18n } from "../../i18n";
+import { compareByName, firstNameOf, shownName } from "./staffNames";
+import css from "./staffGroup.module.scss";
 
 interface StaffPageProps {
   token: string;
@@ -71,13 +73,11 @@ type Wing = "all" | "girls" | "boys";
 /** The camp staff (equipe) list + create/edit form (admin); read-only for programme organizers. */
 export default function StaffPage({ token, camp, camps, readOnly = false }: StaffPageProps) {
   const { tx } = useI18n();
-  const myName = loadAuth()?.user.name ?? "";
   const otherCamps = useMemo(() => camps.filter((c) => c.id !== camp.id), [camps, camp.id]);
   const [importSheetOpen, setImportSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(() => takePendingToast());
   // everything comes from the local store (localStorage + live WebSocket feed)
   const staff = useCollection("staff");
-  const categories = useCategories("staff");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const labelOf = useLabelOf();
   const { segments, navigate } = useRoute();
@@ -97,22 +97,16 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
   /** team ids to show — empty = every team */
   const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set());
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
-  const [health, setHealth] = useState<Set<HealthKey>>(new Set());
   /** tap "sem quarto" in the intro to bubble those cards to the top */
   const [noRoomFirst, setNoRoomFirst] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** the Excel is being prepared: null = idle; {done,total} while each person is read live */
+  const [exporting, setExporting] = useState<{ done: number; total: number } | null>(null);
   const [createSex, setCreateSex] = useState<CamperSex | null>(null);
-  const [createSexBusy, setCreateSexBusy] = useState(false);
-  const onCreateSex = useCallback((sex: CamperSex | null, guessing: boolean) => {
-    setCreateSex(sex);
-    setCreateSexBusy(guessing);
-  }, []);
+  const onCreateSex = useCallback((sex: CamperSex | null) => setCreateSex(sex), []);
   useEffect(() => {
-    if (mode.kind !== "create") {
-      setCreateSex(null);
-      setCreateSexBusy(false);
-    }
+    if (mode.kind !== "create") setCreateSex(null);
   }, [mode.kind]);
 
   /** bedroom id → "Meninos - 403" */
@@ -139,9 +133,39 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
     }
   }
 
-  async function handleCreate(input: StaffInput) {
-    const created = await withBusy(() => createStaff(token, input));
+  /** "Já está no IPAlpha": the person joins this camp's team */
+  async function handleAddExisting(personId: string, ops: Partial<StaffInput>) {
+    const created = await withBusy(() => addStaff(token, personId, ops));
     navigate(`/staff/${created.id}`, { replace: true });
+  }
+
+  /** "Cadastrar pessoa nova": registered in IPAlpha + equipe membership + the camp-ops row */
+  async function handleRegister(input: StaffRegistration) {
+    const res = await withBusy(() => registerStaff(token, input));
+    if (res.staff.name) rememberPeople([{ personId: res.staff.id, name: res.staff.name, sex: input.sex ?? undefined }]);
+    // the phone already belonged to someone in IPAlpha: that person joined, nothing was duplicated
+    if (!res.created) setToast(tx("Este celular já era de alguém no IPAlpha: essa pessoa entrou na equipe."));
+    navigate(`/staff/${res.staff.id}`, { replace: true });
+  }
+
+  /** the Excel of the team — only what this role may see, read live right now */
+  async function handleExport() {
+    if (!staff) return;
+    const role = loadAuth()?.user.activeRole;
+    setExporting({ done: 0, total: 0 });
+    setError(null);
+    try {
+      await downloadStaffXlsx(
+        { token, healthAllowed: role === "coordenacao" || role === "saude", contactsAllowed: role === "coordenacao", onProgress: (done, total) => setExporting({ done, total }) },
+        staff,
+        bedrooms,
+        labelOf,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+    } finally {
+      setExporting(null);
+    }
   }
 
   async function handleEdit(input: StaffInput) {
@@ -151,7 +175,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
   }
 
   async function handleDelete(member: Staff) {
-    if (!(await confirm({ emoji: "🗑️", title: tx("Excluir {name} da equipe?", { name: member.name }), message: member.admin ? tx("O login de admin continua. Só o cadastro na equipe é apagado.") : tx("Isso não pode ser desfeito."), confirmLabel: tx("Excluir"), danger: true }))) return;
+    if (!(await confirm({ emoji: "🗑️", title: tx("Tirar {name} da equipe?", { name: shownName(member.name) }), message: tx("A pessoa sai da equipe deste acampamento. O cadastro dela no IPAlpha continua."), confirmLabel: tx("Tirar da equipe"), danger: true }))) return;
     try {
       await withBusy(() => deleteStaff(token, member.id));
       navigate("/staff", { replace: true });
@@ -166,29 +190,17 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
     const list = sortByName(staff).filter((s) => {
       if (wing !== "all" && wingOf(s.bedroom) !== wing) return false;
       if (teamFilter.size > 0 && !(s.team && teamFilter.has(s.team))) return false;
-      if (!matchesHealth(s, health)) return false;
       if (!q) return true;
       const hay = normalize(
-        [s.name, s.phone, labelOf(s.team), bedroomOf(s.bedroom), labelOf(s.transportation)].filter(Boolean).join(" "),
+        [s.name, s.nickname, labelOf(s.team), bedroomOf(s.bedroom), labelOf(s.transportation)].filter(Boolean).join(" "),
       );
       return hay.includes(q);
     });
     // only bubble "sem quarto" when the intro tag is toggled on
     if (noRoomFirst) list.sort((a, b) => Number(!!a.bedroom) - Number(!!b.bedroom));
     return list;
-  }, [staff, search, wing, teamFilter, health, labelOf, bedroomOf, wingOf, noRoomFirst]);
+  }, [staff, search, wing, teamFilter, labelOf, bedroomOf, wingOf, noRoomFirst]);
   const noRoomCount = useMemo(() => (staff ?? []).filter((s) => !s.bedroom).length, [staff]);
-
-  const healthCounts = useMemo(() => {
-    const c: Partial<Record<HealthKey, number>> = {};
-    for (const key of ["healthIssues", "allergies", "drugAllergies", "medicines", "foodRestrictions"] as const) c[key] = 0;
-    for (const s of staff ?? []) {
-      if (wing !== "all" && wingOf(s.bedroom) !== wing) continue;
-      if (teamFilter.size > 0 && !(s.team && teamFilter.has(s.team))) continue;
-      for (const key of ["healthIssues", "allergies", "drugAllergies", "medicines", "foodRestrictions"] as const) if (hasHealth(s, key)) c[key]!++;
-    }
-    return c;
-  }, [staff, wing, teamFilter, wingOf]);
 
   /** people per wing (by the room they sleep in) */
   const wingCounts = useMemo(() => {
@@ -232,12 +244,15 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
 
   if (mode.kind === "detail") {
     return (
-      <DetailStack
-        token={token}
-        current={{ kind: "staff", id: mode.id }}
-        rootCrumbs={[{ label: tx("Equipe"), onClick: () => navigate("/staff") }]}
-        onEditStaff={readOnly ? undefined : (member) => navigate(`/staff/${member.id}/edit`)}
-      />
+      <>
+        <DetailStack
+          token={token}
+          current={{ kind: "staff", id: mode.id }}
+          rootCrumbs={[{ label: tx("Equipe"), onClick: () => navigate("/staff") }]}
+          onEditStaff={readOnly ? undefined : (member) => navigate(`/staff/${member.id}/edit`)}
+        />
+        <Toast message={toast} onClose={() => setToast(null)} />
+      </>
     );
   }
 
@@ -247,13 +262,13 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
     <div className="admin-page admin-page--staff">
       {mode.kind === "create" && <Breadcrumbs items={[{ label: tx("Equipe"), onClick: () => guardedNav("/staff") }, { label: tx("Novo") }]} />}
       {mode.kind === "edit" && editing && (
-        <Breadcrumbs items={[{ label: tx("Equipe"), onClick: () => guardedNav("/staff") }, { label: editing.name.split(" ")[0], onClick: () => guardedNav(`/staff/${editing.id}`) }, { label: tx("Editar") }]} />
+        <Breadcrumbs items={[{ label: tx("Equipe"), onClick: () => guardedNav("/staff") }, { label: firstNameOf(editing.name), onClick: () => guardedNav(`/staff/${editing.id}`) }, { label: tx("Editar") }]} />
       )}
       <header className="admin-head">
         <h1 className="admin-title">
           {mode.kind === "create" ? (
             <>
-              <img className={`admin-title__icon${createSexBusy ? " admin-title__icon--busy" : ""}`} src={createSex === "M" ? ICONS.man : ICONS.woman} alt="" aria-hidden="true" /> <span>{tx("Novo membro da equipe")}</span>
+              <img className="admin-title__icon" src={createSex === "M" ? ICONS.man : ICONS.woman} alt="" aria-hidden="true" /> <span>{tx("Novo membro da equipe")}</span>
             </>
           ) : mode.kind === "edit" ? (
             tx("✏️ Editar membro da equipe")
@@ -287,13 +302,14 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
             <button
               type="button"
               className="button button--secondary admin-head__new"
-              disabled={busy || staff.length === 0}
+              disabled={busy || !!exporting || staff.length === 0}
               title={tx("Baixar toda a equipe em Excel")}
               aria-label={tx("Baixar toda a equipe em Excel")}
-              onClick={() => downloadStaffXlsx(staff, bedrooms, labelOf)}
+              aria-busy={!!exporting}
+              onClick={() => void handleExport()}
             >
               <DownloadGlyph />
-              <span className="admin-head__action-label">{tx("Download")}</span>
+              <span className="admin-head__action-label">{exporting ? (exporting.total ? tx("Preparando {done}/{total}…", { done: exporting.done, total: exporting.total }) : tx("Preparando…")) : tx("Download")}</span>
             </button>
             <button
               type="button"
@@ -312,8 +328,8 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
           <button
             type="button"
             className="icon-btn icon-btn--lg icon-btn--danger"
-            title={tx("Excluir {name} da equipe", { name: editing.name })}
-            aria-label={tx("Excluir {name} da equipe", { name: editing.name })}
+            title={tx("Tirar {name} da equipe", { name: shownName(editing.name) })}
+            aria-label={tx("Tirar {name} da equipe", { name: shownName(editing.name) })}
             disabled={busy}
             onClick={() => handleDelete(editing)}
           >
@@ -338,33 +354,29 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
       {mode.kind === "create" && (
         <StaffForm
           token={token}
-          categories={categories}
           busy={busy}
-          onSubmit={handleCreate}
+          onAddExisting={handleAddExisting}
+          onRegister={handleRegister}
           onSexChange={onCreateSex}
           leaveGuardRef={leaveGuardRef}
         />
       )}
       {mode.kind === "edit" && !editing && <p className="opt-empty">{tx("Pessoa não encontrada.")}</p>}
       {mode.kind === "edit" && editing && (
-        <>
-          <StaffForm
-            token={token}
-            key={editing.id}
-            member={editing}
-            categories={categories}
-            busy={busy}
-            onSubmit={handleEdit}
-            leaveGuardRef={leaveGuardRef}
-          />
-          {editing.admin && <p className="cat-hint">🔑 {tx("{name} é admin: o login continua se sair da equipe.", { name: editing.name })}</p>}
-        </>
+        <StaffForm
+          token={token}
+          key={editing.id}
+          member={editing}
+          busy={busy}
+          onSubmit={handleEdit}
+          leaveGuardRef={leaveGuardRef}
+        />
       )}
 
       {mode.kind === "view" && (
         <>
           <div className="staff-toolbar">
-            <SearchField placeholder={tx("Buscar por nome, celular, time, quarto…")} value={search} onChange={setSearch} aria-label={tx("Buscar")} />
+            <SearchField placeholder={tx("Buscar por nome, time, quarto…")} value={search} onChange={setSearch} aria-label={tx("Buscar")} />
           </div>
           <div className="health-filter" role="group" aria-label={tx("Ala e time")}>
             {(
@@ -387,7 +399,6 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
               </button>
             )}
           </div>
-          <HealthFilter value={health} onChange={setHealth} counts={healthCounts} />
           <TeamFilterDialog open={teamDialogOpen} teams={teams} value={teamFilter} counts={teamCounts} onChange={setTeamFilter} onClose={() => setTeamDialogOpen(false)} />
 
           {staff.length === 0 && (
@@ -433,7 +444,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
                     className="staff-card__body"
                     role="link"
                     tabIndex={0}
-                    title={tx("Ver {name}", { name: s.name })}
+                    title={tx("Ver {name}", { name: shownName(s.name) })}
                     onClick={() => navigate(`/staff/${s.id}`)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -443,14 +454,11 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
                     }}
                   >
                     <h3 className="staff-card__name">
-                      {s.name}
-                      {s.admin && <span className="staff-card__inactive" title={tx("Admin do app")}>admin</span>}
+                      <span className={s.name ? undefined : css.pendingName} title={s.name ? undefined : tx("Carregando nome…")}>{shownName(s.name)}</span>
+                      <HealthHeart show={s.hasHealth} />
                       {!s.active && <span className="staff-card__inactive">{tx("inativo")}</span>}
                     </h3>
                     {noRoom && <p className="staff-card__meta orphan-msg">⚠️ {tx("Esta pessoa está sem quarto.")}</p>}
-                    <p className="staff-card__meta">
-                      {s.phone ? formatBrazilPhoneClient(s.phone) : <em className="staff-card__missing">{tx("sem celular")}</em>}
-                    </p>
                     {(room || s.team || s.transportation) && (
                       <div className="staff-card__tags">
                         {room && <BedroomTag bedroom={room} />}
@@ -463,20 +471,16 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
                         <TransportTag transportId={s.transportation} short className="staff-tag--pill" />
                       </div>
                     )}
-                    <HealthAlerts person={s} labelOf={labelOf} />
                   </div>
-                  {s.phone && (
-                    <WhatsAppButton
-                      className="wa-btn--sm staff-card__wa"
-                      href={whatsappLink(s.phone, staffGreeting({ toName: s.name, fromName: myName }))}
-                      label={tx("Falar com {name} no WhatsApp", { name: s.name.split(" ")[0] })}
-                    />
-                  )}
+                  {/* phones are never in the records: read from IPAlpha only when someone taps */}
+                  <span className={css.cardContact}>
+                    <PersonContact token={token} personId={s.id} name={s.name} compact />
+                  </span>
                   <button
                     type="button"
                     className="icon-btn icon-btn--lg staff-card__edit"
                     title={tx("Editar")}
-                    aria-label={tx("Editar {name}", { name: s.name })}
+                    aria-label={tx("Editar {name}", { name: shownName(s.name) })}
                     disabled={busy}
                     onClick={() => navigate(`/staff/${s.id}/edit`)}
                   >
@@ -500,5 +504,5 @@ function normalize(s: string): string {
 }
 
 function sortByName(list: Staff[]): Staff[] {
-  return list.slice().sort((a, b) => a.name.localeCompare(b.name, collatorLocale(), { sensitivity: "base" }));
+  return list.slice().sort(compareByName);
 }

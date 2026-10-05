@@ -46,7 +46,7 @@ export default function AdminsEditor({ token, user }: AdminsEditorProps) {
           {info.admins.map((a) => (
             <li key={a.personId} className="wizard-admins__row">
               <span className="wizard-admins__name">
-                {a.name || "—"} {a.personId === user.personId && <span className="cat-hint">{tx("(você)")}</span>}
+                {a.name || tx("Nome indisponível no momento")} {a.personId === user.personId && <span className="cat-hint">{tx("(você)")}</span>}
                 {a.superAdmin && <span className="cat-hint"> {tx("· admin da implantação")}</span>}
               </span>
             </li>

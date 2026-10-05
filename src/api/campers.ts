@@ -10,60 +10,35 @@ export const CAMPER_CATEGORY_KEYS = {
   healthIssues: "condicao-cronica",
 } as const;
 
-export interface Camper {
+/**
+ * A kid's camp-ops record (participants, CONTRACTS_ACAMPA §15). The id IS the
+ * IPAlpha person id. No person data lives here: the name / nickname / sex
+ * come live from core (joined by the store from the people cache), health is
+ * read per person on demand (GET /api/campers/:id) or in a filtered list.
+ */
+export interface CamperRecord {
+  /** the IPAlpha person id */
   id: string;
-  name: string;
-  /** true when the server sent a NAME-ONLY record (bus helper roll call): no health, contacts or notes */
+  personId: string;
+  /** true when the server sent a NAME-ONLY record (bus helper roll call): no notes */
   redacted?: boolean;
-  /** true when the server sent a CARE record (room caretaker / helper): health and notes, but no guardian / emergency / documents */
+  /** true when the server sent a CARE record (room caretaker / helper): no invitedBy / badge token */
   contactsHidden?: boolean;
-  /** "YYYY-MM-DD" or null */
-  birthDate: string | null;
-  /** "F" | "M" | null — from the room (meninas/meninos); never shown on the form */
-  sex: CamperSex | null;
-  /** "F" | "M" | null — Jev guess on the name; internal, never shown; icon + ordering fallback when the room has no wing */
-  probableGender: CamperSex | null;
-  cpf: string;
-  rg: string;
-  school: string;
-  schoolGrade: string;
-  /** church the kid attends */
-  church: string;
   /** who invited the kid */
   invitedBy: string;
-  /** staff id of the team member responsible for the kid (a caretaker of the kid's room); null = orphan */
+  /** person id of the team member responsible for the kid (a caretaker of the kid's room); null = orphan */
   caretakerId: string | null;
   /** token printed on the QR badge */
   qrToken: string;
-  /** id in the registration system */
-  externalId: string;
   team: string | null;
   /** Transport id (see api/transports.ts) — bus / car, not a category option */
   transportation: string | null;
   /** category option id (cima / baixo) */
   bed: string | null;
   bedroom: string | null;
-  /** kilograms (one decimal) or null */
-  weightKg: number | null;
-  allergies: string[];
-  drugAllergies: string[];
-  healthIssues: string[];
-  /** neurodivergent (TEA, TDAH…) — only admins and the medical team receive it (false for everyone else) */
-  neurodivergent: boolean;
-  /** medicines the kid takes, each with its schedule (drives the medical checklist) */
-  medications: Medication[];
-  foodRestrictions: string;
-  healthNotes: string;
   generalNotes: string;
   /** who the kid would like to share the room with */
   bedroomPreference: string;
-  insurance: string;
-  insuranceCard: string;
-  emergencyContact: string;
-  guardianName: string;
-  guardianPhone: string | null;
-  guardianCpf: string;
-  guardianEmail: string;
   /** set once the kid arrived at the church and the parent confirmed the registration data */
   checkin: CamperCheckin | null;
   /** set once the kid boarded the bus going to camp */
@@ -71,7 +46,7 @@ export interface Camper {
   /** set once the kid boarded the bus returning to church */
   busReturnCheckin: CamperCheckin | null;
   createdAt: string;
-  /** ISO — when a parent last edited the "Informações de saúde"; null until they do (drives the 🕓 history button) */
+  /** ISO — when a responsável last edited the kid's health / notes; null until they do */
   parentEditedAt: string | null;
   importId: string | null;
   /** Pending/processing imported campers pulse subtly while the worker reviews observations. */
@@ -81,6 +56,46 @@ export interface Camper {
   aiReviewFinishedAt: string | null;
   updatedAt: string;
 }
+
+/** The health block (persons-api `medical`, read with the acting role token — core's role rules decide). */
+export interface HealthInfo {
+  allergies: string[];
+  drugAllergies: string[];
+  healthIssues: string[];
+  /** TEA, TDAH… */
+  neurodivergent: boolean;
+  /** medicines the person takes, each with its schedule (drives the medical checklist) */
+  medications: Medication[];
+  foodRestrictions: string;
+  healthNotes: string;
+  /** kilograms (one decimal) or null */
+  weightKg: number | null;
+  insurance: string;
+  insuranceCard: string;
+}
+
+export const EMPTY_HEALTH: HealthInfo = { allergies: [], drugAllergies: [], healthIssues: [], neurodivergent: false, medications: [], foodRestrictions: "", healthNotes: "", weightKg: null, insurance: "", insuranceCard: "" };
+
+/** The person fields read live from core with the name (decision 39: sex is shown like the name). */
+export interface PersonLive {
+  /** "" while not known yet (offline, or still loading) */
+  name: string;
+  nickname: string | null;
+  sex: CamperSex | null;
+  /** neutral ♥ — only for roles allowed health; never says what */
+  hasHealth?: boolean;
+  /** health details: only on the person page, a health-tag filter or a name filter with ≤ 6 results */
+  health?: HealthInfo | null;
+  /**
+   * Not served to Acampa today (decision 39 keeps the birth date out of the
+   * names read): ages are unknown, so age-based helpers (room distribution,
+   * birthdays) simply skip it. Kept optional so a future read can fill it.
+   */
+  birthDate?: string | null;
+}
+
+/** What screens read: the camp-ops record + the live person fields. */
+export interface Camper extends CamperRecord, PersonLive {}
 
 export type CamperSex = "F" | "M";
 
@@ -110,14 +125,22 @@ export function medicationsText(list: Medication[]): string {
 
 export interface CamperCheckin {
   at: string;
-  byUserId: string;
-  byName: string;
+  /** who did it (person id — name read live) */
+  byPersonId: string;
+  /** the acting role key */
   byRole: string;
   /** set when nobody did it by hand — e.g. the system checked the kid in when their wristband scored points */
   note?: string;
 }
 
-export type CamperInput = Omit<Camper, "id" | "checkin" | "busCheckin" | "busReturnCheckin" | "parentEditedAt" | "importId" | "aiReviewStatus" | "aiReviewError" | "aiReviewStartedAt" | "aiReviewFinishedAt" | "createdAt" | "updatedAt">;
+/** Camp-ops fields the coordenação / organização may write (PUT /api/campers/:id). */
+export type CamperOpsInput = Partial<Pick<CamperRecord, "team" | "transportation" | "bed" | "bedroom" | "caretakerId" | "invitedBy" | "qrToken" | "generalNotes" | "bedroomPreference">>;
+
+/** One responsável of a kid (ids + live name). */
+export interface Responsible {
+  personId: string;
+  name: string;
+}
 
 export interface CamperDetail {
   camper: Camper;
@@ -131,9 +154,9 @@ export interface CamperDetail {
 
 const json = (token: string) => ({ ...bearer(token), "content-type": "application/json" });
 
-/** Result of GET /api/campers/lookup/:id — emergency QR scan of any kid. */
+/** Result of GET /api/campers/lookup/:id — emergency QR scan of any kid (name + health included). */
 export interface CamperLookupResult {
-  camper: Camper;
+  camper: CamperRecord & { name: string; health: HealthInfo | null };
   /** present on out-of-scope scans so the UI can show the room without the bedrooms collection */
   bedroom?: { id: string; name: string; group: "girls" | "boys" | "staff" } | null;
   /** present on out-of-scope scans so the UI can show the líder without the staff collection */
@@ -153,32 +176,58 @@ export async function lookupCamper(token: string, id: string): Promise<CamperLoo
   return api<CamperLookupResult>(`/api/campers/lookup/${encodeURIComponent(id)}`, { headers: bearer(token) });
 }
 
-export async function createCamper(token: string, input: CamperInput): Promise<Camper> {
-  const res = await command<{ camper: Camper }>("/api/campers", { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["campers", "bedrooms"]);
+/** An existing IPAlpha person joins this camp's kids (`POST /api/campers {personId, …ops}`). */
+export async function addCamper(token: string, personId: string, ops: CamperOpsInput = {}): Promise<CamperRecord> {
+  const res = await command<{ camper: CamperRecord }>("/api/campers", { method: "POST", headers: json(token), body: JSON.stringify({ personId, ...ops }) }, ["campers", "bedrooms"]);
   return res.camper;
 }
 
-export async function updateCamper(token: string, id: string, patch: Partial<CamperInput>): Promise<Camper> {
-  const res = await command<{ camper: Camper }>(`/api/campers/${id}`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers", "bedrooms"]);
+export interface CamperRegistration {
+  name: string;
+  /** "YYYY-MM-DD" */
+  birthDate: string;
+  responsible: { name: string; phone: string };
+  health?: Partial<HealthInfo>;
+}
+
+/** A NEW kid + responsável registered in IPAlpha by the coordenação (`POST /api/campers/register`). */
+export async function registerCamper(token: string, input: CamperRegistration & CamperOpsInput): Promise<{ camper: CamperRecord & { name: string }; responsible: { personId: string; created: boolean } }> {
+  return command("/api/campers/register", { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["campers", "bedrooms"]);
+}
+
+/** One more responsável for a kid (coordenação; decision 38 — linked in IPAlpha). */
+export async function addResponsible(token: string, camperId: string, input: { name: string; phone: string; email?: string }): Promise<{ responsible: Responsible; linked: boolean }> {
+  return api(`/api/campers/${encodeURIComponent(camperId)}/responsibles`, { method: "POST", headers: json(token), body: JSON.stringify(input) });
+}
+
+export async function updateCamper(token: string, id: string, patch: CamperOpsInput): Promise<CamperRecord> {
+  const res = await command<{ camper: CamperRecord }>(`/api/campers/${id}`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers", "bedrooms"]);
   return res.camper;
 }
 
 /** Moves the kid to another room and (optionally) under a caretaker of that room. `caretakerId` null = orphan. */
-export async function moveCamper(token: string, id: string, bedroom: string | null, caretakerId: string | null): Promise<Camper> {
+export async function moveCamper(token: string, id: string, bedroom: string | null, caretakerId: string | null): Promise<CamperRecord> {
   return updateCamper(token, id, { bedroom, caretakerId });
 }
 
-export async function deleteCamper(token: string, id: string): Promise<void> {
-  await command(`/api/campers/${id}`, { method: "DELETE", headers: bearer(token) }, ["campers", "bedrooms"]);
+/** The kid leaves this camp's operations (the IPAlpha membership is removed when the coordenação may). */
+export async function deleteCamper(token: string, id: string): Promise<{ membershipRemoved: boolean }> {
+  return command(`/api/campers/${id}`, { method: "DELETE", headers: bearer(token) }, ["campers", "bedrooms"]);
+}
+
+/** The kid's page: camp ops + name + health (roles allowed) + responsáveis — read live, never stored. */
+export async function fetchCamper(token: string, id: string): Promise<Camper & { responsibles: Responsible[] }> {
+  const res = await api<{ camper: Camper & { responsibles: Responsible[] } }>(`/api/campers/${encodeURIComponent(id)}`, { headers: bearer(token) });
+  return res.camper;
 }
 
 /** The fields a PARENT may edit on their own kid ("Informações de saúde"). Everything but `generalNotes` is medical. */
 export type ParentEditableField = "allergies" | "drugAllergies" | "healthIssues" | "medications" | "foodRestrictions" | "healthNotes" | "weightKg" | "insurance" | "insuranceCard" | "generalNotes";
-export type ParentPatch = Partial<Pick<Camper, ParentEditableField>>;
+export type ParentPatch = Partial<Omit<HealthInfo, "neurodivergent"> & { generalNotes: string }>;
 
 /** The fields the MEDICAL team may edit on any kid — the health block, plus `neurodivergent`. */
 export type MedicalEditableField = Exclude<ParentEditableField, "generalNotes"> | "neurodivergent";
-export type MedicalPatch = Partial<Pick<Camper, MedicalEditableField>>;
+export type MedicalPatch = Partial<HealthInfo>;
 
 /** a field that can appear in the kid's change history (parent or medical edits) */
 export type CamperChangeField = ParentEditableField | MedicalEditableField;
@@ -197,30 +246,30 @@ export const PARENT_FIELD_LABEL: Record<CamperChangeField, string> = {
   neurodivergent: "Neurodivergente",
 };
 
-/** One edit a parent made to their kid (history read by the admin). */
+/** Which fields of a kid were edited, by whom and when (no before / after values — the data lives in IPAlpha). */
 export interface CamperChange {
   id: string;
-  camperId: string;
-  camperName: string;
+  /** the kid */
+  personId: string;
   at: string;
-  byUserId: string;
-  byName: string;
+  byPersonId: string;
   byRole: string;
   /** at least one MEDICAL field changed */
   medical: boolean;
-  changes: { field: CamperChangeField; before: unknown; after: unknown }[];
+  fields: CamperChangeField[];
 }
 
-/** A PARENT edits the "Informações de saúde" of their own kid. */
-export async function parentUpdateCamper(token: string, id: string, patch: ParentPatch): Promise<Camper> {
-  const res = await command<{ camper: Camper }>(`/api/campers/${id}/parent`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers"]);
-  return res.camper;
+/** Answer of a health / notes edit: the record + the health as written in IPAlpha. */
+export type CamperHealthAnswer = { camper: CamperRecord & { health: HealthInfo | null }; changed: boolean };
+
+/** A PARENT edits the "Informações de saúde" of their own kid (written to IPAlpha). */
+export async function parentUpdateCamper(token: string, id: string, patch: ParentPatch): Promise<CamperHealthAnswer> {
+  return command<CamperHealthAnswer>(`/api/campers/${id}/parent`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers"]);
 }
 
-/** The MEDICAL team (or the organization) edits the health block of a kid. */
-export async function medicalUpdateCamper(token: string, id: string, patch: MedicalPatch): Promise<Camper> {
-  const res = await command<{ camper: Camper }>(`/api/campers/${id}/health`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers"]);
-  return res.camper;
+/** The care team (`saude`) or the coordenação edits the health block of a kid (written to IPAlpha). */
+export async function medicalUpdateCamper(token: string, id: string, patch: MedicalPatch): Promise<CamperHealthAnswer> {
+  return command<CamperHealthAnswer>(`/api/campers/${id}/health`, { method: "PUT", headers: json(token), body: JSON.stringify(patch) }, ["campers"]);
 }
 
 /** The parent-edit history of one kid, newest first (admin). */
@@ -234,13 +283,13 @@ const checkinPath = (id: string, kind: CheckinKind) =>
   `/api/campers/${id}/checkin${kind === "bus" ? "/bus" : kind === "bus_return" ? "/bus-return" : ""}`;
 
 /** The kid arrived (church: parent confirmed the data at the gate; bus: boarded). */
-export async function checkinCamper(token: string, id: string, kind: CheckinKind = "church"): Promise<Camper> {
-  const res = await command<{ camper: Camper }>(checkinPath(id, kind), { method: "POST", headers: bearer(token) }, ["campers"]);
+export async function checkinCamper(token: string, id: string, kind: CheckinKind = "church"): Promise<CamperRecord> {
+  const res = await command<{ camper: CamperRecord }>(checkinPath(id, kind), { method: "POST", headers: bearer(token) }, ["campers"]);
   return res.camper;
 }
 
-export async function undoCheckinCamper(token: string, id: string, kind: CheckinKind = "church"): Promise<Camper> {
-  const res = await command<{ camper: Camper }>(checkinPath(id, kind), { method: "DELETE", headers: bearer(token) }, ["campers"]);
+export async function undoCheckinCamper(token: string, id: string, kind: CheckinKind = "church"): Promise<CamperRecord> {
+  const res = await command<{ camper: CamperRecord }>(checkinPath(id, kind), { method: "DELETE", headers: bearer(token) }, ["campers"]);
   return res.camper;
 }
 

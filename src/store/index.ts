@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Bedroom } from "../api/bedrooms";
-import type { Camper } from "../api/campers";
+import type { Camper, CamperRecord } from "../api/campers";
 import type { Category } from "../api/categories";
 import type { Transport } from "../api/transports";
 import type { Instruction } from "../api/instructions";
@@ -8,14 +8,15 @@ import type { Occurrence } from "../api/occurrences";
 import type { MedicationDose } from "../api/medications";
 import type { PrepSection } from "../api/preparation";
 import type { CampEvent, ScheduleRole } from "../api/schedule";
-import type { Staff } from "../api/staff";
+import type { Staff, StaffRecord } from "../api/staff";
 import type { Settings } from "../api/settings";
 import type { Team } from "../api/teams";
 import type { ScoreEntry } from "../api/scores";
 import type { GalleryPhoto } from "../api/gallery";
+import type { Prescription } from "../api/medications";
 import { fetchOfflineKey, type OfflineKeyAnswer } from "../auth/store";
 import { copyIsUsable, decryptJson, defaultBackend, encryptJson, importOfflineKey, stripHealth, type OfflineBackend } from "./offline";
-import { clearPeople, onPeopleChange, peopleSnapshot, rememberPeople, type PersonInfo } from "./people";
+import { clearPeople, onPeopleChange, peopleSnapshot, peopleVersion, personInfo, rememberPeople, type PersonInfo } from "./people";
 
 /**
  * Local-first data store.
@@ -31,6 +32,13 @@ import { clearPeople, onPeopleChange, peopleSnapshot, rememberPeople, type Perso
  * copy (./offline.ts, decision 35) — never in localStorage.
  */
 
+/** What the server pushes: camp-ops records only (no names, no health). */
+export interface ServerCollections extends Omit<Collections, "campers" | "staff"> {
+  campers: CamperRecord[];
+  staff: StaffRecord[];
+}
+
+/** What screens read: kids and team joined with their live names (people cache). */
 export interface Collections {
   campers: Camper[];
   staff: Staff[];
@@ -48,15 +56,18 @@ export interface Collections {
   medications: MedicationDose[];
   gallery: GalleryPhoto[];
   settings: Settings;
+  /** LOCAL ONLY (never pushed): the kids' medicines read live from IPAlpha for the care team's checklist (health) */
+  prescriptions: Prescription[];
 }
 export type CollectionName = keyof Collections;
-type ListCollectionName = Exclude<CollectionName, "settings">;
+type ListCollectionName = Exclude<CollectionName, "settings" | "prescriptions">;
+/** what the server pushes (hydration waits for these; `prescriptions` is filled locally) */
 export const COLLECTION_NAMES: CollectionName[] = ["campers", "staff", "bedrooms", "categories", "transports", "teams", "scores", "roles", "events", "preparation", "instructions", "occurrences", "medications", "gallery", "settings"];
 
 export type ConnectionState = "connecting" | "online" | "offline";
 
 interface StoreState {
-  data: Partial<Collections>;
+  data: Partial<ServerCollections>;
   /** ISO time of the last message from the server (null = never synced on this device) */
   syncedAt: string | null;
   connection: ConnectionState;
@@ -90,7 +101,7 @@ let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 const MAX_TIMEOUT = 2 ** 31 - 1;
 
 interface OfflinePayload {
-  data: Partial<Collections>;
+  data: Partial<ServerCollections>;
   syncedAt: string | null;
   people: PersonInfo[];
 }
@@ -115,7 +126,7 @@ async function writeCopy(): Promise<void> {
   const epoch = offlineEpoch;
   if (!key || !info) return;
   const payload: OfflinePayload = { data: state.data, syncedAt: state.syncedAt, people: peopleSnapshot() };
-  const safe = info.healthAllowed ? payload : { ...payload, data: stripHealth(payload.data as Record<string, unknown>) as Partial<Collections>, people: stripHealth({ people: payload.people }).people };
+  const safe = info.healthAllowed ? payload : { ...payload, data: stripHealth(payload.data as Record<string, unknown>) as Partial<ServerCollections>, people: stripHealth({ people: payload.people }).people };
   try {
     const { iv, data } = await encryptJson(key, safe);
     if (epoch !== offlineEpoch) return;
@@ -218,7 +229,7 @@ export function getState(): StoreState {
 }
 
 /** Replace whole collections (what the server pushes). */
-export function applyServerData(data: Partial<Collections>, at: string): void {
+export function applyServerData(data: Partial<ServerCollections>, at: string): void {
   state = { ...state, data: { ...state.data, ...data }, syncedAt: at };
   persist();
   emit();
@@ -231,18 +242,18 @@ export function setConnection(connection: ConnectionState): void {
 }
 
 /** Optimistic local edit of one collection (after a successful REST write). */
-export function patchCollection<K extends ListCollectionName>(name: K, fn: (list: Collections[K]) => Collections[K]): void {
-  const current = (state.data[name] ?? []) as Collections[K];
+export function patchCollection<K extends ListCollectionName>(name: K, fn: (list: ServerCollections[K]) => ServerCollections[K]): void {
+  const current = (state.data[name] ?? []) as ServerCollections[K];
   state = { ...state, data: { ...state.data, [name]: fn(current) } };
   persist();
   emit();
 }
 
 /** Upsert one item by id. */
-export function upsert<K extends ListCollectionName>(name: K, item: Collections[K][number]): void {
+export function upsert<K extends ListCollectionName>(name: K, item: ServerCollections[K][number]): void {
   patchCollection(name, (list) => {
     const i = list.findIndex((x) => x.id === item.id);
-    const next = list.slice() as Collections[K];
+    const next = list.slice() as ServerCollections[K];
     if (i < 0) next.push(item as never);
     else next[i] = item as never;
     return next;
@@ -250,7 +261,7 @@ export function upsert<K extends ListCollectionName>(name: K, item: Collections[
 }
 
 export function remove<K extends ListCollectionName>(name: K, id: string): void {
-  patchCollection(name, (list) => list.filter((x) => x.id !== id) as Collections[K]);
+  patchCollection(name, (list) => list.filter((x) => x.id !== id) as ServerCollections[K]);
 }
 
 /** Empties the in-memory store (and the people cache). The encrypted copy is handled by `endOfflineSession`. */
@@ -269,14 +280,45 @@ export function clearStore(): void {
 
 const EMPTY: never[] = [];
 
+/** One joined list per (records array, people version) — stable between renders, as useSyncExternalStore needs. */
+const joinCache = new WeakMap<object, { version: number; out: unknown[] }>();
+
+/** The live person fields of a camp-ops record ("" / null while the name is not known yet). */
+function withPerson<T extends { id: string }>(record: T): T & { name: string; nickname: string | null; sex: "F" | "M" | null; hasHealth?: boolean } {
+  const info = personInfo(record.id);
+  return { ...record, name: info?.name ?? "", nickname: info?.nickname ?? null, sex: info?.sex ?? null, ...(info?.hasHealth !== undefined ? { hasHealth: info.hasHealth } : {}) };
+}
+
+function joined(list: { id: string }[]): unknown[] {
+  const v = peopleVersion();
+  const hit = joinCache.get(list);
+  if (hit && hit.version === v) return hit.out;
+  const out = list.map(withPerson);
+  joinCache.set(list, { version: v, out });
+  return out;
+}
+
+/** The view of one collection: kids / team joined with their names, everything else as pushed. */
+function view<K extends CollectionName>(name: K): Collections[K] | undefined {
+  const raw = state.data[name];
+  if (raw === undefined) return undefined;
+  if (name === "campers" || name === "staff") return joined(raw as { id: string }[]) as Collections[K];
+  return raw as unknown as Collections[K];
+}
+
 /** One collection, or `null` while this device has never received it. */
 export function useCollection<K extends CollectionName>(name: K): Collections[K] | null {
-  return useSyncExternalStore(subscribe, () => (state.data[name] as Collections[K] | undefined) ?? null);
+  return useSyncExternalStore(subscribe, () => view(name) ?? null);
 }
 
 /** Same, but never null (empty list until synced). */
 export function useCollectionOrEmpty<K extends CollectionName>(name: K): Collections[K] {
-  return useSyncExternalStore(subscribe, () => ((state.data[name] as Collections[K] | undefined) ?? (EMPTY as unknown as Collections[K])));
+  return useSyncExternalStore(subscribe, () => view(name) ?? (EMPTY as unknown as Collections[K]));
+}
+
+/** Non-hook read of the joined view (assistant context, exports). */
+export function readCollection<K extends CollectionName>(name: K): Collections[K] | null {
+  return view(name) ?? null;
 }
 
 export function useConnection(): ConnectionState {

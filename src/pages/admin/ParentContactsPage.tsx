@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { updateSettings, type ParentContact } from "../../api/settings";
 import { useCollection, useCollectionOrEmpty } from "../../store";
+import { useNames } from "../../store/people";
+import { shownName } from "./staffNames";
 import StaffPicker from "./StaffPicker";
 import { speakWhen } from "../../dates";
 import PageFooter from "../../components/PageFooter";
@@ -49,6 +51,9 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   const staffById = useMemo(() => new Map(staff.map((person) => [person.id, person])), [staff]);
+  // a contact may point at someone who left the team: their name is still read live by person id
+  const nameOf = useNames([...contacts.map((c) => c.personId), draft.personId]);
+  const contactName = (personId: string) => staffById.get(personId)?.name || nameOf(personId);
   const selectedStaff = draft.personId ? staffById.get(draft.personId) ?? null : null;
   const editing = draft.id !== null;
   const validDraft = draft.title.trim().length > 0 && !!selectedStaff?.active;
@@ -124,7 +129,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
         <h1 className="admin-title">📞 {tx("Contatos importantes")}</h1>
       </header>
       <p className="admin-intro">
-        {tx("Quem os pais podem procurar, com um")} <strong>{tx("título claro")}</strong> {tx("para o assunto. Os pais veem nome e celular de cada pessoa.")}
+        {tx("Quem os pais podem procurar, com um")} <strong>{tx("título claro")}</strong> {tx("para o assunto. Os pais veem o nome e podem pedir o celular de cada pessoa.")}
       </p>
       {settings && <ParentWindowNote window={settings.parentWindow} />}
 
@@ -149,7 +154,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
           <button type="button" className="contact-person" disabled={busy} onClick={() => setPickerOpen(true)}>
             <span className="contact-person__icon" aria-hidden="true">👤</span>
             <span className="contact-person__body">
-              <strong>{selectedStaff?.name ?? tx("Escolher pessoa")}</strong>
+              <strong>{selectedStaff ? shownName(contactName(selectedStaff.id)) : tx("Escolher pessoa")}</strong>
               <span>{selectedStaff ? tx("Toque para trocar") : tx("Busque na equipe ativa")}</span>
             </span>
             <span className="contact-person__action">{selectedStaff ? tx("Trocar") : tx("Escolher")}</span>
@@ -179,13 +184,14 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
           <ol className="contact-list">
             {contacts.map((contact, index) => {
               const person = staffById.get(contact.personId);
+              const name = contactName(contact.personId);
               return (
                 <li key={contact.id} className="contact-item">
                   <div className="contact-item__main">
                     <span className="contact-item__icon" aria-hidden="true">👤</span>
                     <div className="contact-item__body">
                       <h3>{contact.title}</h3>
-                      <p>{person?.name ?? tx("Pessoa não encontrada")}</p>
+                      <p>{person || name ? shownName(name) : tx("Não está mais na equipe")}</p>
                     </div>
                   </div>
                   <div className="contact-item__actions" aria-label={tx("Ações de {title}", { title: contact.title })}>
@@ -201,7 +207,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
         )}
       </section>
 
-      <PageFooter>{tx("O telefone vem do cadastro da equipe. Quem entra nesta lista passa a ter acesso ao app fora da janela da equipe (como os organizadores).")}</PageFooter>
+      <PageFooter>{tx("O celular vem do cadastro da pessoa no IPAlpha. Quem entra nesta lista passa a ter acesso ao app fora da janela da equipe (como a organização).")}</PageFooter>
 
       <StaffPicker
         open={pickerOpen}

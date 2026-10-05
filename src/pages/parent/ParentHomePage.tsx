@@ -1,30 +1,31 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import BedroomTag from "../../components/BedroomTag";
-import { ageOf, type Camper } from "../../api/campers";
+import { EMPTY_HEALTH, type Camper, type HealthInfo } from "../../api/campers";
 import { staffSex, type Staff } from "../../api/staff";
 import CamperQr from "../../components/CamperQr";
 import HealthAlerts from "../../components/HealthAlerts";
 import KidIcon from "../../components/KidIcon";
 import ParentKidTabs from "../../components/ParentKidTabs";
+import PersonContact from "../../components/PersonContact";
 import PlayScene from "../../components/PlayScene";
 import HealthIcon from "../../components/HealthIcon";
 import StaffIcon from "../../components/StaffIcon";
 import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
-import WhatsAppButton from "../../components/WhatsAppButton";
+import { useCamperLive, useHealthLabel } from "../../hooks/usePersonData";
 import type { ParentAccess } from "../../hooks/useParentWindow";
 import { kidIconSex } from "../../icons";
 import { parentHomeIntroLiteral, teamLookingAfterLiteral } from "../../parentCopy";
-import { useCollectionOrEmpty } from "../../store";
-import { formatBrazilPhoneClient } from "../../phoneFormat";
+import { useCollection, useCollectionOrEmpty } from "../../store";
+import { useNames } from "../../store/people";
 import type { LoggedUser } from "../../roles";
 import { useLabelOf, useParentHome, type MyKid } from "../../store/derive";
-import { staffGreeting, whatsappLink } from "../../whatsapp";
 import TransportTag from "../../components/TransportTag";
 import AttentionEditDialog from "./AttentionEditDialog";
 import CheckinQrDialog from "./CheckinQrDialog";
-import { speakBirth, speakWhen } from "../../dates";
+import { speakWhen } from "../../dates";
 import { useI18n } from "../../i18n";
+import styles from "../../styles/ops.module.scss";
 
 interface ParentHomePageProps {
   user: LoggedUser;
@@ -32,54 +33,104 @@ interface ParentHomePageProps {
   access: ParentAccess;
 }
 
+/** A name read live from IPAlpha: a gentle placeholder until it arrives, never a blank line. */
+const shown = (name: string) => name || "…";
 
-function ContactBody({ staff: s, title }: { staff: Staff; title?: ReactNode }) {
-  const { tx } = useI18n();
-  return (
-    <>
-      {title && <p className="parent-contact__title">{title}</p>}
-      <h3 className="staff-card__name">{s.name}</h3>
-      <p className="staff-card__meta">{s.phone ? formatBrazilPhoneClient(s.phone) : <em className="staff-card__missing">{tx("sem celular")}</em>}</p>
-    </>
-  );
-}
-
-/** Compact chip: important contacts sit in one stretching row. */
-function ImportantContact({ staff: s, title, from }: { staff: Staff; title?: ReactNode; from: string }) {
-  const { tx } = useI18n();
+/** Compact chip: important contacts sit in one stretching row. The phone is read only on tap. */
+function ImportantContact({ token, personId, name, title }: { token: string; personId: string; name: string; title?: ReactNode }) {
   return (
     <li className="parent-chip">
       <div className="parent-chip__body">
-        <ContactBody staff={s} title={title} />
+        {title && <p className="parent-contact__title">{title}</p>}
+        <h3 className="staff-card__name">{shown(name)}</h3>
       </div>
-      {s.phone && <WhatsAppButton className="wa-btn--sm" href={whatsappLink(s.phone, staffGreeting({ toName: s.name, fromName: from }))} label={tx("Falar com {name} no WhatsApp", { name: s.name.split(" ")[0] })} />}
+      <PersonContact token={token} personId={personId} name={name} compact />
     </li>
   );
 }
 
-/** Full-width card for the kid's room team — same padding as the identity card. */
-function TeamContact({ staff: s, title, from, about }: { staff: Staff; title?: ReactNode; from: string; about?: string }) {
-  const { tx } = useI18n();
+/** Full-width card for the kid's room team — same padding as the identity card. The phone is read only on tap. */
+function TeamContact({ token, staff: s, title, about }: { token: string; staff: Staff; title?: ReactNode; about?: string }) {
   return (
     <li className="parent-team-card">
       <div className="parent-team-card__body">
-        <ContactBody staff={s} title={title} />
+        {title && <p className="parent-contact__title">{title}</p>}
+        <h3 className="staff-card__name">{shown(s.name)}</h3>
       </div>
-      {s.phone && <WhatsAppButton href={whatsappLink(s.phone, staffGreeting({ toName: s.name, fromName: from, about }))} label={tx("Falar com {name} no WhatsApp", { name: s.name.split(" ")[0] })} />}
+      <PersonContact token={token} personId={s.id} name={s.name} about={about} />
     </li>
   );
 }
 
-/** One kid: registration data, the team looking after them, the "Informações de saúde" block and the QR code. */
-function KidSection({ kid, token, user, showTeam }: { kid: MyKid; token: string; user: LoggedUser; showTeam: boolean }) {
+/** "Informações de saúde": read live from IPAlpha (the responsável's own kid), edited in AttentionEditDialog. */
+function KidHealth({ token, kid, reviewing }: { token: string; kid: Camper; reviewing: boolean }) {
+  const { tx } = useI18n();
+  const live = useCamperLive(token, kid.id);
+  const healthLabel = useHealthLabel(token);
+  const labelOf = (id: string | null | undefined) => (id ? healthLabel(id) || null : null);
+  const [editing, setEditing] = useState(false);
+  const h: HealthInfo | null = live.data ? { ...EMPTY_HEALTH, ...(live.data.health ?? {}) } : null;
+  const notes = live.data?.generalNotes ?? kid.generalNotes;
+  const empty = h && !h.allergies.length && !h.drugAllergies.length && !h.healthIssues.length && !h.medications.length && !h.foodRestrictions && !h.healthNotes;
+
+  return (
+    <div className="detail-section">
+      <div className="detail-h2-row">
+        <h3 className="detail-h2"><HealthIcon size={24} /> {tx("Informações de saúde")}</h3>
+        <button type="button" className="button button--edit" disabled={!h} onClick={() => setEditing(true)}>
+          <span className="pencil" aria-hidden="true">✏️</span> {tx("Editar")}
+        </button>
+      </div>
+      <div className={`detail-card ${styles.reveal} ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
+        {!h ? (
+          live.error ? (
+            <p className="cat-hint">
+              {tx("Não conseguimos ler as informações de saúde agora.")}{" "}
+              <button type="button" className="link-btn" onClick={live.reload}>{tx("Tentar de novo")}</button>
+            </p>
+          ) : (
+            <p className={`cat-hint ${styles.loading}`}>{tx("Carregando…")}</p>
+          )
+        ) : (
+          <>
+            <dl className="detail-grid">
+              <dt>{tx("Peso")}</dt>
+              <dd>{h.weightKg != null ? tx("{weight} kg", { weight: String(h.weightKg).replace(".", ",") }) : "—"}</dd>
+              <dt>{tx("Convênio")}</dt>
+              <dd>
+                {h.insurance || "—"}
+                {h.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: h.insuranceCard })}</span>}
+              </dd>
+            </dl>
+            <HealthAlerts person={h} labelOf={labelOf} boxed />
+            {empty && <p className="cat-hint">{tx("Nenhuma alergia, condição ou medicação informada.")}</p>}
+          </>
+        )}
+        <p className="detail-note">📝 {notes || (reviewing ? tx("Observações em revisão pela IA…") : <em className="staff-card__missing">{tx("sem observações")}</em>)}</p>
+      </div>
+      {editing && h && (
+        <AttentionEditDialog
+          token={token}
+          open
+          camper={kid}
+          health={h}
+          generalNotes={notes}
+          onSaved={live.reload}
+          onClose={() => setEditing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** One kid: camp data, the team looking after them, the "Informações de saúde" block and the QR code. */
+function KidSection({ kid, token, showTeam }: { kid: MyKid; token: string; showTeam: boolean }) {
   const { tx } = useI18n();
   const { camper: k, bedroom, caretaker, roomStaff } = kid;
   const labelOf = useLabelOf();
   const bedrooms = useCollectionOrEmpty("bedrooms");
-  const [editing, setEditing] = useState(false);
-  const age = ageOf(k.birthDate);
-  const sex = kidIconSex(bedroom?.group, k.sex, k.probableGender);
-  const first = k.name.split(" ")[0];
+  const sex = kidIconSex(bedroom?.group, k.sex);
+  const first = k.name.split(" ")[0] || tx("sua criança");
   const bedLabel = labelOf(k.bed);
   const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
 
@@ -89,8 +140,7 @@ function KidSection({ kid, token, user, showTeam }: { kid: MyKid; token: string;
         <h2 className="admin-title detail-title">
           <KidIcon sex={sex} size={40} />
           <span className="parent-kid__identity">
-            <span className="parent-kid__name">{k.name}</span>
-            {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
+            <span className="parent-kid__name">{shown(k.name)}</span>
           </span>
           <span className="parent-kid__break" aria-hidden="true" />
           {k.checkin && <span className="parent-kid__status staff-tag staff-tag--here">{tx("✅ check-in feito")}</span>}
@@ -99,8 +149,6 @@ function KidSection({ kid, token, user, showTeam }: { kid: MyKid; token: string;
 
       <div className="detail-card">
         <dl className="detail-grid">
-          <dt>{tx("Nascimento")}</dt>
-          <dd>{speakBirth(k.birthDate) ?? "—"}</dd>
           <dt>{tx("Time")}</dt>
           <dd>
             <TeamTag teamId={k.team} fallback="—" />
@@ -113,7 +161,7 @@ function KidSection({ kid, token, user, showTeam }: { kid: MyKid; token: string;
           <dt>{tx("Transporte")}</dt>
           <dd>{k.transportation ? <TransportTag transportId={k.transportation} /> : "—"}</dd>
           <dt>{tx("Líder")}</dt>
-          <dd>{showTeam ? (caretaker ? <><RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {caretaker.name}</> : "—") : <em className="staff-card__missing">{tx("disponível a partir do check-in")}</em>}</dd>
+          <dd>{showTeam ? (caretaker ? <><RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {shown(caretaker.name)}</> : "—") : <em className="staff-card__missing">{tx("disponível a partir do check-in")}</em>}</dd>
         </dl>
       </div>
 
@@ -126,61 +174,40 @@ function KidSection({ kid, token, user, showTeam }: { kid: MyKid; token: string;
             <p className="opt-empty">{tx("A equipe do quarto ainda não foi definida.")}</p>
           ) : (
             <ul className="parent-team">
-              {caretaker && <TeamContact staff={caretaker} title={<><RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {tx("Líder de {name}", { name: first })}</>} from={user.name} about={k.name} />}
+              {caretaker && <TeamContact token={token} staff={caretaker} title={<><RoomRoleIcon role="caretaker" sex={staffSex(caretaker, bedrooms)} /> {tx("Líder de {name}", { name: first })}</>} about={k.name} />}
               {roomStaff.map((s) => (
-                <TeamContact key={s.id} staff={s} title={bedroom ? tx("Equipe do quarto {name}", { name: bedroom.name }) : tx("Equipe do quarto")} from={user.name} about={k.name} />
+                <TeamContact key={s.id} token={token} staff={s} title={bedroom ? tx("Equipe do quarto {name}", { name: bedroom.name }) : tx("Equipe do quarto")} about={k.name} />
               ))}
             </ul>
           )}
         </div>
       )}
 
-      <div className="detail-section">
-        <div className="detail-h2-row">
-          <h3 className="detail-h2"><HealthIcon size={24} /> {tx("Informações de saúde")}</h3>
-          <button type="button" className="button button--edit" onClick={() => setEditing(true)}>
-            <span className="pencil" aria-hidden="true">✏️</span> {tx("Editar")}
-          </button>
-        </div>
-        <div className={`detail-card ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
-          <dl className="detail-grid">
-            <dt>{tx("Peso")}</dt>
-            <dd>{k.weightKg != null ? tx("{weight} kg", { weight: String(k.weightKg).replace(".", ",") }) : "—"}</dd>
-            <dt>{tx("Convênio")}</dt>
-            <dd>
-              {k.insurance || "—"}
-              {k.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: k.insuranceCard })}</span>}
-            </dd>
-          </dl>
-          <HealthAlerts person={k} labelOf={labelOf} boxed />
-          {!k.allergies.length && !k.drugAllergies.length && !k.healthIssues.length && !k.medications.length && !k.foodRestrictions && !k.healthNotes && (
-            <p className="cat-hint">{tx("Nenhuma alergia, condição ou medicação informada.")}</p>
-          )}
-          <p className="detail-note">📝 {k.generalNotes || (reviewing ? tx("Observações em revisão pela IA…") : <em className="staff-card__missing">{tx("sem observações")}</em>)}</p>
-        </div>
-      </div>
+      <KidHealth token={token} kid={k} reviewing={reviewing} />
 
       <div className="detail-section parent-qr">
         <h3 className="detail-h2">{tx("🎟️ QR code de {name}", { name: first })}</h3>
         <p className="admin-intro">{tx("Mostre à equipe na entrada do acampamento para o check-in.")}</p>
         <CamperQr camperId={k.id} name={k.name} />
       </div>
-
-      {editing && <AttentionEditDialog token={token} open camper={k} onClose={() => setEditing(false)} />}
     </section>
   );
 }
 
 /**
  * "Início" for a PARENT: the important contacts — always, for as long as the
- * parent may use the app — then the selected kid: registration data, the team
+ * parent may use the app — then the selected kid: camp data, the team
  * looking after them (parents' window only), the editable "Informações de saúde"
- * and the QR code. Before the check-in starts and after the last event the
- * ROOM TEAM is not sent by the server; the contacts are.
+ * (read live from IPAlpha) and the QR code. Before the check-in starts and
+ * after the last event the ROOM TEAM is not sent by the server; the contacts
+ * are. Phones are never in the records: each one is read on tap.
  */
 export default function ParentHomePage({ user, token, access }: ParentHomePageProps) {
   const { tx } = useI18n();
   const data = useParentHome();
+  const settings = useCollection("settings");
+  const contacts = useMemo(() => settings?.parentContacts ?? [], [settings]);
+  const nameOf = useNames(contacts.map((c) => c.personId));
   const first = user.name.split(" ")[0];
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
 
@@ -190,6 +217,8 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
       setSelectedKidId(data.kids[0].camper.id);
     }
   }, [data, selectedKidId]);
+
+  const hello = first ? tx("Olá, {name}! 👋", { name: first }) : tx("Olá! 👋");
 
   if (data === null) {
     return (
@@ -202,9 +231,9 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
   if (data.kids.length === 0) {
     return (
       <div className="admin-page">
-        <h1 className="admin-title">{tx("Olá, {name}! 👋", { name: first })}</h1>
+        <h1 className="admin-title">{hello}</h1>
         <p className="opt-empty">
-          {tx("Não encontramos nenhuma criança inscrita com o seu celular.")}
+          {tx("Ainda não encontramos nenhuma criança ligada a você neste acampamento.")}
           <br />
           {tx("Fale com a organização para ajustar o cadastro.")}
         </p>
@@ -214,14 +243,14 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
 
   const kids: Camper[] = data.kids.map((k) => k.camper);
   const selectedKid = data.kids.find((kid) => kid.camper.id === selectedKidId) ?? data.kids[0];
-  const sex = kidIconSex(selectedKid.bedroom?.group, selectedKid.camper.sex, selectedKid.camper.probableGender);
+  const sex = kidIconSex(selectedKid.bedroom?.group, selectedKid.camper.sex);
 
   return (
     <div className="admin-page">
-      <h1 className="admin-title">{tx("Olá, {name}! 👋", { name: first })}</h1>
+      <h1 className="admin-title">{hello}</h1>
       <p className="admin-intro">
         {access.open
-          ? tx(parentHomeIntroLiteral(data.kids.map((kid) => kidIconSex(kid.bedroom?.group, kid.camper.sex, kid.camper.probableGender))))
+          ? tx(parentHomeIntroLiteral(data.kids.map((kid) => kidIconSex(kid.bedroom?.group, kid.camper.sex))))
           : access.opensAt && new Date(access.opensAt).getTime() > Date.now()
             ? tx("A equipe do quarto aparece aqui a partir do check-in ({when}).", { when: speakWhen(access.opensAt, { long: true }) })
             : tx("O acampamento terminou. Obrigado por confiar em nós! 💚")}
@@ -229,13 +258,13 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
 
       <CheckinQrDialog kids={kids} active={access.checkin} />
 
-      {/* the numbers to call — shown the whole time the parent has access, not only during the camp */}
-      {data.contacts.length > 0 && (
+      {/* the people to call — shown the whole time the parent has access, not only during the camp */}
+      {contacts.length > 0 && (
         <section className="detail-section">
           <h2 className="detail-h2">📞 {tx("Contatos importantes")}</h2>
           <ul className="parent-contacts">
-            {data.contacts.map((c) => (
-              <ImportantContact key={c.id} staff={c.staff} title={c.title} from={user.name} />
+            {contacts.map((c) => (
+              <ImportantContact key={c.id} token={token} personId={c.personId} name={nameOf(c.personId)} title={c.title} />
             ))}
           </ul>
         </section>
@@ -249,7 +278,7 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
         aria-labelledby={data.kids.length > 1 ? `parent-kid-tab-${selectedKid.camper.id}` : undefined}
         className="parent-kid-panel"
       >
-        <KidSection key={selectedKid.camper.id} kid={selectedKid} token={token} user={user} showTeam={access.open} />
+        <KidSection key={selectedKid.camper.id} kid={selectedKid} token={token} showTeam={access.open} />
       </div>
 
       <PlayScene sex={sex} />

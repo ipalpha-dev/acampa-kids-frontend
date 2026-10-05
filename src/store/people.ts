@@ -82,6 +82,10 @@ export function clearPeople(): void {
   emit();
 }
 
+export function peopleVersion(): number {
+  return version;
+}
+
 export function usePeopleVersion(): number {
   return useSyncExternalStore(subscribe, () => version);
 }

@@ -45,6 +45,7 @@ import TrialsPage from "./admin/TrialsPage";
 import CleanupPage from "./admin/CleanupPage";
 import SeedsPage from "./admin/SeedsPage";
 import SuperPage from "./admin/SuperPage";
+import MessageTemplatesPage from "./admin/MessageTemplatesPage";
 import Breadcrumbs from "../components/Breadcrumbs";
 import ScoreboardPage from "./ScoreboardPage";
 import GalleryPage from "./GalleryPage";
@@ -52,6 +53,7 @@ import { useCheckinHelper, type HelperAccess } from "../hooks/useCheckinHelper";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useParentWindow } from "../hooks/useParentWindow";
 import { useCampWindow } from "../hooks/useCampWindow";
+import { useRosterNames } from "../hooks/useRosterNames";
 import { useCollection, useCollectionOrEmpty, useHydrated } from "../store";
 import WizardPage from "../wizard/WizardPage";
 import { campIsZeroed, setWizardDismissed, wizardDismissed } from "../wizard/state";
@@ -81,7 +83,7 @@ interface DashboardProps {
 type View = TabKey | "profile" | "badge" | "settings" | "wizard" | SettingsKey;
 
 /** Admin settings live behind the ⚙️ button; each one is its own URL (#/categories, #/settings). `superOnly`: just the deployment owner (SUPER_ADMIN_PHONE). */
-type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "contacts" | "notifications" | "super" | "about";
+type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "contacts" | "notifications" | "templates" | "super" | "about";
 /** `adminOnly`: an ORGANIZER (Settings → Organizadores) gets every other page — these four stay with the real admin. `superOnly`: only the deployment owner. */
 const SETTINGS: readonly { key: SettingsKey; label: string; emoji?: string; icon?: string; adminOnly?: boolean; superOnly?: boolean }[] = [
   { key: "general", label: "Geral", emoji: "⚙️" },
@@ -90,6 +92,7 @@ const SETTINGS: readonly { key: SettingsKey; label: string; emoji?: string; icon
   { key: "checkin-settings", label: "Check-in", emoji: "✅" },
   { key: "contacts", label: "Contatos importantes", emoji: "📞" },
   { key: "notifications", label: "Notificações", icon: ICONS.notifications, adminOnly: true },
+  { key: "templates", label: "Mensagens", emoji: "✉️", adminOnly: true },
   { key: "trials", label: "Testes", emoji: "🚧" },
   { key: "categories", label: "Categorias", emoji: "🗂️", adminOnly: true },
   { key: "cleanup", label: "Limpeza", icon: ICONS.cleanup, adminOnly: true },
@@ -221,6 +224,8 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
   const isParent = user.audience === "parent";
   const helper = useCheckinHelper(user.activeRole, user.personId, isTeam, endsAt);
   const parentAccess = useParentWindow(isParent);
+  // live names of the kids / team this role may see, paged in the background
+  useRosterNames(token);
   useCampWindow(isTeam && !helper.medical && !helper.organizer && !helper.scoreHelper, user.personId, during);
   const settings = useCollection("settings");
   const roomsDraft = !!settings?.kidsRoomsDraft;
@@ -364,7 +369,7 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
         transports: transportsList,
         preparation: prepList,
         instructions: instrList,
-        teamStaff: staffList.filter((s) => s.active && !s.admin),
+        teamStaff: staffList.filter((s) => s.active),
       })
     ) {
       navigate("/wizard", { replace: true });
@@ -779,6 +784,7 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
             {view === "gallery" && <GalleryPage token={token} canManage={settingsAllowed || helper.photographer} parentMode={isParent} />}
             {view === "contacts" && <ParentContactsPage token={token} />}
             {view === "notifications" && <NotificationsPage token={token} />}
+            {view === "templates" && <MessageTemplatesPage token={token} />}
             {view === "about" && <AboutPage token={token} />}
             {view === "checkin" && !settingsAllowed && <CheckinPage token={token} />}
             {view === "checkin" && settingsAllowed && segments.length === 1 && <AdminCheckinPage />}
@@ -791,15 +797,14 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
                 onHome={() => navigate("/checkin")}
                 onOpenStaff={(id) => navigate(`/staff/${id}`)}
                 onOpenCamper={(id) => navigate(`/campers/${id}`)}
-                myName={user.name}
                 via="bus"
               />
             )}
             {view === "checkin" && settingsAllowed && segments[1] === "bus" && segments[2] === "outbound" && <BusCheckinPage token={token} trip="outbound" basePath="/checkin/bus/outbound" checkinHomePath="/checkin" reportPath="/checkin/bus/report" />}
             {view === "checkin" && settingsAllowed && segments[1] === "bus" && segments[2] === "return" && <BusCheckinPage token={token} trip="return" basePath="/checkin/bus/return" checkinHomePath="/checkin" reportPath="/checkin/bus/report" />}
             {view === "checkin" && settingsAllowed && segments[1] === "staff" && <StaffCheckinPage token={token} checkinHomePath="/checkin" />}
-            {view === "checkin" && settingsAllowed && segments[1] === "vests" && <VestPage token={token} myName={user.name} checkinHomePath="/checkin" />}
-            {view === "vests" && <VestPage token={token} myName={user.name} />}
+            {view === "checkin" && settingsAllowed && segments[1] === "vests" && <VestPage token={token} checkinHomePath="/checkin" />}
+            {view === "vests" && <VestPage token={token} />}
             {view === "bus" && segments.length === 1 && helper.bus && (
               helper.busOutbound && helper.busReturn
                 ? <BusTripsPage outboundAvailable={helper.busOutbound} returnAvailable={helper.busReturn} />
@@ -812,7 +817,7 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
             )}
             {view === "staffcheckin" && <StaffCheckinPage token={token} />}
             {view === "profile" && (isParent
-              ? <ParentProfile user={user} onLogout={handleLogout} loggingOut={loggingOut} onSwitchRole={onSwitchRole} />
+              ? <ParentProfile token={token} user={user} onLogout={handleLogout} loggingOut={loggingOut} onSwitchRole={onSwitchRole} />
               : (
                 <ProfileView
                   user={user}

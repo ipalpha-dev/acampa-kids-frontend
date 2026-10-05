@@ -1,0 +1,84 @@
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+// ── Sobre: pie / legend tones (palette in SCSS, not in the component) ──────
+
+.slice { stroke: var(--tone, var(--muted)); }
+.dot { background: var(--tone, var(--muted)); }
+
+.tone-muted { --tone: var(--muted); }
+
+.vendor-anthropic { --tone: var(--sun); }
+.vendor-openai { --tone: var(--panel); }
+.vendor-openai_api { --tone: var(--forest-dark); }
+.vendor-xai { --tone: var(--red); }
+.vendor-meta { --tone: var(--pine); }
+.vendor-zhipu { --tone: var(--sage); }
+.vendor-google { --tone: var(--sky); }
+.vendor-alibaba { --tone: var(--orange, #e08a1e); }
+.vendor-typesafe { --tone: var(--teal, #0f9a8a); }
+
+.kind-edit { --tone: var(--sun); }
+.kind-suggest { --tone: var(--panel); }
+.kind-image { --tone: var(--red); }
+.kind-camper_notes { --tone: var(--pine); }
+.kind-structure_health { --tone: var(--teal, #0f9a8a); }
+.kind-normalize_observations { --tone: var(--orange, #e08a1e); }
+.kind-dedup_field { --tone: var(--sage); }
+.kind-guess_sex { --tone: var(--sky); }
+.kind-assistant_chat { --tone: var(--forest); }
+.kind-assistant_voice { --tone: var(--forest-dark); }
+
+// ── Superusuário: import cache counter ─────────────────────────────────────
+
+.cacheCount { font-size: 1.4rem; }
+
+// ── Geral: "Informações de saúde da importação" ───────────────────────────
+// the list grows / shrinks with its real height (0fr ↔ 1fr) instead of jumping
+
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .28s $ease, opacity .2s ease;
+}
+
+.revealOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.revealInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pausedList {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pausedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius, 12px);
+  background: var(--sand);
+  animation: pausedIn .24s $ease both;
+}
+
+@keyframes pausedIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { transition: none; }
+  .pausedItem { animation: none; }
+}

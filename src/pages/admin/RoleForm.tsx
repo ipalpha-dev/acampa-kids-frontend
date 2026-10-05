@@ -214,7 +214,7 @@ function RolePositionsPicker({ value, onChange, disabled }: { value: RoomRole[];
               onClick={() => onChange(o.roles)}
             >
               <span className="big-option__emoji" aria-hidden="true">
-                <img className="audience-icon" src={o.icon} alt="" style={{ width: 32, height: 32 }} />
+                <img className="audience-icon audience-icon--32" src={o.icon} alt="" />
               </span>
               <span className="big-option__label">{o.label}</span>
               <span className="big-option__hint">{o.hint}</span>

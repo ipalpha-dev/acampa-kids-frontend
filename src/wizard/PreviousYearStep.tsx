@@ -112,7 +112,7 @@ export default function PreviousYearStep({ token, camp, camps }: PreviousYearSte
         <img className="admin-title__icon" src={ICONS.previousYear} alt="" aria-hidden="true" /> {tx("Outros anos")}
       </h2>
       <p className="admin-intro">
-        {tx("Traga o que já existe de outro acampamento: categorias, times, quartos, ônibus, equipe, acampantes, programação, documentos e configurações. Cada bloco vira gente e registro NOVOS deste ano — nada aqui altera o ano de origem.")}
+        {tx("Traga o que já existe de outro acampamento: categorias, times, quartos, ônibus, equipe, acampantes, programação, documentos e configurações. Cada bloco vira registro NOVO deste ano (as pessoas são as mesmas do IPAlpha) — nada aqui altera o ano de origem.")}
       </p>
 
       <h3 className="cat-form__title">{tx("De onde importar")}</h3>
@@ -163,12 +163,15 @@ export default function PreviousYearStep({ token, camp, camps }: PreviousYearSte
 function buildSummaryLine(result: ImportFromCampResult, tx: (pt: string, vars?: Record<string, string | number>) => string): string {
   const parts: string[] = [];
   let skipped = 0;
+  let waiting = 0;
   for (const b of BLOCKS) {
     const r = result[b.key];
     if (!r) continue;
     skipped += r.skipped;
+    waiting += r.membershipsFailed ?? 0;
     if (r.created > 0) parts.push(tx("{n} {unit}", { n: r.created, unit: tx(b.unit[r.created === 1 ? 0 : 1]) }));
   }
   const base = parts.length > 0 ? parts.join(", ") : tx("Nada novo para importar");
-  return skipped > 0 ? tx("{summary} · {n} já estavam aqui", { summary: base, n: skipped }) : base;
+  const line = skipped > 0 ? tx("{summary} · {n} já estavam aqui", { summary: base, n: skipped }) : base;
+  return waiting > 0 ? `${line} · ${tx("{n} pessoa(s) ainda precisa(m) ser incluída(s) nesta edição pelo Mordomia", { n: waiting })}` : line;
 }

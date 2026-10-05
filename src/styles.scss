@@ -4107,3 +4107,13 @@ body:has(.assign-ghost) .assign-chip:hover { transform: none; box-shadow: none; 
 .suspense-hero .cat-hint { text-align: center; }
 .scoreboard-suspense-status { display: flex; align-items: center; gap: 8px; text-align: left; }
 .scoreboard-suspense-status__icon { flex: none; width: 28px; height: 28px; object-fit: contain; }
+
+// neutral ♥ of the people lists (decision 31): there is health info, never what
+.health-heart { display: inline-grid; place-items: center; width: 1.3em; height: 1.3em; margin-left: 4px; border-radius: 50%; background: #fdecea; color: #b4473a; font-size: .8em; line-height: 1; vertical-align: middle; }
+
+// on-demand contact (read from IPAlpha when tapped)
+.person-contact { display: inline-flex; align-items: center; gap: 8px; }
+.person-contact__phone { color: inherit; font-weight: 700; text-decoration: none; }
+
+.option-icon-34 { width: 34px; height: 34px; }
+.audience-icon--32 { width: 32px; height: 32px; }

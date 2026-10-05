@@ -59,13 +59,13 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
       <p className="cat-hint">
         {tx("Pessoas da equipe que leram")} <strong>{tx("3 ou mais")}</strong> {tx("crianças que não são do quarto delas pelo botão de busca.")}
         {" "}
-        {tx("A partir de 3 o admin recebe um SMS; a partir de 5 o acesso a crianças de fora fica bloqueado até zerar.")}
+        {tx("A partir de 3 a coordenação recebe um SMS; a partir de 5 o acesso a crianças de fora fica bloqueado até zerar.")}
       </p>
       <ul className="foreign-lookup-list">
         {offenders.map((o) => (
           <li key={o.personId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
             <div>
-              <strong>{nameOf(o.personId) || "—"}</strong>
+              <strong>{nameOf(o.personId) || tx("Carregando nome…")}</strong>
               <span className="foreign-lookup-list__count">
                 {o.count === 1
                   ? tx("{n} criança", { n: o.count })

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CAMPER_CATEGORY_KEYS, blankMedication, parentUpdateCamper, type Camper, type Medication, type ParentPatch } from "../../api/campers";
+import { CAMPER_CATEGORY_KEYS, EMPTY_HEALTH, blankMedication, parentUpdateCamper, type Camper, type CamperHealthAnswer, type HealthInfo, type Medication, type ParentPatch } from "../../api/campers";
 import { CategoryChips } from "../../components/CategoryFields";
 import MedicationsEditor from "../../components/MedicationsEditor";
 import Dialog from "../../components/Dialog";
@@ -16,6 +16,12 @@ interface AttentionEditDialogProps {
   token: string;
   open: boolean;
   camper: Camper;
+  /** the kid's health as read live from IPAlpha right before opening */
+  health: HealthInfo;
+  /** the kid's observations (camp ops) as read live */
+  generalNotes: string;
+  /** after IPAlpha confirmed the edit (the page re-reads the health live) */
+  onSaved?: (answer: CamperHealthAnswer) => void;
   onClose: () => void;
 }
 
@@ -23,34 +29,37 @@ interface AttentionEditDialogProps {
  * The parent edits the "Informações de saúde" of their kid: same field order as
  * the registration form, with each medical topic collapsed behind a switch
  * until there's something to declare. Only changed fields are sent; the
- * server logs them and texts the team.
+ * health is written to IPAlpha (the responsável's own kid), the server logs
+ * which fields changed and lets the team know. Nothing is kept on the device.
  */
-export default function AttentionEditDialog({ token, open, camper: k, onClose }: AttentionEditDialogProps) {
+export default function AttentionEditDialog({ token, open, camper: k, health, generalNotes: notes, onSaved, onClose }: AttentionEditDialogProps) {
   const { tx } = useI18n();
+  /** IPAlpha may leave fields out: read them as "nothing informed" */
+  const h: HealthInfo = { ...EMPTY_HEALTH, ...health };
   const categories = useCategories("camper");
   const cat = (key: string) => categories.find((c) => c.key === key);
-  const first = k.name.split(" ")[0];
+  const first = k.name.split(" ")[0] || tx("sua criança");
 
-  const [insurance, setInsurance] = useState(k.insurance);
-  const [insuranceCard, setInsuranceCard] = useState(k.insuranceCard);
-  const [weight, setWeight] = useState(k.weightKg != null ? String(k.weightKg).replace(".", ",") : "");
-  const [allergies, setAllergies] = useState<string[]>(k.allergies);
-  const [drugAllergies, setDrugAllergies] = useState<string[]>(k.drugAllergies);
-  const [healthIssues, setHealthIssues] = useState<string[]>(k.healthIssues);
-  const [medications, setMedications] = useState<Medication[]>(k.medications);
-  const [foodRestrictions, setFoodRestrictions] = useState(k.foodRestrictions);
-  const [healthNotes, setHealthNotes] = useState(k.healthNotes);
-  const [generalNotes, setGeneralNotes] = useState(k.generalNotes);
+  const [insurance, setInsurance] = useState(h.insurance);
+  const [insuranceCard, setInsuranceCard] = useState(h.insuranceCard);
+  const [weight, setWeight] = useState(h.weightKg != null ? String(h.weightKg).replace(".", ",") : "");
+  const [allergies, setAllergies] = useState<string[]>(h.allergies);
+  const [drugAllergies, setDrugAllergies] = useState<string[]>(h.drugAllergies);
+  const [healthIssues, setHealthIssues] = useState<string[]>(h.healthIssues);
+  const [medications, setMedications] = useState<Medication[]>(h.medications);
+  const [foodRestrictions, setFoodRestrictions] = useState(h.foodRestrictions);
+  const [healthNotes, setHealthNotes] = useState(h.healthNotes);
+  const [generalNotes, setGeneralNotes] = useState(notes);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // each health topic is a switch: off = nothing to declare (field hidden and cleared on save)
-  const [hasAllergies, setHasAllergies] = useState(k.allergies.length > 0);
-  const [hasDrugAllergies, setHasDrugAllergies] = useState(k.drugAllergies.length > 0);
-  const [hasHealthIssues, setHasHealthIssues] = useState(k.healthIssues.length > 0);
-  const [hasMedicines, setHasMedicines] = useState(k.medications.length > 0);
-  const [hasFoodRestrictions, setHasFoodRestrictions] = useState(!!k.foodRestrictions);
-  const [hasHealthNotes, setHasHealthNotes] = useState(!!k.healthNotes);
+  const [hasAllergies, setHasAllergies] = useState(h.allergies.length > 0);
+  const [hasDrugAllergies, setHasDrugAllergies] = useState(h.drugAllergies.length > 0);
+  const [hasHealthIssues, setHasHealthIssues] = useState(h.healthIssues.length > 0);
+  const [hasMedicines, setHasMedicines] = useState(h.medications.length > 0);
+  const [hasFoodRestrictions, setHasFoodRestrictions] = useState(!!h.foodRestrictions);
+  const [hasHealthNotes, setHasHealthNotes] = useState(!!h.healthNotes);
 
   const weightKg = weight.trim() ? Number(weight.trim().replace(",", ".")) : null;
   const weightOk = weightKg === null || (Number.isFinite(weightKg) && weightKg >= 5 && weightKg <= 200);
@@ -64,17 +73,17 @@ export default function AttentionEditDialog({ token, open, camper: k, onClose }:
   const savedHealthNotes = hasHealthNotes ? healthNotes.trim() : "";
 
   const patch: ParentPatch = {};
-  if (!same(savedAllergies, k.allergies)) patch.allergies = savedAllergies;
-  if (!same(savedDrugAllergies, k.drugAllergies)) patch.drugAllergies = savedDrugAllergies;
-  if (!same(savedHealthIssues, k.healthIssues)) patch.healthIssues = savedHealthIssues;
-  if (JSON.stringify(savedMeds) !== JSON.stringify(k.medications)) patch.medications = savedMeds;
-  if (savedFood !== k.foodRestrictions) patch.foodRestrictions = savedFood;
-  if (savedHealthNotes !== k.healthNotes) patch.healthNotes = savedHealthNotes;
+  if (!same(savedAllergies, h.allergies)) patch.allergies = savedAllergies;
+  if (!same(savedDrugAllergies, h.drugAllergies)) patch.drugAllergies = savedDrugAllergies;
+  if (!same(savedHealthIssues, h.healthIssues)) patch.healthIssues = savedHealthIssues;
+  if (JSON.stringify(savedMeds) !== JSON.stringify(h.medications)) patch.medications = savedMeds;
+  if (savedFood !== h.foodRestrictions) patch.foodRestrictions = savedFood;
+  if (savedHealthNotes !== h.healthNotes) patch.healthNotes = savedHealthNotes;
   const roundedWeight = weightOk && weightKg !== null ? Math.round(weightKg * 10) / 10 : null;
-  if (roundedWeight !== k.weightKg) patch.weightKg = roundedWeight;
-  if (insurance.trim() !== k.insurance) patch.insurance = insurance.trim();
-  if (insuranceCard.trim() !== k.insuranceCard) patch.insuranceCard = insuranceCard.trim();
-  if (generalNotes.trim() !== k.generalNotes) patch.generalNotes = generalNotes.trim();
+  if (roundedWeight !== h.weightKg) patch.weightKg = roundedWeight;
+  if (insurance.trim() !== h.insurance) patch.insurance = insurance.trim();
+  if (insuranceCard.trim() !== h.insuranceCard) patch.insuranceCard = insuranceCard.trim();
+  if (generalNotes.trim() !== notes) patch.generalNotes = generalNotes.trim();
   const changed = Object.keys(patch).length > 0;
   const medicalChange = Object.keys(patch).some((f) => f !== "generalNotes");
 
@@ -84,7 +93,7 @@ export default function AttentionEditDialog({ token, open, camper: k, onClose }:
   const ai = useAiNotesSorter({
     token,
     subject: "parent",
-    initialNotes: k.generalNotes,
+    initialNotes: notes,
     busy,
     getCurrent: () => ({
       allergies: savedAllergies,
@@ -142,7 +151,8 @@ export default function AttentionEditDialog({ token, open, camper: k, onClose }:
     setBusy(true);
     setError(null);
     try {
-      await parentUpdateCamper(token, k.id, patch);
+      const answer = await parentUpdateCamper(token, k.id, patch);
+      onSaved?.(answer);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : tx("Algo deu errado."));

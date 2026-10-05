@@ -57,8 +57,8 @@ export async function updateCamp(token: string, id: string, input: UpdateCampInp
   return res.camp;
 }
 
-/** Super admin: sends a 6-digit SMS code to the caller's own phone before a camp can be deleted. Never the active camp. */
-export async function requestCampDelete(token: string, id: string): Promise<{ success: boolean; phone: string; expiresAt: string; delivery: "sms" | "mock" }> {
+/** Super admin: sends a 6-digit SMS code to the caller's own phone (as IPAlpha knows it — never answered) before a camp can be deleted. Never the active camp. */
+export async function requestCampDelete(token: string, id: string): Promise<{ success: boolean; expiresAt: string; delivery: "sms" }> {
   return api(`/api/camps/${id}/delete/request`, { method: "POST", headers: bearer(token) });
 }
 
@@ -101,14 +101,11 @@ export async function fetchCampSummary(token: string, id: string): Promise<CampI
   return api(`/api/camps/${id}/summary`, { headers: bearer(token) });
 }
 
-/** A camper row from ANOTHER year, as the cross-year import search shows it — no health fields. */
+/** A camper row from ANOTHER year, as the cross-year import search shows it — name + sex live, no health. */
 export interface CampCamperRow {
   id: string;
   name: string;
-  birthDate: string | null;
-  age: number | null;
   sex: "F" | "M" | null;
-  guardianFirstName: string | null;
   bedroom: string | null;
   team: string | null;
   /** someone soft-matching already exists in this year */
@@ -119,7 +116,6 @@ export interface CampCamperRow {
 export interface CampStaffRow {
   id: string;
   name: string;
-  phone: string | null;
   roomRole: "caretaker" | "helper" | null;
   bedroom: string | null;
   team: string | null;
@@ -127,13 +123,13 @@ export interface CampStaffRow {
   matched: boolean;
 }
 
-/** Manager: searches another camp's campers by name, guardian or CPF (max 50). */
+/** Manager: searches another camp's campers by name (max 50). */
 export async function searchCampCampers(token: string, id: string, q: string): Promise<CampCamperRow[]> {
   const res = await api<{ rows: CampCamperRow[] }>(`/api/camps/${id}/campers${q ? `?q=${encodeURIComponent(q)}` : ""}`, { headers: bearer(token) });
   return res.rows;
 }
 
-/** Manager: searches another camp's staff by name or phone (max 50). */
+/** Manager: searches another camp's staff by name (max 50). */
 export async function searchCampStaff(token: string, id: string, q: string): Promise<CampStaffRow[]> {
   const res = await api<{ rows: CampStaffRow[] }>(`/api/camps/${id}/staff${q ? `?q=${encodeURIComponent(q)}` : ""}`, { headers: bearer(token) });
   return res.rows;
@@ -152,6 +148,8 @@ export interface ImportBlockResult {
   created: number;
   updated: number;
   skipped: number;
+  /** people copied whose membership in this edition IPAlpha refused (granted later in Mordomia) */
+  membershipsFailed?: number;
 }
 
 export type ImportFromCampResult = Partial<Record<CampImportBlock, ImportBlockResult>>;

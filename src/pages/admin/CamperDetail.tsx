@@ -1,34 +1,37 @@
 import { useEffect, useState } from "react";
-import { ROOM_ROLE_META } from "../../api/staff";
 import AssignLeaderDialog from "./AssignLeaderDialog";
 import ChangeRoomDialog from "./ChangeRoomDialog";
 import CamperHistoryDialog from "./CamperHistoryDialog";
 import CamperFieldDialog, { type CamperQuickField } from "./CamperFieldDialog";
+import CamperResponsibleDialog from "./CamperResponsibleDialog";
 import Breadcrumbs from "../../components/Breadcrumbs";
-import HealthAlerts, { healthLines } from "../../components/HealthAlerts";
+import HealthAlerts, { healthLines, useHealthLabelOf } from "../../components/HealthAlerts";
 import HealthEditDialog from "../../components/HealthEditDialog";
+import HealthHeart from "../../components/HealthHeart";
 import CamperCard from "../../components/CamperCard";
 import KidIcon from "../../components/KidIcon";
 import PlayScene from "../../components/PlayScene";
+import PersonContact from "../../components/PersonContact";
 import { ICONS, kidIconSex } from "../../icons";
 import BedroomTag from "../../components/BedroomTag";
-import { ageOf, type Camper } from "../../api/campers";
+import { ageOf, type Camper, type CamperRecord, type HealthInfo, type PersonLive } from "../../api/campers";
 import ParentIcon from "../../components/ParentIcon";
 import GuardianWhatsApp from "../../components/GuardianWhatsApp";
 import StaffIcon from "../../components/StaffIcon";
 import StaffMiniCard from "../../components/StaffMiniCard";
 import TeamTag from "../../components/TeamTag";
-import WhatsAppButton from "../../components/WhatsAppButton";
 import { loadAuth } from "../../auth/store";
-import { formatCpf } from "../../cpf";
-import { formatBrazilPhoneClient } from "../../phoneFormat";
-import { staffGreeting, whatsappLink } from "../../whatsapp";
+import { useCamperLive } from "../../hooks/usePersonData";
 import { useCollectionOrEmpty } from "../../store";
 import { useCamperDetail, useLabelOf } from "../../store/derive";
+import { useNames } from "../../store/people";
 import TransportTag from "../../components/TransportTag";
 import type { DetailNav } from "./DetailStack";
-import { speakBirth } from "../../dates";
 import { useI18n } from "../../i18n";
+import styles from "../../components/campers.module.scss";
+
+/** An emergency-lookup record: camp ops + the name (+ health) the lookup answered. */
+export type CamperOverride = CamperRecord & { name: string; health?: HealthInfo | null } & Partial<Omit<PersonLive, "name" | "health">>;
 
 interface CamperDetailProps {
   token: string;
@@ -36,25 +39,27 @@ interface CamperDetailProps {
   nav: DetailNav;
   /**
    * Emergency QR lookup: the kid may be OUTSIDE the viewer's realtime store.
-   * When set, this record is shown instead of looking the id up locally
-   * (room / caretaker / roommates still join from the store when present).
+   * When set, this record (and its health) is shown instead of reading the
+   * kid's page (room / caretaker / roommates still join from the store).
    */
-  camperOverride?: Camper;
+  camperOverride?: CamperOverride;
   /** room from the lookup response (out-of-scope kids aren't in the bedrooms store) */
   bedroomOverride?: { id: string; name: string; group: "girls" | "boys" | "staff" } | null;
   /** caretaker from the lookup response (name only) */
   caretakerOverride?: { id: string; name: string } | null;
-  /** absent = read-only (medical team, or opened from another page): no pencil, no room change */
+  /** absent = read-only (care team, or opened from another page): no pencil, no room change */
   onEdit?: (camper: Camper) => void;
-  /** the MEDICAL team (or admin) may edit the kid's health block in place — the 🩺 pencil */
+  /** the care team (or coordenação) may edit the kid's health block in place — the 🩺 pencil */
   canEditHealth?: boolean;
   onOpenStaff?: (staffId: string) => void;
   onOpenCamper?: (camperId: string) => void;
   onOpenBedroom?: (bedroomId: string) => void;
 }
 
-
-/** One kid: full registration info, the room + caretakers, and roommates. */
+/**
+ * One kid: camp operations from the store, the name / health / responsáveis
+ * read LIVE from IPAlpha (never stored), the room + its team, and roommates.
+ */
 export default function CamperDetail({ token, camperId, nav, camperOverride, bedroomOverride, caretakerOverride, onEdit, canEditHealth, onOpenStaff, onOpenCamper, onOpenBedroom }: CamperDetailProps) {
   const { tx } = useI18n();
   const [moveOpen, setMoveOpen] = useState(false);
@@ -62,49 +67,94 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
   const [historyOpen, setHistoryOpen] = useState(false);
   const [fieldOpen, setFieldOpen] = useState<CamperQuickField | null>(null);
   const [healthOpen, setHealthOpen] = useState(false);
-  // joined locally from the store — works offline and updates live
+  const [responsibleOpen, setResponsibleOpen] = useState(false);
+  // camp ops joined locally from the store — works offline and updates live
   const data = useCamperDetail(camperId);
+  // the kid's page read live: name, health (roles allowed) and responsáveis — an emergency lookup already brought its own
+  const live = useCamperLive(token, camperOverride ? null : camperId);
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const staff = useCollectionOrEmpty("staff");
   const labelOf = useLabelOf();
-  const myName = loadAuth()?.user.name ?? "";
+  const healthLabelOf = useHealthLabelOf(token);
+  const activeRole = loadAuth()?.user.activeRole;
   const { setTitle } = nav;
 
-  // emergency lookup: the kid may not be in the local store at all
-  const resolved = camperOverride
-    ? (() => {
-        const roomFromStore = camperOverride.bedroom ? bedrooms.find((b) => b.id === camperOverride.bedroom) : null;
-        const room = bedroomOverride ?? (roomFromStore ? { id: roomFromStore.id, name: roomFromStore.name, group: roomFromStore.group } : null);
-        const caretakerFromStore = camperOverride.caretakerId ? (staff.find((s) => s.id === camperOverride.caretakerId) ?? null) : null;
-        const caretaker = caretakerOverride ?? caretakerFromStore;
-        return {
-          camper: camperOverride,
-          bedroom: room,
-          caretaker,
-          caretakers: camperOverride.bedroom ? staff.filter((s) => s.bedroom === camperOverride.bedroom) : [],
-          // roommates stay empty on an out-of-scope lookup — we only fetched this one kid
-          roommates: data?.camper.id === camperOverride.id ? data.roommates : [],
-        };
-      })()
-    : data;
+  const storeKid = camperOverride ? null : (data?.camper ?? null);
+  const k: Camper | null = camperOverride
+    ? { ...camperOverride, nickname: camperOverride.nickname ?? null, sex: camperOverride.sex ?? null }
+    : storeKid
+      ? { ...storeKid, ...(live.data ? { name: live.data.name || storeKid.name, nickname: live.data.nickname, sex: live.data.sex ?? storeKid.sex } : {}) }
+      : (live.data ?? null);
+
+  const roomFromStore = k?.bedroom ? bedrooms.find((b) => b.id === k.bedroom) : null;
+  const bedroom = camperOverride ? (bedroomOverride ?? (roomFromStore ? { id: roomFromStore.id, name: roomFromStore.name, group: roomFromStore.group } : null)) : (data?.bedroom ?? (roomFromStore ? { id: roomFromStore.id, name: roomFromStore.name, group: roomFromStore.group } : null));
+  const caretakerFromStore = k?.caretakerId ? (staff.find((s) => s.id === k.caretakerId) ?? null) : null;
+  const caretaker: { id: string; name: string } | null = camperOverride ? (caretakerOverride ?? caretakerFromStore) : (data?.caretaker ?? caretakerFromStore);
+  const caretakers = data?.caretakers ?? (k?.bedroom ? staff.filter((s) => s.bedroom === k.bedroom) : []);
+  // roommates stay empty on an out-of-scope lookup — we only fetched this one kid
+  const roommates = data?.roommates ?? [];
+
+  /** undefined = this role does not see health; null = nothing declared */
+  const health: HealthInfo | null | undefined = camperOverride ? camperOverride.health : live.data ? live.data.health : undefined;
+  const responsibles = live.data?.responsibles ?? [];
+  const nameOf = useNames([...responsibles.map((r) => r.personId), caretaker?.id]);
 
   useEffect(() => {
-    if (resolved) setTitle(resolved.camper.name.split(" ")[0]);
-  }, [resolved, setTitle]);
+    if (k?.name) setTitle(k.name.split(" ")[0]);
+  }, [k?.name, setTitle]);
 
-  if (!resolved) {
+  if (!k) {
+    const notFound = (data === undefined && !camperOverride && !live.loading) || !!live.error;
     return (
       <div className="admin-page">
         <Breadcrumbs items={nav.crumbs} />
-        {data === undefined && !camperOverride ? <p className="message message--error">{tx("Acampante não encontrado.")}</p> : <p className="opt-empty">{tx("Sincronizando… 🏕️")}</p>}
+        {notFound ? <p className="message message--error">{tx("Acampante não encontrado.")}</p> : <p className="opt-empty">{tx("Sincronizando… 🏕️")}</p>}
       </div>
     );
   }
 
-  const { camper: k, bedroom, caretaker, caretakers, roommates } = resolved;
-  const age = ageOf(k.birthDate);
-  const sex = kidIconSex(bedroom?.group, k.sex, k.probableGender);
+  const age = ageOf(k.birthDate ?? null);
+  const sex = kidIconSex(bedroom?.group, k.sex);
   const reviewing = k.aiReviewStatus === "pending" || k.aiReviewStatus === "processing" || k.aiReviewStatus === "structured";
+  const isCoordination = activeRole === "coordenacao";
+  // the health pencil: the care team (in place), or the coordenação on its own page
+  const mayEditHealth = (!!canEditHealth || (!!onEdit && isCoordination)) && health !== undefined && !camperOverride;
+  const mayAddResponsible = !!onEdit && isCoordination && !camperOverride;
+  const caretakerName = caretaker ? caretaker.name || nameOf(caretaker.id) : "";
+  const healthLoading = !camperOverride && live.loading && !live.data;
+
+  const healthBlock = (() => {
+    if (healthLoading) return <p className="cat-hint">{tx("Carregando informações de saúde…")}</p>;
+    if (health === undefined) return null;
+    const hasLines = !!health && healthLines(health, healthLabelOf).length > 0;
+    const extras = health && (health.weightKg != null || health.insurance || health.insuranceCard);
+    return (
+      <div className={styles.healthReveal}>
+        <div>
+          {hasLines ? <HealthAlerts person={health!} labelOf={healthLabelOf} boxed /> : <p className="staff-card__alert staff-card__alert--soft">{tx("Nada de saúde declarado.")}</p>}
+          {extras && (
+            <dl className="detail-grid">
+              {health!.weightKg != null && (
+                <>
+                  <dt>{tx("Peso")}</dt>
+                  <dd>{tx("{weight} kg", { weight: String(health!.weightKg).replace(".", ",") })}</dd>
+                </>
+              )}
+              {(health!.insurance || health!.insuranceCard) && (
+                <>
+                  <dt>{tx("Convênio")}</dt>
+                  <dd>
+                    {health!.insurance || "—"}
+                    {health!.insuranceCard && <span className="cat-hint">· {health!.insuranceCard}</span>}
+                  </dd>
+                </>
+              )}
+            </dl>
+          )}
+        </div>
+      </div>
+    );
+  })();
 
   return (
     <div className="admin-page">
@@ -112,16 +162,15 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
       <header className="admin-head">
         <h1 className="admin-title detail-title">
           <KidIcon sex={sex} size={40} />
-          {k.name}
+          {k.name || <span className={styles.pendingName}>{tx("Carregando nome…")}</span>}
+          <HealthHeart show={health === undefined ? k.hasHealth : false} />
           {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
         </h1>
         {onEdit && (
           <>
-            {k.parentEditedAt && (
-              <button type="button" className="icon-btn icon-btn--lg" title={tx("Histórico de alterações feitas pelos pais")} aria-label={tx("Histórico de alterações")} onClick={() => setHistoryOpen(true)}>
-                🕓
-              </button>
-            )}
+            <button type="button" className="icon-btn icon-btn--lg" title={tx("Histórico de alterações")} aria-label={tx("Histórico de alterações")} onClick={() => setHistoryOpen(true)}>
+              🕓
+            </button>
             <button type="button" className="icon-btn icon-btn--lg" title={tx("Editar")} aria-label={tx("Editar")} onClick={() => onEdit(k)}>
               <span className="pencil" aria-hidden="true">✏️</span>
             </button>
@@ -136,10 +185,10 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
             {caretaker ? (
               onOpenStaff ? (
                 <button type="button" className="link-btn" title={tx("Ver líder")} onClick={() => onOpenStaff(caretaker.id)}>
-                  {caretaker.name}
+                  {caretakerName || tx("Carregando nome…")}
                 </button>
               ) : (
-                caretaker.name
+                caretakerName || tx("Carregando nome…")
               )
             ) : k.caretakerId ? (
               "—"
@@ -152,10 +201,6 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
               </button>
             )}
           </dd>
-          <dt>{tx("Nascimento")}</dt>
-          <dd>{speakBirth(k.birthDate) ?? "—"}</dd>
-          <dt>{tx("Peso")}</dt>
-          <dd>{k.weightKg != null ? tx("{weight} kg", { weight: String(k.weightKg).replace(".", ",") }) : "—"}</dd>
           <dt>{tx("Time")}</dt>
           <dd>
             <TeamTag teamId={k.team} fallback="—" />
@@ -167,11 +212,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
           </dd>
           <dt>{tx("Quarto")}</dt>
           <dd>
-            {bedroom ? (
-              <BedroomTag bedroom={bedroom} onClick={onOpenBedroom ? () => onOpenBedroom(bedroom.id) : undefined} />
-            ) : (
-              "—"
-            )}
+            {bedroom ? <BedroomTag bedroom={bedroom} onClick={onOpenBedroom ? () => onOpenBedroom(bedroom.id) : undefined} /> : "—"}
             {onEdit && (
               <button type="button" className="icon-btn icon-btn--bare" title={tx("Trocar de quarto / líder")} aria-label={tx("Trocar de quarto ou líder")} onClick={() => setMoveOpen(true)}>
                 <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" />
@@ -194,99 +235,60 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
               <dd>{k.bedroomPreference}</dd>
             </>
           )}
-          {(k.school || k.schoolGrade) && (
-            <>
-              <dt>{tx("Escola")}</dt>
-              <dd>{[k.school, k.schoolGrade].filter(Boolean).join(" · ")}</dd>
-            </>
-          )}
-          {k.church && (
-            <>
-              <dt>{tx("Igreja")}</dt>
-              <dd>{k.church}</dd>
-            </>
-          )}
           {k.invitedBy && (
             <>
               <dt>{tx("Convidado por")}</dt>
               <dd>{k.invitedBy}</dd>
             </>
           )}
-          {(k.rg || k.cpf) && (
-            <>
-              <dt>{tx("Documentos")}</dt>
-              <dd>{[k.rg && tx("RG {rg}", { rg: k.rg }), k.cpf && tx("CPF {cpf}", { cpf: formatCpf(k.cpf) })].filter(Boolean).join(" · ")}</dd>
-            </>
-          )}
         </dl>
-        {canEditHealth ? (
+        {(health !== undefined || healthLoading) && (
           <div className="detail-health">
             <div className="detail-health__head">
               <h3 className="detail-health__title">{tx("🩺 Saúde")}</h3>
-              <button type="button" className="icon-btn icon-btn--bare" title={tx("Editar saúde")} aria-label={tx("Editar saúde")} onClick={() => setHealthOpen(true)}>
-                <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" />
-              </button>
+              {mayEditHealth && (
+                <button type="button" className="icon-btn icon-btn--bare" title={tx("Editar saúde")} aria-label={tx("Editar saúde")} onClick={() => setHealthOpen(true)}>
+                  <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" />
+                </button>
+              )}
             </div>
-            {healthLines(k, labelOf).length > 0 ? <HealthAlerts person={k} labelOf={labelOf} boxed /> : <p className="staff-card__alert staff-card__alert--soft">{tx("Nada de saúde declarado.")}</p>}
+            {healthBlock}
           </div>
-        ) : (
-          <HealthAlerts person={k} labelOf={labelOf} boxed />
         )}
-        {(k.generalNotes || reviewing) && <p className={`detail-note ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>📝 {k.generalNotes || tx("Observações em revisão pela IA…")}</p>}
+        {(k.generalNotes || reviewing) && (
+          <p className={`detail-note ${reviewing ? "camper-ai-observation" : ""}`} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
+            📝 {k.generalNotes || tx("Observações em revisão pela IA…")}
+          </p>
+        )}
       </section>
 
-      {/* a CARE record (room team) carries the guardian's name + phone only; the rest is admin / medical / check-in.
-          An out-of-scope emergency lookup comes without any guardian data — no section then. */}
-      {!k.redacted && (!k.contactsHidden || k.guardianName || k.guardianPhone) && (
+      {/* the family: names from IPAlpha, contacts read only on tap (LGPD) — no section on an out-of-scope emergency lookup */}
+      {!k.redacted && !camperOverride && (responsibles.length > 0 || mayAddResponsible || live.loading) && (
         <section className="detail-section">
           <h2 className="detail-h2">
-            <ParentIcon size={24} /> {tx("Pai ou Responsável")}
+            <ParentIcon size={24} /> {responsibles.length > 1 ? tx("Responsáveis") : tx("Responsável")}
           </h2>
           <div className="detail-card">
-            <dl className="detail-grid">
-              <dt>{tx("Nome")}</dt>
-              <dd>{k.guardianName || "—"}</dd>
-              <dt>{tx("Telefone")}</dt>
-              <dd>
-                {k.guardianPhone ? (
-                  <>
-                    {formatBrazilPhoneClient(k.guardianPhone)}
-                    <WhatsAppButton
-                      className="wa-btn--sm"
-                      href={whatsappLink(k.guardianPhone, staffGreeting({ toName: k.guardianName, fromName: myName, about: k.name }))}
-                      label={k.guardianName.split(" ")[0] ? tx("Falar com {name} no WhatsApp", { name: k.guardianName.split(" ")[0] }) : tx("Falar com o responsável no WhatsApp")}
-                    />
-                  </>
-                ) : (
-                  <em className="staff-card__missing">{tx("não informado")}</em>
-                )}
-              </dd>
-              {!k.contactsHidden && (
-                <>
-                  {k.guardianEmail && (
-                    <>
-                      <dt>{tx("E-mail")}</dt>
-                      <dd>
-                        <a href={`mailto:${k.guardianEmail}`}>{k.guardianEmail}</a>
-                      </dd>
-                    </>
-                  )}
-                  {k.guardianCpf && (
-                    <>
-                      <dt>{tx("CPF")}</dt>
-                      <dd>{formatCpf(k.guardianCpf)}</dd>
-                    </>
-                  )}
-                  <dt>{tx("Emergência")}</dt>
-                  <dd>{k.emergencyContact || "—"}</dd>
-                  <dt>{tx("Convênio")}</dt>
-                  <dd>
-                    {k.insurance || "—"}
-                    {k.insuranceCard && <span className="cat-hint">· {k.insuranceCard}</span>}
-                  </dd>
-                </>
-              )}
-            </dl>
+            {live.loading && !live.data && <p className="cat-hint">{tx("Carregando…")}</p>}
+            {live.data && responsibles.length === 0 && <p className="cat-hint">{tx("Nenhum responsável cadastrado ainda.")}</p>}
+            {responsibles.length > 0 && (
+              <ul className={styles.responsibles}>
+                {responsibles.map((r) => {
+                  const rName = r.name || nameOf(r.personId);
+                  return (
+                    <li key={r.personId} className={styles.responsible}>
+                      <span className={`${styles.responsibleName} ${rName ? "" : styles.pendingName}`}>{rName || tx("Carregando nome…")}</span>
+                      <PersonContact token={token} personId={r.personId} name={rName} about={k.name} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {mayAddResponsible && (
+              <button type="button" className={`button button--secondary button--small ${styles.addResponsible}`} onClick={() => setResponsibleOpen(true)}>
+                + {tx("Adicionar outro responsável")}
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -327,7 +329,9 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
       {onEdit && <AssignLeaderDialog token={token} open={leaderOpen} camper={k} onClose={() => setLeaderOpen(false)} />}
       {onEdit && fieldOpen && <CamperFieldDialog token={token} open camper={k} field={fieldOpen} onClose={() => setFieldOpen(null)} />}
       {onEdit && <CamperHistoryDialog token={token} open={historyOpen} camperId={k.id} camperName={k.name} onClose={() => setHistoryOpen(false)} />}
-      {canEditHealth && <HealthEditDialog token={token} open={healthOpen} camper={k} onClose={() => setHealthOpen(false)} />}
+      {mayAddResponsible && <CamperResponsibleDialog token={token} open={responsibleOpen} camperId={k.id} camperName={k.name} onClose={() => setResponsibleOpen(false)} onAdded={() => live.reload()} />}
+      {/* mounted only while open, so it starts from the health read just now */}
+      {mayEditHealth && healthOpen && <HealthEditDialog token={token} open camperId={k.id} name={k.name} health={health ?? null} onClose={() => setHealthOpen(false)} onSaved={() => live.reload()} />}
       <PlayScene sex={sex} />
     </div>
   );

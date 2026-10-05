@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { analyzeCamperFile, applyCamperImport, createImportLeader, getCamperImportProgress, listImportFields, type CamperImport, type ImportField, type ImportReviewItem } from "../../api/camperImports";
+import { analyzeCamperFile, applyCamperImport, createImportLeader, getCamperImportProgress, importErrorMessage, listImportFields, type CamperImport, type ImportField, type ImportReviewItem } from "../../api/camperImports";
 import ImportPhaseBar, { CAMPER_PHASES, type ImportPhaseInfo } from "../../components/ImportPhaseBar";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import { CheckGlyph, DownloadGlyph, EllipsisGlyph, EyeGlyph, SkipGlyph } from "../../components/Glyph";
@@ -52,6 +52,8 @@ export default function CamperImportPage({ token, onDone }: Props) {
   const [phase, setPhase] = useState<ImportPhaseInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<{ imported: number; created: { kind: string; count: number; label: string }[]; skipped: number } | null>(null);
+  /** the analysis as it was right before Apply — the server empties rows / preview once applied; kept in memory only for "Baixar não importados" */
+  const [appliedFrom, setAppliedFrom] = useState<CamperImport | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const activeInput = useRef<HTMLInputElement | HTMLSelectElement>(null);
   const lastSkipped = useRef<string | null>(null);
@@ -178,13 +180,15 @@ export default function CamperImportPage({ token, onDone }: Props) {
     try {
       if (!file) throw new Error(tx("Escolha novamente a planilha original."));
       const result = await applyCamperImport(token, record.id, file, delta, [...declinedCategoryIds],duplicateChoice);
-      setOutcome({ imported: record.preview.length - skippedRows, created: createdCounters(record.createdItems), skipped: skippedRows });
+      setOutcome({ imported: result.inserted + (result.updated ?? 0), created: createdCounters(record.createdItems), skipped: typeof result.skipped === "number" ? result.skipped : skippedRows });
+      setAppliedFrom(record);
       setRecord(result.import); setStage("done");
-    } catch (e) { setError(e instanceof Error ? e.message : tx("Não foi possível importar.")); }
+    } catch (e) { setError(importErrorMessage(e, tx("Não foi possível importar."), tx)); }
     finally { setBusy(false); }
   }
 
   function downloadSkipped() {
+    const record = appliedFrom;
     if (!record) return;
     const reasons = new Map<number, string>();
     for (const review of record.reviews) {
@@ -210,11 +214,12 @@ export default function CamperImportPage({ token, onDone }: Props) {
       <section className="import-success">
         <span className="import-success__check"><CheckGlyph size={54} /></span>
         <h1 className="admin-title">{tx("Importação concluída")}</h1>
-        <p className="admin-intro">{tx("As crianças já estão no sistema. A revisão das observações por IA continua em segundo plano.")}</p>
+        <p className="admin-intro">{tx("As crianças já estão no sistema. A revisão das observações por IA continua em segundo plano e grava as informações de saúde direto no IPAlpha.")}</p>
+        {(record.needsSignIn || record.status === "needsSignIn") && <p className="message message--warn">{tx("A sua entrada no IPAlpha terminou enquanto a IA organizava as informações de saúde. Nada se perdeu: entre de novo e continue a importação em Configurações.")}</p>}
         {outcome && <div className="import-stats">
           <span className="import-stats__success"><b>{outcome.imported}</b> {tx("crianças")}</span>
           {outcome.created.map((counter) => <span className="import-stats__success" key={counter.kind}><b>{counter.count}</b> {tx(counter.label)}</span>)}
-          <span className="import-stats__warning"><b>{outcome.skipped}{outcome.skipped > 0 && <button type="button" className="icon-btn icon-btn--bare import-download-icon" title={tx("Baixar não importados")} aria-label={tx("Baixar não importados")} onClick={downloadSkipped}><DownloadGlyph /></button>}</b> {tx("ignoradas")}</span>
+          <span className="import-stats__warning"><b>{outcome.skipped}{outcome.skipped > 0 && appliedFrom && <button type="button" className="icon-btn icon-btn--bare import-download-icon" title={tx("Baixar não importados")} aria-label={tx("Baixar não importados")} onClick={downloadSkipped}><DownloadGlyph /></button>}</b> {tx("ignoradas")}</span>
         </div>}
         <button type="button" className="button button--primary" onClick={leave}>{tx("Ver acampantes")}</button>
       </section>

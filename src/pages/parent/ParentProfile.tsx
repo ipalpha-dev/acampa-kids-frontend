@@ -6,18 +6,77 @@ import { useI18n } from "../../i18n";
 import { formatBrazilPhoneClient } from "../../phoneFormat";
 import { roleMeta, sortRoles, type CoreRole, type LoggedUser } from "../../roles";
 import { useParentHome, type MyKid } from "../../store/derive";
+import { useCamperLive, usePersonData } from "../../hooks/usePersonData";
+import styles from "../../styles/ops.module.scss";
 
 interface ParentProfileProps {
   user: LoggedUser;
+  /** the session token (live reads of the kids' details) */
+  token: string;
   onLogout: () => void;
   loggingOut: boolean;
   /** switches the session to another profile the same person holds (mãe que também é da equipe) */
   onSwitchRole: (role: CoreRole) => Promise<void>;
 }
 
-/** The emergency block of ONE kid — what the registration form collected, read-only. */
-function KidEmergency({ kid: { camper: k }, tabbed }: { kid: MyKid; tabbed: boolean }) {
+/** A gentle note when IPAlpha keeps a kind of data away from this role. */
+function InIpalphaNote() {
   const { tx } = useI18n();
+  return <p className="cat-hint">{tx("Esses dados ficam no IPAlpha, em Meus dados.")}</p>;
+}
+
+/**
+ * Emergency contact + documents of the kid, read from IPAlpha only when the
+ * responsável asks (core's role rules decide; each read is logged for the
+ * family — LGPD). Nothing is kept: leaving the page forgets them.
+ */
+function KidPersonData({ token, kidId }: { token: string; kidId: string }) {
+  const { tx } = useI18n();
+  const emergency = usePersonData(token, kidId, "emergencyContact");
+  const doc = usePersonData(token, kidId, "document");
+  const loading = emergency.loading || doc.loading;
+  const ec = emergency.data;
+  const d = doc.data;
+  const rg = d && typeof d === "object" && typeof d.rg === "string" ? d.rg : "";
+  const cpf = d && typeof d === "object" && typeof d.cpf === "string" ? d.cpf : typeof d === "string" ? d : "";
+  if (loading) return <p className={`cat-hint ${styles.loading}`}>{tx("Carregando…")}</p>;
+  if (emergency.error && doc.error) return <InIpalphaNote />;
+  return (
+    <div className={styles.reveal}>
+      <dl className="detail-grid">
+        <dt>{tx("Emergência")}</dt>
+        <dd>
+          {emergency.error ? (
+            <em className="staff-card__missing">{tx("no IPAlpha, em Meus dados")}</em>
+          ) : ec ? (
+            [ec.name, ec.relation && `(${ec.relation})`, ec.phone && formatBrazilPhoneClient(ec.phone)].filter(Boolean).join(" ")
+          ) : (
+            "—"
+          )}
+        </dd>
+        <dt>{tx("Documentos")}</dt>
+        <dd>
+          {doc.error ? (
+            <em className="staff-card__missing">{tx("no IPAlpha, em Meus dados")}</em>
+          ) : rg || cpf ? (
+            [rg && tx("RG {n}", { n: rg }), cpf && tx("CPF {n}", { n: formatCpf(cpf) })].filter(Boolean).join(" · ")
+          ) : (
+            "—"
+          )}
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
+/** The emergency block of ONE kid — the family and the care data, read live from IPAlpha. */
+function KidEmergency({ token, kid: { camper: k }, tabbed }: { token: string; kid: MyKid; tabbed: boolean }) {
+  const { tx } = useI18n();
+  const live = useCamperLive(token, k.id);
+  const [asked, setAsked] = useState(false);
+  const name = k.name || live.data?.name || "";
+  const health = live.data?.health ?? null;
+  const responsibles = live.data?.responsibles ?? [];
   return (
     <section
       id="parent-profile-kid-panel"
@@ -25,52 +84,46 @@ function KidEmergency({ kid: { camper: k }, tabbed }: { kid: MyKid; tabbed: bool
       aria-labelledby={tabbed ? `parent-profile-kid-tab-${k.id}` : undefined}
       className="detail-section"
     >
-      <h2 className="detail-h2">{tx("🚨 Emergência · {name}", { name: k.name.split(" ")[0] })}</h2>
+      <h2 className="detail-h2">{tx("🚨 Emergência · {name}", { name: name.split(" ")[0] || "…" })}</h2>
       <div className="detail-card">
         <dl className="detail-grid">
-          <dt>{tx("Responsável")}</dt>
-          <dd>{k.guardianName || "—"}</dd>
-          <dt>{tx("Telefone")}</dt>
-          <dd>{k.guardianPhone ? formatBrazilPhoneClient(k.guardianPhone) : "—"}</dd>
-          {k.guardianEmail && (
-            <>
-              <dt>{tx("E-mail")}</dt>
-              <dd>{k.guardianEmail}</dd>
-            </>
-          )}
-          {k.guardianCpf && (
-            <>
-              <dt>{tx("CPF")}</dt>
-              <dd>{formatCpf(k.guardianCpf)}</dd>
-            </>
-          )}
-          <dt>{tx("Emergência")}</dt>
-          <dd>{k.emergencyContact || "—"}</dd>
+          <dt>{tx("Família")}</dt>
+          <dd>
+            {live.loading && !live.data ? (
+              <span className={`cat-hint ${styles.loading}`}>{tx("Carregando…")}</span>
+            ) : responsibles.length ? (
+              responsibles.map((r) => r.name || "…").join(" · ")
+            ) : (
+              "—"
+            )}
+          </dd>
           <dt>{tx("Convênio")}</dt>
           <dd>
-            {k.insurance || "—"}
-            {k.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: k.insuranceCard })}</span>}
+            {health?.insurance || "—"}
+            {health?.insuranceCard && <span className="cat-hint">{tx("· carteirinha {n}", { n: health.insuranceCard })}</span>}
           </dd>
-          {(k.rg || k.cpf) && (
-            <>
-              <dt>{tx("Documentos")}</dt>
-              <dd>{[k.rg && tx("RG {n}", { n: k.rg }), k.cpf && tx("CPF {n}", { n: formatCpf(k.cpf) })].filter(Boolean).join(" · ")}</dd>
-            </>
-          )}
         </dl>
+        {asked ? (
+          <KidPersonData token={token} kidId={k.id} />
+        ) : (
+          <button type="button" className={`button button--secondary button--small ${styles.askButton}`} onClick={() => setAsked(true)}>
+            {tx("Ver contato de emergência e documentos")}
+          </button>
+        )}
       </div>
-      <p className="cat-hint">{tx("Para corrigir o contato de emergência ou os documentos, fale com a organização. O convênio você edita em Início → Informações de saúde.")}</p>
+      <p className="cat-hint">{tx("O contato de emergência e os documentos ficam no IPAlpha: você revisa em Meus dados. O convênio você edita em Início → Informações de saúde.")}</p>
     </section>
   );
 }
 
 /**
- * The parent's own page (header → their name): who they are plus the
- * emergency data the registration form collected for the selected kid —
- * guardian, emergency contact, insurance, documents. With more than one kid
- * the same tab strip as Início picks which one is shown.
+ * The parent's own page (header → their name): who they are, the roles they
+ * hold, and — for the selected kid — the family and the care data read live
+ * from IPAlpha (emergency contact / documents only on tap, when this role may
+ * read them). With more than one kid the same tab strip as Início picks which
+ * one is shown.
  */
-export default function ParentProfile({ user, onLogout, loggingOut, onSwitchRole }: ParentProfileProps) {
+export default function ParentProfile({ user, token, onLogout, loggingOut, onSwitchRole }: ParentProfileProps) {
   const { tx } = useI18n();
   const meta = roleMeta(user.activeRole);
   const data = useParentHome();
@@ -149,7 +202,7 @@ export default function ParentProfile({ user, onLogout, loggingOut, onSwitchRole
 
       <ParentKidTabs kids={kids} selectedId={selectedKid?.camper.id ?? ""} onSelect={setSelectedKidId} idPrefix="parent-profile-kid-tab" panelId="parent-profile-kid-panel" />
 
-      {selectedKid && <KidEmergency key={selectedKid.camper.id} kid={selectedKid} tabbed={kids.length > 1} />}
+      {selectedKid && <KidEmergency key={selectedKid.camper.id} token={token} kid={selectedKid} tabbed={kids.length > 1} />}
 
       <div className="profile-actions">
         <button type="button" className="button button--danger profile-logout" onClick={onLogout} disabled={loggingOut}>

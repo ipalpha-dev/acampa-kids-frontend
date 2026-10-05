@@ -14,6 +14,7 @@ import PageFooter from "../components/PageFooter";
 import Toggle from "../components/Toggle";
 import { useConfirm } from "../components/ConfirmDialog";
 import { ICONS } from "../icons";
+import { personInfo, requestNames, usePeopleVersion } from "../store/people";
 import { collatorLocale, useI18n } from "../i18n";
 
 interface GalleryPageProps {
@@ -978,6 +979,10 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
   );
 
   const current = lightbox ? lightbox.list[lightbox.index] ?? null : null;
+  usePeopleVersion();
+  useEffect(() => {
+    if (current?.byPersonId) requestNames([current.byPersonId]);
+  }, [current?.byPersonId]);
   const currentEvent = current?.eventId ? eventById.get(current.eventId) : undefined;
 
   return (
@@ -1347,7 +1352,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
             {current.caption && <p className="lightbox__caption">{current.caption}</p>}
             <p className="lightbox__meta">
               {currentEvent ? `${currentEvent.emoji || "📅"} ${currentEvent.title} · ` : ""}
-              {tx("por {name}", { name: current.byName })} · {speakDay(dayKey(current.createdAt), "month")}
+              {tx("por {name}", { name: personInfo(current.byPersonId)?.name || "—" })} · {speakDay(dayKey(current.createdAt), "month")}
             </p>
 
             {/* carousel: every photo of the set, the open one highlighted */}

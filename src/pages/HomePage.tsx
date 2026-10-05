@@ -4,12 +4,9 @@ import { birthdayDuringCamp, type Camper } from "../api/campers";
 import { ROOM_ROLE_META, staffSex } from "../api/staff";
 import CamperCard from "../components/CamperCard";
 import GroupIcon from "../components/GroupIcon";
-import GuardianWhatsApp from "../components/GuardianWhatsApp";
 import RoomRoleIcon from "../components/RoomRoleIcon";
 import TeamTag from "../components/TeamTag";
-import WhatsAppButton from "../components/WhatsAppButton";
-import { formatBrazilPhoneClient } from "../phoneFormat";
-import { staffGreeting, whatsappLink } from "../whatsapp";
+import PersonContact from "../components/PersonContact";
 import KidIcon from "../components/KidIcon";
 import PlayScene from "../components/PlayScene";
 import SelfCheckinCard from "../components/SelfCheckinCard";
@@ -43,7 +40,9 @@ interface RoomBirthday {
 
 /**
  * The kids of the room whose birthday falls on a camp day (first → last event
- * day), sorted by day. Empty without a programme.
+ * day), sorted by day. Empty without a programme — and, today, always empty:
+ * IPAlpha does not serve birth dates to Acampa (decision 39/51 — the room team
+ * gets the birthday message from the server instead). Kept for when it does.
  */
 function useRoomBirthdays(kids: Camper[]): RoomBirthday[] {
   const events = useCollection("events");
@@ -54,7 +53,7 @@ function useRoomBirthdays(kids: Camper[]): RoomBirthday[] {
     const until = dates[dates.length - 1];
     return kids
       .flatMap((kid) => {
-        const day = birthdayDuringCamp(kid.birthDate, from, until);
+        const day = birthdayDuringCamp(kid.birthDate ?? null, from, until);
         if (!day) return [];
         const age = kid.birthDate ? Number(day.slice(0, 4)) - Number(kid.birthDate.slice(0, 4)) : null;
         return [{ kid, day, age }];
@@ -111,7 +110,7 @@ function BirthdayBanner({ birthdays, onOpen }: { birthdays: RoomBirthday[]; onOp
             return (
               <li key={kid.id} className={isToday ? "birthday-banner__item--today" : undefined}>
                 <button type="button" className="link-btn" title={tx("Ver criança")} onClick={() => onOpen(kid.id)}>
-                  {kid.name}
+                  {kid.name || "…"}
                 </button>{" "}
                 {isToday ? tx("faz") : tx("faz aniversário")} {age !== null && tx("{age} anos", { age })} {isToday ? <strong>{tx("hoje")}</strong> : `· ${speakDaySlash(day)}`}
               </li>
@@ -127,9 +126,9 @@ function BirthdayBanner({ birthdays, onOpen }: { birthdays: RoomBirthday[]; onOp
  * "Início" for a team member: their room — the kids under THEIR care (a
  * caretaker), the other kids of the room (collapsed; the server only sends
  * them while the camp is happening) and the colleagues sharing it. For
- * colleagues only the name and room role are shown (the server already
- * strips phones and health data of other staff; the UI never asks for them).
- * Guardian / emergency data never reaches this page.
+ * colleagues the name and room role are shown; a phone is read from IPAlpha
+ * only when someone taps "Ver contato" (PersonContact). The families' contacts
+ * live on each kid's page (read live, on tap) — never in this list.
  */
 export default function HomePage({ user, token, medical = false }: HomePageProps) {
   const { tx } = useI18n();
@@ -144,6 +143,7 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
   const setTitle = useCallback(() => {}, []);
   const openCamper = (id: string) => navigate(`/home/${id}`);
   const first = user.name.split(" ")[0];
+  const hello = first ? tx("Olá, {name}! 👋", { name: first }) : tx("Olá! 👋");
   const access = settings?.staffAccessWindow;
   /** the room's kids the server sent me (mine + the others during the camp) */
   const roomKids = useMemo(() => (data ? [...data.myKids, ...data.campers] : []), [data]);
@@ -153,7 +153,7 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
   if (data === undefined && access && !access.open) {
     return (
       <div className="admin-page">
-        <h1 className="admin-title">{tx("Olá, {name}! 👋", { name: first })}</h1>
+        <h1 className="admin-title">{hello}</h1>
         <p className="opt-empty">
           {tx("O app ainda não está liberado para a equipe.")}
           <br />
@@ -174,9 +174,9 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
   if (data === undefined) {
     return (
       <div className="admin-page">
-        <h1 className="admin-title">{tx("Olá, {name}! 👋", { name: first })}</h1>
+        <h1 className="admin-title">{hello}</h1>
         <p className="opt-empty">
-          {tx("Seu celular ainda não está vinculado a um cadastro da equipe.")}
+          {tx("Ainda não encontramos você na equipe deste acampamento.")}
           <br />
           {tx("Fale com a organização para ajustar o seu cadastro.")}
         </p>
@@ -194,7 +194,7 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
   if (!bedroom) {
     return (
       <div className="admin-page">
-        <h1 className="admin-title">{tx("Olá, {name}! 👋", { name: first })}</h1>
+        <h1 className="admin-title">{hello}</h1>
         <StaffBusCard transportId={me.transportation} />
         <SelfCheckinCard token={token} user={user} />
         {/* the medical team works from this list even without a room of their own */}
@@ -248,14 +248,14 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
           ) : (
             <ul className="kid-list">
               {myKids.map((k) => (
-                <CamperCard key={k.id} camper={k} labelOf={labelOf} hideBedroom onOpen={openCamper} corner={<GuardianWhatsApp camper={k} />} />
+                <CamperCard key={k.id} camper={k} labelOf={labelOf} hideBedroom onOpen={openCamper} />
               ))}
             </ul>
           )}
         </section>
       )}
 
-      {/* ── colleagues: name, room role and phone ── */}
+      {/* ── colleagues: name, room role; the phone only on tap ── */}
       {/* alone in the room: phones drop the whole block (CSS) — a heading, a
           “0 pessoas” count and an empty note is a lot of screen to say nothing */}
       <section className={`detail-section roommate-section ${roommates.length === 0 ? "roommate-section--empty" : ""}`}>
@@ -277,20 +277,13 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
                   <RoomRoleIcon role={r.roomRole} sex={staffSex(r, bedrooms)} size={40} />
                 </span>
                 <span className="roommate-card__body">
-                  <strong className="roommate-card__name">{r.name}</strong>
-                  <span className="roommate-card__role">
-                    {tx(ROOM_ROLE_META[r.roomRole].label)}
-                    {r.phone && <> · {formatBrazilPhoneClient(r.phone)}</>}
-                  </span>
+                  <strong className="roommate-card__name">{r.name || "…"}</strong>
+                  <span className="roommate-card__role">{tx(ROOM_ROLE_META[r.roomRole].label)}</span>
                   <TeamTag teamId={r.team} className="staff-tag--inline roommate-card__team" />
                 </span>
-                {r.phone && (
-                  <WhatsAppButton
-                    className="wa-btn--sm roommate-card__wa"
-                    href={whatsappLink(r.phone, staffGreeting({ toName: r.name, fromName: user.name }))}
-                    label={tx("Falar com {name} no WhatsApp", { name: r.name.split(" ")[0] })}
-                  />
-                )}
+                <span className="roommate-card__wa">
+                  <PersonContact token={token} personId={r.id} name={r.name} compact />
+                </span>
               </li>
             ))}
           </ul>
@@ -311,7 +304,7 @@ export default function HomePage({ user, token, medical = false }: HomePageProps
             ) : (
               <ul className="kid-list">
                 {campers.map((k) => (
-                  <CamperCard key={k.id} camper={k} labelOf={labelOf} hideBedroom onOpen={openCamper} corner={<GuardianWhatsApp camper={k} />} />
+                  <CamperCard key={k.id} camper={k} labelOf={labelOf} hideBedroom onOpen={openCamper} />
                 ))}
               </ul>
             ))}

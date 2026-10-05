@@ -183,8 +183,8 @@ export interface GroupingOptions {
 
 /** "meninas 5 · meninos 12" — what the limit works out to for each wing (for the Limite label) */
 export function blobLimitHint(bedrooms: readonly Bedroom[]): string {
-  const girls = blobLimitOf({ sex: "F", probableGender: null } as Camper, bedrooms);
-  const boys = blobLimitOf({ sex: "M", probableGender: null } as Camper, bedrooms);
+  const girls = blobLimitOf({ sex: "F" }, bedrooms);
+  const boys = blobLimitOf({ sex: "M" }, bedrooms);
   return girls === boys ? String(girls) : `meninas ${girls} · meninos ${boys}`;
 }
 
@@ -203,8 +203,8 @@ const BIG_ROOM_SHARE = 0.2;
  * wing split in two corridors (4×7 + 6×14) rightly answers 14 → 12, where a
  * median or percentile would say 7 → 5.
  */
-export function blobLimitOf(kid: Camper, bedrooms: readonly Bedroom[]): number {
-  const sex = kid.sex ?? kid.probableGender;
+export function blobLimitOf(kid: Pick<Camper, "sex">, bedrooms: readonly Bedroom[]): number {
+  const sex = kid.sex;
   const wing = sex === "F" ? "girls" : sex === "M" ? "boys" : null;
   const caps = bedrooms.filter((b) => wing ? b.group === wing : b.group !== "staff").map((b) => b.capacity).sort((a, b) => b - a);
   if (!caps.length) return DEFAULT_BLOB_LIMIT;

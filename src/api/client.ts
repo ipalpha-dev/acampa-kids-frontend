@@ -36,6 +36,8 @@ export const OFFLINE_MESSAGE = "Sem conexão com o servidor. Verifique o Wi-Fi d
 
 /** Fired on `window` when an authenticated call answers 401 (see App.tsx). */
 export const SESSION_ENDED_EVENT = "acampa:session-ended";
+/** Fired on `window` when an authenticated call answers 503 IPALPHA_UNAVAILABLE. */
+export const CORE_UNAVAILABLE_EVENT = "acampa:core-unavailable";
 
 function hasBearer(options?: RequestInit): boolean {
   const headers = options?.headers;
@@ -82,6 +84,10 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     // offline copy and returns to the login with a gentle note, from one place
     if (res.status === 401 && hasBearer(options)) {
       window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code } }));
+    }
+    // IPAlpha down while signed in: the camp keeps working from memory; App.tsx shows a gentle note
+    if (res.status === 503 && code === "IPALPHA_UNAVAILABLE" && hasBearer(options)) {
+      window.dispatchEvent(new CustomEvent(CORE_UNAVAILABLE_EVENT));
     }
     throw new ApiError(
       res.status,

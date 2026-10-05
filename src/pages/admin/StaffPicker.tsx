@@ -3,6 +3,7 @@ import type { Staff } from "../../api/staff";
 import Dialog from "../../components/Dialog";
 import SearchField from "../../components/SearchField";
 import { useI18n } from "../../i18n";
+import { compareByName, shownName } from "./staffNames";
 
 /** What a person is already doing at this time (shown as a label). */
 export interface Occupation {
@@ -14,6 +15,7 @@ export interface Occupation {
 interface StaffPickerProps {
   open: boolean;
   title: string;
+  /** team members (store records joined with their live names) — picks return the PERSON id */
   staff: Staff[];
   /** staffId → occupation; people in this map go to the END of the list with a label */
   occupied: Map<string, Occupation>;
@@ -47,9 +49,9 @@ export default function StaffPicker({ open, title, staff, occupied, onPick, onCl
 
   const results = useMemo(() => {
     const nq = normalize(q.trim());
-    const match = staff.filter((s) => s.active && (!nq || normalize(s.name).includes(nq)));
-    const free = match.filter((s) => !occupied.has(s.id)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
-    const busy = match.filter((s) => occupied.has(s.id)).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const match = staff.filter((s) => s.active && (!nq || normalize(s.name).includes(nq) || normalize(s.nickname ?? "").includes(nq)));
+    const free = match.filter((s) => !occupied.has(s.id)).sort(compareByName);
+    const busy = match.filter((s) => occupied.has(s.id)).sort(compareByName);
     return [...free, ...busy];
   }, [staff, occupied, q]);
 
@@ -86,14 +88,14 @@ export default function StaffPicker({ open, title, staff, occupied, onPick, onCl
             aria-label={tx("Buscar pessoa")}
           />
           <p className="cat-hint">
-            {freeCount} livre{freeCount !== 1 ? "s" : ""}
-            {results.length - freeCount > 0 && ` · ${results.length - freeCount} ocupado${results.length - freeCount !== 1 ? "s" : ""}`}
+            {freeCount === 1 ? tx("{n} livre", { n: freeCount }) : tx("{n} livres", { n: freeCount })}
+            {results.length - freeCount > 0 && ` · ${results.length - freeCount === 1 ? tx("{n} ocupado", { n: 1 }) : tx("{n} ocupados", { n: results.length - freeCount })}`}
           </p>
         </header>
 
         <div className="picker-sheet__body">
           {results.length === 0 ? (
-            <p className="opt-empty">Ninguém encontrado.</p>
+            <p className="opt-empty">{tx("Ninguém encontrado.")}</p>
           ) : (
             <ul className="picker__list" role="listbox">
               {results.map((s, i) => {
@@ -108,7 +110,7 @@ export default function StaffPicker({ open, title, staff, occupied, onPick, onCl
                       onMouseEnter={() => setCursor(i)}
                       onClick={() => onPick(s.id)}
                     >
-                      <span className="picker__name">{s.name}</span>
+                      <span className="picker__name">{shownName(s.name)}</span>
                       {occ && (
                         <span className="picker__busy" title={`${occ.role} · ${occ.where}`}>
                           {occ.role}
@@ -125,7 +127,7 @@ export default function StaffPicker({ open, title, staff, occupied, onPick, onCl
 
         <div className="cat-form__actions picker-sheet__actions">
           <button type="button" className="button button--secondary" onClick={onClose}>
-            Cancelar
+            {tx("Cancelar")}
           </button>
         </div>
       </div>

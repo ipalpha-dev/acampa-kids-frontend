@@ -1,8 +1,35 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { MEDICATION_PRESETS } from "../components/MedicationsEditor";
-import { medKeyOf, SOS_SLOT, type MedicationDose } from "../api/medications";
+import { fetchPrescriptionsPage, medKeyOf, SOS_SLOT, type MedicationDose, type Prescription } from "../api/medications";
 import type { Camper, Medication } from "../api/campers";
-import { useCollection, useCollectionOrEmpty } from "../store";
+import { applyServerData, getState, useCollection, useCollectionOrEmpty, useConnection } from "../store";
+import { rememberPeople } from "../store/people";
+import { fetchAllPages } from "./usePagedList";
+
+let prescriptionsRun: Promise<void> | null = null;
+
+/**
+ * Reads the kids' medicines live from IPAlpha (`GET /api/medications/prescriptions`,
+ * paged in the background) into the local `prescriptions` collection — the
+ * care team's checklist keeps working offline from the encrypted copy (health
+ * is kept offline only for saúde / coordenação). Re-read on each connection.
+ */
+export function usePrescriptionsSync(token: string): void {
+  const connection = useConnection();
+  useEffect(() => {
+    if (connection !== "online" || prescriptionsRun) return;
+    const all: Prescription[] = [];
+    prescriptionsRun = fetchAllPages((cursor) => fetchPrescriptionsPage(token, cursor), (items) => {
+      all.push(...items);
+      rememberPeople(items.map((p) => ({ personId: p.personId, name: p.name })));
+    })
+      .then(() => applyServerData({ prescriptions: all }, getState().syncedAt ?? new Date().toISOString()))
+      .catch(() => {})
+      .finally(() => {
+        prescriptionsRun = null;
+      });
+  }, [token, connection]);
+}
 
 /**
  * One line of the checklist: a kid × a medicine × a prescribed moment.
@@ -14,6 +41,11 @@ export interface MedEntry {
   medKey: string;
   /** "HH:MM", "sos", or "" for a medicine the parents never scheduled */
   slot: string;
+  /**
+   * option ids of medicines the kid must NOT take, when the prescriptions read
+   * carries them (`drugAllergies` on the item) — empty otherwise
+   */
+  drugAllergies: string[];
 }
 
 /** the checklist of ONE day, already grouped the way both the tab and the home card show it */
@@ -26,9 +58,9 @@ export interface MedicationDay {
   unscheduled: MedEntry[];
   /** how many kids take anything at all (before the search filter) */
   kidsWithMeds: number;
-  /** ticks of the day, keyed "<camperId>|<medKey>|<slot>" (scheduled doses only) */
+  /** ticks of the day, keyed "<personId>|<medKey>|<slot>" (scheduled doses only) */
   given: Map<string, MedicationDose>;
-  /** "quando necessário" doses of the day, keyed "<camperId>|<medKey>" (they repeat) */
+  /** "quando necessário" doses of the day, keyed "<personId>|<medKey>" (they repeat) */
   sosGiven: Map<string, MedicationDose[]>;
   /** scheduled doses already ticked / due today */
   doneCount: number;
@@ -70,8 +102,10 @@ export function nowTime(now = new Date()): string {
  * `search` filters by the kid's name (the tab's search box); the home card
  * passes nothing.
  */
-export function useMedicationDay(day: string, search = ""): MedicationDay {
+export function useMedicationDay(token: string, day: string, search = ""): MedicationDay {
+  usePrescriptionsSync(token);
   const campers = useCollection("campers");
+  const prescriptions = useCollection("prescriptions");
   const doses = useCollection("medications");
   const bedrooms = useCollectionOrEmpty("bedrooms");
 
@@ -83,17 +117,24 @@ export function useMedicationDay(day: string, search = ""): MedicationDay {
         return [b.id, { n: Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER, name: b.name }] as const;
       }),
     );
-    const list = campers ?? [];
+    const byId = new Map((campers ?? []).map((k) => [k.id, k]));
     const q = normalizeName(search.trim());
-    const withMeds = list.filter((k) => k.medications.length > 0);
+    /** each kid with medicines, joined to their camp-ops record (room) when this role receives it */
+    const withMeds = (prescriptions ?? [])
+      .filter((p) => p.medications.length > 0)
+      .map((p) => {
+        const known = byId.get(p.personId);
+        const kid = known ? (known.name ? known : { ...known, name: p.name }) : ({ id: p.personId, personId: p.personId, name: p.name, bedroom: null } as unknown as Camper);
+        return { kid, meds: p.medications, drugAllergies: (p as Prescription & { drugAllergies?: string[] }).drugAllergies ?? [] };
+      });
     const matches = (k: Camper) => !q || normalizeName(k.name).includes(q);
     const bySlot = new Map<string, MedEntry[]>();
     const sosList: MedEntry[] = [];
     const missing: MedEntry[] = [];
-    for (const kid of withMeds) {
+    for (const { kid, meds, drugAllergies } of withMeds) {
       if (!matches(kid)) continue;
-      for (const med of kid.medications) {
-        const entry = { kid, med, medKey: medKeyOf(med.name) };
+      for (const med of meds) {
+        const entry = { kid, med, medKey: medKeyOf(med.name), drugAllergies };
         if (med.asNeeded) sosList.push({ ...entry, slot: SOS_SLOT });
         else if (med.times.length === 0) missing.push({ ...entry, slot: "" });
         else
@@ -123,11 +164,11 @@ export function useMedicationDay(day: string, search = ""): MedicationDay {
       unscheduled: missing.sort(byRoomThenName),
       kidsWithMeds: withMeds.length,
     };
-  }, [campers, bedrooms, search]);
+  }, [campers, prescriptions, bedrooms, search]);
 
   const given = useMemo(() => {
     const map = new Map<string, MedicationDose>();
-    for (const d of doses ?? []) if (d.day === day && d.slot !== SOS_SLOT) map.set(`${d.camperId}|${d.medKey}|${d.slot}`, d);
+    for (const d of doses ?? []) if (d.day === day && d.slot !== SOS_SLOT) map.set(`${d.personId}|${d.medKey}|${d.slot}`, d);
     return map;
   }, [doses, day]);
 
@@ -135,7 +176,7 @@ export function useMedicationDay(day: string, search = ""): MedicationDay {
     const map = new Map<string, MedicationDose[]>();
     for (const d of doses ?? []) {
       if (d.day !== day || d.slot !== SOS_SLOT) continue;
-      const key = `${d.camperId}|${d.medKey}`;
+      const key = `${d.personId}|${d.medKey}`;
       map.set(key, [...(map.get(key) ?? []), d]);
     }
     for (const rows of map.values()) rows.sort((a, b) => a.givenAt.localeCompare(b.givenAt));
@@ -152,6 +193,6 @@ export function useMedicationDay(day: string, search = ""): MedicationDay {
     sosGiven,
     doneCount: rows.filter((e) => given.has(`${e.kid.id}|${e.medKey}|${e.slot}`)).length,
     total: rows.length,
-    loading: !campers || !doses,
+    loading: !prescriptions || !doses,
   };
 }

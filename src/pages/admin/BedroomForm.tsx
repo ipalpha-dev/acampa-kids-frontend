@@ -5,6 +5,7 @@ import GroupIcon from "../../components/GroupIcon";
 import { ICONS } from "../../icons";
 import { useHideScanFab } from "../../scanFab";
 import { useI18n } from "../../i18n";
+import css from "./staffGroup.module.scss";
 
 interface BedroomFormProps {
   bedroom?: Bedroom;
@@ -83,7 +84,7 @@ export default function BedroomForm({ bedroom, defaultGroup, busy, onSubmit, onC
   return (
     <form className="cat-form cat-form--plain" onSubmit={handleSubmit}>
       <div className="cat-form__row staff-form__row">
-        <label className="cat-field" style={{ width: 140 }}>
+        <label className={`cat-field ${css.capacityField}`}>
           <span className="cat-field__label">{tx("Número")}</span>
           <input
             className="cat-input"

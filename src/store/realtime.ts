@@ -1,4 +1,4 @@
-import { applyServerData, setConnection, type Collections } from "./index";
+import { applyServerData, setConnection, type ServerCollections as Collections } from "./index";
 
 /**
  * Keeps ONE WebSocket to the backend while the user is logged in.
@@ -22,7 +22,14 @@ type ServerMessage =
   | { type: "snapshot"; at: string; data: Partial<Collections> }
   | { type: "update"; at: string; data: Partial<Collections> }
   | { type: "ping"; at: string }
+  | { type: "import-needs-sign-in"; at: string; data: { importId: string; subject: "camper" | "staff" } }
   | { type: "error"; code: string; message: string };
+
+/**
+ * Fired on `window` when an import's background health pass paused waiting for
+ * the importer to sign in again (decision 50) — only the importer hears it.
+ */
+export const IMPORT_NEEDS_SIGN_IN_EVENT = "acampa:import-needs-sign-in";
 
 let socket: WebSocket | null = null;
 let currentToken: string | null = null;
@@ -74,6 +81,7 @@ function open() {
       resolveCollectionWaiters(msg.data);
     }
     else if (msg.type === "ping") ws.send("pong");
+    else if (msg.type === "import-needs-sign-in") window.dispatchEvent(new CustomEvent(IMPORT_NEEDS_SIGN_IN_EVENT, { detail: msg.data }));
     else if (msg.type === "error" && msg.code === "UNAUTHORIZED") {
       currentToken = null;
       onUnauthorized?.(/acesso da equipe/i.test(msg.message) ? "access-window-closed" : "session");

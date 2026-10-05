@@ -5,7 +5,8 @@ import { giveMedication, SOS_SLOT, undoMedication, type MedicationDose } from ".
 import { bedroomLabel, type Bedroom } from "../api/bedrooms";
 import BedIcon from "./BedIcon";
 import CamperPeekDialog from "./CamperPeekDialog";
-import GuardianWhatsApp from "./GuardianWhatsApp";
+import OpsFamilyContact from "./OpsFamilyContact";
+import { useNames } from "../store/people";
 import { ICONS } from "../icons";
 import { minutesOf, nowTime, slotParts, useMedicationDay, type MedEntry } from "../hooks/useMedicationDay";
 import { useDoseGrace } from "../hooks/useDoseGrace";
@@ -75,7 +76,12 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
   }, [bedrooms]);
 
   /** every prescribed line of the day + the ticks already made */
-  const { slots, sos, unscheduled, kidsWithMeds, given: givenToday, sosGiven: sosToday, doneCount, total, loading } = useMedicationDay(day, card ? "" : search);
+  const { slots, sos, unscheduled, kidsWithMeds, given: givenToday, sosGiven: sosToday, doneCount, total, loading } = useMedicationDay(token, day, card ? "" : search);
+
+  /** who gave each dose (person ids — names read live) */
+  const doses = useCollectionOrEmpty("medications");
+  const nameOf = useNames(doses.filter((d) => d.day === day).map((d) => d.byPersonId));
+  const firstOf = (id: string) => nameOf(id).split(" ")[0] || "…";
 
   /** rows that just reached the end of their round: highlighted briefly so the move is followed by the eye */
   const [arriving, setArriving] = useState<Set<string>>(new Set());
@@ -133,7 +139,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
       await run(key, () => undoMedication(token, given.id));
       return;
     }
-    await run(key, () => giveMedication(token, { camperId: e.kid.id, medName: e.med.name, day, slot: e.slot }));
+    await run(key, () => giveMedication(token, { personId: e.kid.id, medName: e.med.name, day, slot: e.slot }));
     start(key);
   }
 
@@ -190,9 +196,9 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                       item of that line (top right of the card), never a floating overlay */}
                   <div className="meds-sos__top">
                     <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name })}>
-                      <MedBody entry={e} sosDoses={taken} room={roomOf(e.kid.bedroom)} />
+                      <MedBody entry={e} sosDoses={taken} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
                     </button>
-                    <GuardianWhatsApp camper={e.kid} className="wa-btn--sm meds-sos__wa" />
+                    <OpsFamilyContact token={token} camperId={e.kid.id} kidName={e.kid.name} className="meds-sos__wa" />
                   </div>
                   <span className="meds-row__actions">
                     {taken.length > 0 && (
@@ -211,7 +217,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                       type="button"
                       className="button button--secondary meds-row__give"
                       disabled={pending.has(key)}
-                      onClick={() => void run(key, () => giveMedication(token, { camperId: e.kid.id, medName: e.med.name, day, slot: SOS_SLOT }))}
+                      onClick={() => void run(key, () => giveMedication(token, { personId: e.kid.id, medName: e.med.name, day, slot: SOS_SLOT }))}
                     >
                       {tx("+ Dose")}
                     </button>
@@ -260,7 +266,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                   <li key={key} className={cls}>
                     <div className={`bus-row meds-row meds-row--tick ${given ? "bus-row--on" : ""} ${justTicked ? "meds-row--ticked" : ""} ${e.kid.aiReviewStatus === "pending" || e.kid.aiReviewStatus === "processing" || e.kid.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={e.kid.aiReviewStatus === "pending" || e.kid.aiReviewStatus === "processing" || e.kid.aiReviewStatus === "structured" ? tx("Cadastro em revisão pela IA") : undefined}>
                       {/* the tick lives in its own checkbox: the rest of the card opens the kid */}
-                      <label className="meds-check" title={given ? tx("Dado por {name} · {when} — desmarque para desfazer", { name: given.by.name, when: speakStamp(given.givenAt) }) : tx("Marcar como dado")}>
+                      <label className="meds-check" title={given ? tx("Dado por {name} · {when} — desmarque para desfazer", { name: firstOf(given.byPersonId), when: speakStamp(given.givenAt) }) : tx("Marcar como dado")}>
                         <input
                           type="checkbox"
                           className="meds-check__input"
@@ -275,7 +281,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                         </span>
                       </label>
                       <button type="button" className="meds-row__hit" title={tx("Ver {name}", { name: e.kid.name })} onClick={() => setPeek({ id: e.kid.id, name: e.kid.name })}>
-                        <MedBody entry={e} given={given} room={roomOf(e.kid.bedroom)} />
+                        <MedBody entry={e} given={given} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
                       </button>
                       {/* while the dose can still be taken back, the corner offers exactly that */}
                       {justTicked ? (
@@ -283,7 +289,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                           <UndoGlyph /> {tx("Desfazer")}
                         </button>
                       ) : (
-                        <GuardianWhatsApp camper={e.kid} className="wa-btn--sm meds-row__wa" />
+                        <OpsFamilyContact token={token} camperId={e.kid.id} kidName={e.kid.name} className="meds-row__wa" />
                       )}
                     </div>
                   </li>
@@ -343,9 +349,9 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
                       ?
                     </span>
                     <button type="button" className="meds-row__hit" title={tx("Abrir a ficha de {name}", { name: e.kid.name })} onClick={() => navigate(`/campers/${e.kid.id}`)}>
-                      <MedBody entry={e} room={roomOf(e.kid.bedroom)} />
+                      <MedBody entry={e} room={roomOf(e.kid.bedroom)} firstOf={firstOf} />
                     </button>
-                    <GuardianWhatsApp camper={e.kid} className="wa-btn--sm meds-row__wa" />
+                    <OpsFamilyContact token={token} camperId={e.kid.id} kidName={e.kid.name} className="meds-row__wa" />
                   </div>
                 </li>
               ))}
@@ -398,14 +404,14 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
 }
 
 /** name + room chip + medicine + dose, plus who gave it and any warning about the kid */
-function MedBody({ entry, given, sosDoses, room }: { entry: MedEntry; given?: MedicationDose; sosDoses?: MedicationDose[]; room?: Pick<Bedroom, "name" | "group"> | null }) {
+function MedBody({ entry, given, sosDoses, room, firstOf }: { entry: MedEntry; given?: MedicationDose; sosDoses?: MedicationDose[]; room?: Pick<Bedroom, "name" | "group"> | null; firstOf: (personId: string) => string }) {
   const { tx } = useI18n();
   const { kid, med } = entry;
-  const cannotTake = kid.drugAllergies.length > 0;
+  const cannotTake = entry.drugAllergies.length > 0;
   return (
     <span className="bus-row__body">
       <span className="bus-row__name">
-        {kid.name}
+        {kid.name || "…"}
         {room && (
           <span className="meds-room" title={bedroomLabel(room)}>
             <BedIcon size={14} group={room.group} />
@@ -424,12 +430,12 @@ function MedBody({ entry, given, sosDoses, room }: { entry: MedEntry; given?: Me
       </span>
       {given && (
         <span className="meds-row__given">
-          ✅ {given.by.name.split(" ")[0]} · {speakStamp(given.givenAt)}
+          ✅ {firstOf(given.byPersonId)} · {speakStamp(given.givenAt)}
         </span>
       )}
       {sosDoses && sosDoses.length > 0 && (
         <span className="meds-row__given">
-          ✅ {sosDoses.map((d) => `${speakStamp(d.givenAt)} (${d.by.name.split(" ")[0]})`).join(" · ")}
+          ✅ {sosDoses.map((d) => `${speakStamp(d.givenAt)} (${firstOf(d.byPersonId)})`).join(" · ")}
         </span>
       )}
     </span>

@@ -42,8 +42,8 @@ interface Block {
 }
 
 const BLOCKS: readonly Block[] = [
-  { key: "campers", label: "Acampantes", icon: ICONS.camper, hint: "As crianças, os check-ins, o histórico dos pais e os pontos lidos no crachá.", unit: ["acampante", "acampantes"] },
-  { key: "staff", label: "Equipe", icon: ICONS.staffPair, hint: "A equipe, suas funções na programação e as listas das configurações.", unit: ["pessoa", "pessoas"] },
+  { key: "campers", label: "Acampantes", icon: ICONS.camper, hint: "A participação das crianças neste acampamento: check-ins, histórico de edições das famílias e pontos lidos no crachá. Os cadastros continuam no IPAlpha.", unit: ["acampante", "acampantes"] },
+  { key: "staff", label: "Equipe", icon: ICONS.staffPair, hint: "A participação da equipe neste acampamento, suas funções na programação e as listas das configurações. Os cadastros continuam no IPAlpha.", unit: ["pessoa", "pessoas"] },
   { key: "bedrooms", label: "Quartos", icon: ICONS.bed, hint: "Os quartos; as crianças e a equipe ficam sem quarto, cama e líder.", unit: ["quarto", "quartos"] },
   { key: "transports", label: "Transporte", icon: ICONS.transport, hint: "Os ônibus e carros; ninguém fica com veículo e os ajudantes do check-in do ônibus saem da função.", unit: ["veículo", "veículos"] },
   { key: "teams", label: "Times", emoji: "🚩", hint: "Os times, o time de cada pessoa e todo o placar.", unit: ["time", "times"] },
@@ -59,7 +59,7 @@ const BLOCKS: readonly Block[] = [
     keptOnAll: true,
   },
   { key: "occurrences", label: "Ocorrências", emoji: "📋", hint: "Todo o registro de ocorrências do acampamento.", unit: ["ocorrência", "ocorrências"] },
-  { key: "medications", label: "Medicações", icon: ICONS.medications, hint: "As marcações da equipe médica (o que cada criança tomou). A medicação cadastrada das crianças fica.", unit: ["marcação", "marcações"] },
+  { key: "medications", label: "Medicações", icon: ICONS.medications, hint: "As marcações da equipe de cuidado (o que cada criança tomou). A medicação das crianças continua no IPAlpha.", unit: ["marcação", "marcações"] },
   { key: "scores", label: "Placar", emoji: "🏆", hint: "Todos os pontos dados e tirados dos times.", unit: ["lançamento", "lançamentos"] },
   { key: "gallery", label: "Fotos", icon: ICONS.camera, hint: "Todas as fotos do álbum e os arquivos delas.", unit: ["foto", "fotos"] },
   {
@@ -86,7 +86,7 @@ const BLOCKS: readonly Block[] = [
  */
 const KEEP: readonly { key: StaffKeepGroup; label: string; icon?: string; emoji?: string }[] = [
   { key: "busHelpers", label: "Ajudantes do ônibus", icon: ICONS.transport },
-  { key: "parentContacts", label: "Contatos dos pais", emoji: "📞" },
+  { key: "parentContacts", label: "Contatos para as famílias", emoji: "📞" },
 ];
 
 /** The person ids one list holds (each list has its own shape). */
@@ -298,7 +298,7 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
         <h2 className="cleanup-all__title">🧹 {tx("Limpar tudo")}</h2>
         <p className="cleanup-all__text">
           {tx(
-            "Apaga os {total} registro(s) dos blocos acima de uma vez — menos as Instruções e a Preparação, que têm botão próprio —, libera a memória dos avisos e zera as datas do check-in, as janelas de acesso, o lembrete e os ensaios. Ficam para o ano que vem: os logins, as categorias e as funções. Na confirmação dá para escolher quem da equipe fica.",
+            "Apaga os {total} registro(s) dos blocos acima de uma vez — menos as Instruções e a Preparação, que têm botão próprio —, libera a memória dos avisos e zera as datas do check-in, as janelas de acesso, o lembrete e os ensaios. Ficam para o ano que vem: as categorias, as funções e os cadastros das pessoas, que vivem no IPAlpha. Na confirmação dá para escolher quem da equipe fica.",
             { total },
           )}
         </p>

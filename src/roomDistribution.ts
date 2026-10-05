@@ -146,7 +146,7 @@ function shuffle<T>(list: T[], rand: () => number): T[] {
 // ── helpers ──
 
 const wingOf = (k: Camper): BedroomGroup | null => {
-  const sex = k.sex ?? k.probableGender;
+  const sex = k.sex;
   return sex === "F" ? "girls" : sex === "M" ? "boys" : null;
 };
 
@@ -157,9 +157,9 @@ function kidBeds(room: Bedroom): number {
 
 /** is this kid the sex + age the slice is about? */
 function inSlice(k: Camper, s: AgeSlice): boolean {
-  if ((k.sex ?? k.probableGender) !== s.sex) return false;
+  if ((k.sex) !== s.sex) return false;
   if (s.allAges) return true;
-  const age = ageOf(k.birthDate);
+  const age = ageOf(k.birthDate ?? null);
   return age !== null && age >= s.minAge && age <= s.maxAge;
 }
 
@@ -260,10 +260,10 @@ export function attempt(input: DistributeInput, strategy: Strategy, seed: number
   // People with another job (admin lists) skip the kids' rooms altogether.
   if (placeStaff) {
     const movable = staff.filter((s) => s.active && !(s.id in plan.staff));
-    const forRooms = movable.filter((s) => !s.admin && !input.excludeStaffIds.has(s.id));
-    const busy = movable.filter((s) => s.admin || input.excludeStaffIds.has(s.id));
+    const forRooms = movable.filter((s) => !input.excludeStaffIds.has(s.id));
+    const busy = movable.filter((s) => input.excludeStaffIds.has(s.id));
     const bySex = (g: BedroomGroup) => (s: Staff) => {
-      const sex = s.sex ?? s.probableGender;
+      const sex = s.sex;
       return g === "girls" ? sex !== "M" : g === "boys" ? sex !== "F" : true;
     };
     const kidRooms = shuffle(bedrooms.filter((b) => b.group !== "staff"), rand);
@@ -441,7 +441,7 @@ export function attempt(input: DistributeInput, strategy: Strategy, seed: number
 export function solve(input: DistributeInput, deadlineMs: number, onProgress?: (best: DistributionPlan, attempts: number) => void): DistributionPlan {
   // "every room has a líder" is only a requirement when there are líderes to give out;
   // with none on the roster (or staff not being placed) it can never be met and must not keep us searching
-  const leadersAvailable = input.who !== "kids" && input.staff.some((s) => s.active && s.roomRole === "caretaker" && !s.admin && !input.excludeStaffIds.has(s.id));
+  const leadersAvailable = input.who !== "kids" && input.staff.some((s) => s.active && s.roomRole === "caretaker" && !input.excludeStaffIds.has(s.id));
   let best: DistributionPlan | null = null;
   let attempts = 0;
   let seed = 1;

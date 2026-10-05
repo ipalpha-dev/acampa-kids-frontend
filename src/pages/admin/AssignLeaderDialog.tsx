@@ -9,7 +9,8 @@ import { useConfirm } from "../../components/ConfirmDialog";
 import Dialog from "../../components/Dialog";
 import SearchField from "../../components/SearchField";
 import { useCollectionOrEmpty } from "../../store";
-import { collatorLocale, useI18n } from "../../i18n";
+import { useI18n } from "../../i18n";
+import { compareByName, firstNameOf, shownName } from "./staffNames";
 
 interface AssignLeaderDialogProps {
   token: string;
@@ -67,14 +68,14 @@ export default function AssignLeaderDialog({ token, open, camper: k, onClose }: 
   }, [open]);
 
   const room = k.bedroom ? bedrooms.find((b) => b.id === k.bedroom) : undefined;
-  const kidSex: CamperSex | null = (room?.group === "girls" ? "F" : room?.group === "boys" ? "M" : null) ?? k.sex ?? k.probableGender;
+  const kidSex: CamperSex | null = (room?.group === "girls" ? "F" : room?.group === "boys" ? "M" : null) ?? k.sex;
 
   const results = useMemo(() => {
     const nq = normalize(q.trim());
-    const byName = (a: Staff, b: Staff) => a.name.localeCompare(b.name, collatorLocale());
+    const byName = compareByName;
     // anyone with a room; the staff wing (no sex) is the exception at the end — a parent on the team, say.
     // admins are on the roster only for the room / transport / vest: they never look after kids
-    const pool = staff.filter((s) => !s.redacted && !!s.bedroom && s.id !== k.caretakerId && (!nq || normalize(s.name).includes(nq)));
+    const pool = staff.filter((s) => !s.redacted && !!s.bedroom && s.id !== k.caretakerId && (!nq || normalize(s.name).includes(nq) || normalize(s.nickname ?? "").includes(nq)));
     const sexOf = (s: Staff) => staffSex(s, bedrooms);
     const compatible = (s: Staff) => !kidSex || sexOf(s) === kidSex;
     const same = pool.filter(compatible);
@@ -98,8 +99,8 @@ export default function AssignLeaderDialog({ token, open, camper: k, onClose }: 
 
   async function pick(s: Staff) {
     if (busy) return;
-    const first = s.name.split(" ")[0];
-    const kid = k.name.split(" ")[0];
+    const first = firstNameOf(s.name);
+    const kid = firstNameOf(k.name);
     const sRoom = s.bedroom ? bedrooms.find((b) => b.id === s.bedroom) : undefined;
 
     // the other sex was offered only because nobody of the kid's sex matched: make sure
@@ -162,10 +163,10 @@ export default function AssignLeaderDialog({ token, open, camper: k, onClose }: 
 
   const whoCares =
     kidSex === "F"
-      ? tx("Quem vai cuidar da {name}?", { name: k.name.split(" ")[0] })
+      ? tx("Quem vai cuidar da {name}?", { name: firstNameOf(k.name) })
       : kidSex === "M"
-        ? tx("Quem vai cuidar do {name}?", { name: k.name.split(" ")[0] })
-        : tx("Quem vai cuidar do(a) {name}?", { name: k.name.split(" ")[0] });
+        ? tx("Quem vai cuidar do {name}?", { name: firstNameOf(k.name) })
+        : tx("Quem vai cuidar do(a) {name}?", { name: firstNameOf(k.name) });
 
   let index = -1;
   return (
@@ -226,7 +227,7 @@ export default function AssignLeaderDialog({ token, open, camper: k, onClose }: 
                           onClick={() => void pick(s)}
                         >
                           <span className="picker__name">
-                            {s.name}
+                            {shownName(s.name)}
                             {/* · Líder / Auxiliar, right after the name */}
                             <span className="picker__role">
                               <span className="picker__dot" aria-hidden="true">·</span>

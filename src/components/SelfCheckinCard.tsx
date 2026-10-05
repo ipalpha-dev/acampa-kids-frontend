@@ -6,11 +6,12 @@ import type { LoggedUser } from "../roles";
 import { speakTime } from "../dates";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import { useI18n } from "../i18n";
+import { usePersonName } from "../store/people";
 import Dialog from "./Dialog";
 
 interface SelfCheckinCardProps {
   token: string;
-  /** the logged-in person — their staff record is found by phone */
+  /** the logged-in person — their staff record is the one whose id is their person id */
   user: LoggedUser;
 }
 
@@ -67,6 +68,8 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
   const events = useCollectionOrEmpty("events");
   const settings = useCollection("settings");
   const me = useMemo(() => staff?.find((s) => s.id === user.personId) ?? null, [staff, user.personId]);
+  /** who stamped the arrival when it was not the person themself (name read live) */
+  const stampedBy = usePersonName(me?.checkin && me.checkin.byPersonId !== user.personId ? me.checkin.byPersonId : null);
   /** first event of the programme = departure (events come sorted by date/time, but sort defensively) */
   const first = useMemo(() => [...events].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0] ?? null, [events]);
   const departure = first?.date ?? null;
@@ -157,11 +160,11 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
   // ── already there ──
   if (checkedIn) {
     const when = speakTime(me.checkin!.at);
-    const self = me.checkin!.byUserId === user.id;
+    const self = me.checkin!.byPersonId === user.personId;
     const distanceNote = justDone !== null && justDone > 0 ? tx(" (a {distance} do ponto de encontro)", { distance: formatDistance(justDone) }) : "";
     const arrival = self
       ? tx("Você confirmou sua chegada às {when}", { when })
-      : tx("{name} confirmou sua chegada às {when}", { name: me.checkin!.byName.split(" ")[0], when });
+      : tx("{name} confirmou sua chegada às {when}", { name: stampedBy.split(" ")[0] || tx("A equipe"), when });
     const card = (
       <section className={`selfcheck selfcheck--done${popup ? " selfcheck--popup" : ""}`} aria-live="polite">
         <span className="selfcheck__badge" aria-hidden="true">✅</span>

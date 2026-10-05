@@ -11,10 +11,11 @@ export interface SampleLoad {
 }
 
 /**
- * 🧪 Test mode: fills an EMPTY camp with the fictional sample (names shuffled
- * within the same gender, random phones / CPFs / RGs / e-mails) so the whole
- * system can be tried end-to-end. Admin only; refuses when the camp already
- * has people (clean up first).
+ * 🧪 Test mode: fills an EMPTY camp with the fictional sample so the whole
+ * system can be tried end-to-end. The fictional people (and their
+ * responsáveis) are registered in IPAlpha by the backend with the coordenação
+ * sign-in; Acampa keeps only the camp ops. Coordenação only; refuses when the
+ * camp already has people (clean up first).
  */
 export async function loadSampleCamp(token: string): Promise<SampleLoad> {
   return command<SampleLoad>(

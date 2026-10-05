@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { addScore } from "../api/scores";
 import { contrastText, type Team } from "../api/teams";
 import Dialog from "../components/Dialog";
@@ -15,6 +15,14 @@ import { ICONS } from "../icons";
 import { useI18n } from "../i18n";
 import { speakWhen } from "../dates";
 import { useScoreSuspense } from "../scoreSuspense";
+import { usePersonName } from "../store/people";
+import styles from "../styles/ops.module.scss";
+
+/** A person's name read live from IPAlpha (score lines carry ids only); "…" until it arrives. */
+function LiveName({ id, first = false }: { id: string | null | undefined; first?: boolean }) {
+  const name = usePersonName(id);
+  return <>{(first ? name.split(" ")[0] : name) || "…"}</>;
+}
 
 interface ScoreboardPageProps {
   token: string;
@@ -256,7 +264,7 @@ export default function ScoreboardPage({ token, userId, canEdit, canScan, showTe
                     {KIND_META[kind].emoji}{" "}
                     {kind === "scan" ? (
                       <>
-                        <strong>{e.camperName}</strong>
+                        <strong><LiveName id={e.camperId} /></strong>
                         {ev && (
                           <>
                             {" "}
@@ -280,7 +288,7 @@ export default function ScoreboardPage({ token, userId, canEdit, canScan, showTe
                       </>
                     )}
                     <small className="score-recent__meta">
-                      {fmtShort(e.createdAt)} · {e.by.name.split(" ")[0]}
+                      {fmtShort(e.createdAt)} · <LiveName id={e.byPersonId} first />
                     </small>
                   </span>
                 </li>
@@ -327,7 +335,7 @@ function PointsDialog({ pending, busy, onSubmit, onClose }: { pending: Pending; 
   return (
     <Dialog open onClose={onClose} title={title} width={480}>
       <form className="cat-form cat-form--plain" onSubmit={submit}>
-        <h2 className="cat-form__title" style={{ borderLeft: `8px solid ${team.color}`, paddingLeft: 12 }}>
+        <h2 className={`cat-form__title ${styles.teamTitle}`} style={{ "--team": team.color } as CSSProperties}>
           {title}
         </h2>
         <div className="cat-field">
