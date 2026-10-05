@@ -132,6 +132,38 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     de: "Wer importiert, kann in diesem Import nicht selbst die Bezugsperson sein.",
   },
 
+  // ── persons-api failure reasons (decisions 75, 81) ──
+  "O IPAlpha não aceitou a inscrição desta pessoa no acampamento.": {
+    en: "IPAlpha did not accept this person's place in the camp.",
+    es: "IPAlpha no aceptó la inscripción de esta persona en el campamento.",
+    fr: "IPAlpha n'a pas accepté l'inscription de cette personne au camp.",
+    de: "IPAlpha hat die Anmeldung dieser Person zum Camp nicht angenommen.",
+  },
+  "O período de inscrições desta edição está fechado no IPAlpha, então a gravação parou. O que já foi gravado continua salvo — quando o período abrir, grave de novo para continuar.": {
+    en: "Sign-ups for this edition are closed in IPAlpha, so saving stopped. What was saved stays saved — when sign-ups open, save again to continue.",
+    es: "Las inscripciones de esta edición están cerradas en IPAlpha, así que el guardado se detuvo. Lo guardado sigue guardado — cuando se abran, guarda de nuevo para continuar.",
+    fr: "Les inscriptions de cette édition sont fermées dans IPAlpha, l'enregistrement s'est donc arrêté. Ce qui a été enregistré reste enregistré — quand elles rouvriront, enregistrez à nouveau pour continuer.",
+    de: "Die Anmeldungen für diese Ausgabe sind in IPAlpha geschlossen, deshalb wurde das Speichern angehalten. Bereits Gespeichertes bleibt — wenn die Anmeldung öffnet, speichere erneut, um fortzufahren.",
+  },
+  "Seu perfil no IPAlpha não pode mais inscrever pessoas nesta edição, então a gravação parou. O que já foi gravado continua salvo — confira seu acesso com a coordenação e grave de novo.": {
+    en: "Your IPAlpha profile can no longer sign people up for this edition, so saving stopped. What was saved stays saved — check your access with the coordination and save again.",
+    es: "Tu perfil en IPAlpha ya no puede inscribir personas en esta edición, así que el guardado se detuvo. Lo guardado sigue guardado — revisa tu acceso con la coordinación y guarda de nuevo.",
+    fr: "Votre profil IPAlpha ne peut plus inscrire de personnes dans cette édition, l'enregistrement s'est donc arrêté. Ce qui a été enregistré reste enregistré — vérifiez votre accès avec la coordination et enregistrez à nouveau.",
+    de: "Dein IPAlpha-Profil kann für diese Ausgabe keine Personen mehr anmelden, deshalb wurde das Speichern angehalten. Bereits Gespeichertes bleibt — kläre deinen Zugang mit der Koordination und speichere erneut.",
+  },
+  "O IPAlpha não aceitou mais inscrições nesta edição do acampamento. O que já foi gravado continua salvo. Fale com quem cuida do IPAlpha.": {
+    en: "IPAlpha no longer accepted sign-ups for this camp edition. What was saved stays saved. Talk to whoever looks after IPAlpha.",
+    es: "IPAlpha ya no aceptó inscripciones en esta edición del campamento. Lo guardado sigue guardado. Habla con quien cuida de IPAlpha.",
+    fr: "IPAlpha n'a plus accepté d'inscriptions pour cette édition du camp. Ce qui a été enregistré reste enregistré. Parlez à la personne qui s'occupe d'IPAlpha.",
+    de: "IPAlpha hat für diese Camp-Ausgabe keine Anmeldungen mehr angenommen. Bereits Gespeichertes bleibt. Sprich mit der Person, die IPAlpha betreut.",
+  },
+  "O IPAlpha não conseguiu terminar esta importação. O que já foi gravado continua salvo. Fale com quem cuida do IPAlpha.": {
+    en: "IPAlpha could not finish this import. What was saved stays saved. Talk to whoever looks after IPAlpha.",
+    es: "IPAlpha no pudo terminar esta importación. Lo guardado sigue guardado. Habla con quien cuida de IPAlpha.",
+    fr: "IPAlpha n'a pas pu terminer cet import. Ce qui a été enregistré reste enregistré. Parlez à la personne qui s'occupe d'IPAlpha.",
+    de: "IPAlpha konnte diesen Import nicht abschließen. Bereits Gespeichertes bleibt. Sprich mit der Person, die IPAlpha betreut.",
+  },
+
   // ── decision 78: values a manual edit kept aside ──
   "Valores da importação para conferir": { en: "Import values to review", es: "Valores de la importación para revisar", fr: "Valeurs de l'import à vérifier", de: "Importwerte zum Prüfen" },
   "Alguém já tinha mudado estes campos à mão, então mantivemos o que estava. Escolha qual valor fica.": {

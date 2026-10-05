@@ -6,7 +6,7 @@ import { ConfirmProvider } from "../../components/ConfirmDialog";
 import { I18nProvider } from "../../i18n";
 import { clearPeople } from "../../store/people";
 import { IMPORT_BATCH_EVENT, IMPORT_PROGRESS_EVENT } from "../../store/realtime";
-import ImportPage, { forgetOpenImports } from "./ImportPage";
+import ImportPage, { failureOf, forgetOpenImports, reasonLabel } from "./ImportPage";
 
 const CAMP = { id: "c1", label: "Acampa Kids 2026", year: 2026, active: true };
 
@@ -262,5 +262,44 @@ describe("import through IPAlpha (CONTRACTS_ACAMPA §20 / §24)", () => {
     expect(await screen.findByText("Use uma planilha .xlsx ou .csv.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Enviar planilha" })).toBeDisabled();
     expect(backend.calls.some((c) => c.method === "POST")).toBe(false);
+  });
+});
+
+describe("persons-api failure reasons (decisions 75, 81)", () => {
+  const tx = (pt: string) => pt;
+  beforeEach(() => {
+    vi.spyOn(navigator, "languages", "get").mockReturnValue(["pt-BR"]);
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
+    saveAuth({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "me", personId: "me", name: "Eu", roles: ["coordenacao"], activeRole: "coordenacao", audience: "admin", superAdmin: false }, camp: CAMP, camps: [] });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    clearPeople();
+    forgetOpenImports();
+  });
+
+  it("a refused membership on a row is said gently; other row reasons keep their own line", () => {
+    expect(reasonLabel(tx, "membership:conflict")).toBe("O IPAlpha não aceitou a inscrição desta pessoa no acampamento.");
+    expect(reasonLabel(tx, "email:phoneOrEmailTaken,membership:unknownRole")).toBe("O IPAlpha não aceitou a inscrição desta pessoa no acampamento.");
+    expect(reasonLabel(tx, "cannotLinkSelf")).toBe("Quem importa não pode ser o responsável nesta mesma importação.");
+    expect(reasonLabel(tx, "somethingNew")).toBe("Não deu certo desta vez.");
+  });
+
+  it("a stopped run: transient and importer refusals resume; edition / setup refusals and a failed reading do not", () => {
+    for (const r of ["projectsUnavailable", "interrupted", "internalError", "membership:roleNotHeld", "membership:outsideWindow", "membership:noGrant"]) expect(failureOf(tx, r).resumable).toBe(true);
+    for (const r of ["analysisFailed", null, "membership:unknownEdition", "projectsRefused", "projectNotFound"]) expect(failureOf(tx, r).resumable).toBe(false);
+    expect(failureOf(tx, "membership:outsideWindow").text).toContain("período de inscrições");
+    expect(failureOf(tx, "membership:roleNotHeld").text).toContain("Seu perfil no IPAlpha");
+  });
+
+  it("shows why the run stopped and offers no 'Continuar gravando' when applying again cannot help", async () => {
+    const backend = stubBackend();
+    backend.set(importView({ status: "failed", failureReason: "membership:unknownEdition", counts: { ...DONE.counts } }));
+    forgetOpenImports();
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Escolher planilha"), { target: { files: [new File(["x"], "kids.csv")] } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar planilha" }));
+    expect(await screen.findByText(/não aceitou mais inscrições nesta edição/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continuar gravando" })).toBeNull();
   });
 });

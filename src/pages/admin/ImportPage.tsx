@@ -154,12 +154,34 @@ function rowLabel(tx: Tx, rowRef: string | number | null): string {
   return /^\d+$/.test(String(rowRef)) ? tx("Linha {row}", { row: rowRef }) : String(rowRef);
 }
 
-function reasonLabel(tx: Tx, reason: string): string {
-  for (const part of reason.split(",")) {
-    const pt = REASON_LABEL[part.trim()];
+/** projects-api refused this person's place in the camp (decision 81: a person this row created was undone in IPAlpha) */
+const MEMBERSHIP_PREFIX = "membership:";
+
+export function reasonLabel(tx: Tx, reason: string): string {
+  const parts = reason.split(",").map((p) => p.trim());
+  for (const part of parts) {
+    const pt = REASON_LABEL[part];
     if (pt) return tx(pt);
   }
+  if (parts.some((p) => p.startsWith(MEMBERSHIP_PREFIX))) return tx("O IPAlpha não aceitou a inscrição desta pessoa no acampamento.");
   return tx("Não deu certo desta vez.");
+}
+
+/** persons-api stops a run when the importer may no longer register (decision 75: projects-api re-checks live). */
+const IMPORTER_REFUSALS = new Set(["roleNotHeld", "notSteward", "editionMismatch", "noGrant", "outsideWindow"]);
+const RESUMABLE_FAILURES = new Set(["projectsUnavailable", "interrupted", "internalError"]);
+
+/** Why a run stopped (persons-api `failureReason`) and whether applying again continues it. */
+export function failureOf(tx: Tx, reason: string | null): { text: string; resumable: boolean } {
+  if (!reason || reason === "analysisFailed") return { text: tx("O IPAlpha não conseguiu ler esta planilha. Confira o arquivo e envie de novo."), resumable: false };
+  if (RESUMABLE_FAILURES.has(reason)) return { text: tx("O IPAlpha parou no meio da gravação. O que já foi gravado continua salvo — grave de novo para continuar de onde parou."), resumable: true };
+  if (reason.startsWith(MEMBERSHIP_PREFIX)) {
+    const why = reason.slice(MEMBERSHIP_PREFIX.length);
+    if (why === "outsideWindow") return { text: tx("O período de inscrições desta edição está fechado no IPAlpha, então a gravação parou. O que já foi gravado continua salvo — quando o período abrir, grave de novo para continuar."), resumable: true };
+    if (IMPORTER_REFUSALS.has(why)) return { text: tx("Seu perfil no IPAlpha não pode mais inscrever pessoas nesta edição, então a gravação parou. O que já foi gravado continua salvo — confira seu acesso com a coordenação e grave de novo."), resumable: true };
+    return { text: tx("O IPAlpha não aceitou mais inscrições nesta edição do acampamento. O que já foi gravado continua salvo. Fale com quem cuida do IPAlpha."), resumable: false };
+  }
+  return { text: tx("O IPAlpha não conseguiu terminar esta importação. O que já foi gravado continua salvo. Fale com quem cuida do IPAlpha."), resumable: false };
 }
 
 /** A friendly sentence for every refusal the import routes answer. */
@@ -431,7 +453,8 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
 
   const stage: "pick" | ImportView["status"] = view ? view.status : "pick";
   const title = subject === "camper" ? tx("Importar acampantes") : tx("Importar equipe");
-  const resumable = view?.status === "failed" && !!view.failureReason && view.failureReason !== "analysisFailed";
+  const failure = view?.status === "failed" ? failureOf(tx, view.failureReason) : null;
+  const resumable = !!failure?.resumable;
 
   return (
     <div className="admin-page">
@@ -549,11 +572,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
           <section className="cat-form">
             <h2 className="cat-form__title">{stage === "failed" ? tx("Não foi possível terminar esta importação") : tx("Importação cancelada")}</h2>
             <p className="cat-hint">
-              {stage === "cancelled"
-                ? tx("As linhas da planilha foram apagadas do IPAlpha. O que já tinha sido gravado continua salvo.")
-                : resumable
-                  ? tx("O IPAlpha parou no meio da gravação. O que já foi gravado continua salvo — grave de novo para continuar de onde parou.")
-                  : tx("O IPAlpha não conseguiu ler esta planilha. Confira o arquivo e envie de novo.")}
+              {stage === "cancelled" ? tx("As linhas da planilha foram apagadas do IPAlpha. O que já tinha sido gravado continua salvo.") : failure?.text}
             </p>
             {view.counts.batches > 0 && <Summary view={view} />}
             <div className="cat-form__actions">
