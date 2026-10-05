@@ -5,6 +5,7 @@ import { staffSex, type Staff } from "../../api/staff";
 import CamperQr from "../../components/CamperQr";
 import HealthAlerts from "../../components/HealthAlerts";
 import KidIcon from "../../components/KidIcon";
+import LinkRequestsCard from "../../components/LinkRequestsCard";
 import ParentKidTabs from "../../components/ParentKidTabs";
 import PersonContact from "../../components/PersonContact";
 import PlayScene from "../../components/PlayScene";
@@ -261,6 +262,9 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
       </p>
 
       <CheckinQrDialog kids={kids} active={access.checkin} />
+
+      {/* another responsável the coordenação asked to include — the family decides (decision 80) */}
+      <LinkRequestsCard token={token} />
 
       {/* the people to call — shown the whole time the parent has access, not only during the camp */}
       {contacts.length > 0 && (

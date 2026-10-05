@@ -21,6 +21,66 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "E-mail (opcional)": { en: "E-mail (optional)", es: "Correo (opcional)", fr: "E-mail (facultatif)", de: "E-Mail (optional)" },
   "Confira o e-mail.": { en: "Please check the e-mail.", es: "Revisa el correo.", fr: "Vérifiez l'e-mail.", de: "Bitte E-Mail prüfen." },
 
+  // ── another responsável: a request the family accepts (decision 80) ──
+  "Adicionar outro responsável": { en: "Add another guardian", es: "Agregar otro responsable", fr: "Ajouter un autre responsable", de: "Weitere Bezugsperson hinzufügen" },
+  "Vamos pedir à família de {name}: quando um responsável aceitar, esta pessoa também passa a cuidar de {name} no IPAlpha e no Acampa Kids. Nada é compartilhado antes disso.": {
+    en: "We'll ask {name}'s family: once a guardian accepts, this person also cares for {name} in IPAlpha and Acampa Kids. Nothing is shared before that.",
+    es: "Le preguntaremos a la familia de {name}: cuando un responsable acepte, esta persona también cuidará de {name} en IPAlpha y en Acampa Kids. No se comparte nada antes.",
+    fr: "Nous demanderons à la famille de {name} : quand un responsable acceptera, cette personne prendra aussi soin de {name} dans IPAlpha et Acampa Kids. Rien n'est partagé avant.",
+    de: "Wir fragen die Familie von {name}: Sobald eine Bezugsperson zustimmt, kümmert sich diese Person in IPAlpha und Acampa Kids ebenfalls um {name}. Vorher wird nichts geteilt.",
+  },
+  "Enviar pedido": { en: "Send request", es: "Enviar solicitud", fr: "Envoyer la demande", de: "Anfrage senden" },
+  "Pedido enviado": { en: "Request sent", es: "Solicitud enviada", fr: "Demande envoyée", de: "Anfrage gesendet" },
+  "A família de {name} vai ver o pedido no Acampa Kids e no IPAlpha. Quando um responsável aceitar, {person} também passa a cuidar de {name} por aqui. O pedido vale por 30 dias.": {
+    en: "{name}'s family will see the request in Acampa Kids and IPAlpha. Once a guardian accepts, {person} also cares for {name} here. The request is valid for 30 days.",
+    es: "La familia de {name} verá la solicitud en Acampa Kids y en IPAlpha. Cuando un responsable acepte, {person} también cuidará de {name} aquí. La solicitud vale por 30 días.",
+    fr: "La famille de {name} verra la demande dans Acampa Kids et IPAlpha. Quand un responsable acceptera, {person} prendra aussi soin de {name} ici. La demande est valable 30 jours.",
+    de: "Die Familie von {name} sieht die Anfrage in Acampa Kids und IPAlpha. Sobald eine Bezugsperson zustimmt, kümmert sich {person} hier ebenfalls um {name}. Die Anfrage gilt 30 Tage.",
+  },
+  "Esta pessoa já é responsável por esta criança.": { en: "This person is already a guardian of this child.", es: "Esta persona ya es responsable de este niño.", fr: "Cette personne est déjà responsable de cet enfant.", de: "Diese Person ist bereits Bezugsperson dieses Kindes." },
+  "Já existe um pedido para esta pessoa esperando a resposta da família.": {
+    en: "There is already a request for this person waiting for the family's answer.",
+    es: "Ya hay una solicitud para esta persona esperando la respuesta de la familia.",
+    fr: "Une demande pour cette personne attend déjà la réponse de la famille.",
+    de: "Für diese Person wartet schon eine Anfrage auf die Antwort der Familie.",
+  },
+  "Esta criança ainda não tem um responsável para aceitar o pedido. Fale com quem cuida do IPAlpha.": {
+    en: "This child doesn't have a guardian yet who could accept the request. Talk to whoever looks after IPAlpha.",
+    es: "Este niño aún no tiene un responsable que pueda aceptar la solicitud. Habla con quien cuida de IPAlpha.",
+    fr: "Cet enfant n'a pas encore de responsable pour accepter la demande. Parlez à la personne qui s'occupe d'IPAlpha.",
+    de: "Dieses Kind hat noch keine Bezugsperson, die die Anfrage annehmen könnte. Sprich mit der Person, die IPAlpha betreut.",
+  },
+  "Você não pode pedir para incluir a si mesmo.": { en: "You can't ask to include yourself.", es: "No puedes pedir incluirte a ti mismo.", fr: "Vous ne pouvez pas demander à vous inclure vous-même.", de: "Du kannst nicht darum bitten, dich selbst hinzuzufügen." },
+  "O IPAlpha só liga responsáveis a crianças com data de nascimento e menores de 18 anos.": {
+    en: "IPAlpha only connects guardians to children under 18 with a birth date.",
+    es: "IPAlpha solo vincula responsables a niños menores de 18 años con fecha de nacimiento.",
+    fr: "IPAlpha ne relie des responsables qu'aux enfants de moins de 18 ans ayant une date de naissance.",
+    de: "IPAlpha verbindet Bezugspersonen nur mit Kindern unter 18 Jahren mit Geburtsdatum.",
+  },
+  "O período de inscrições desta edição está fechado no IPAlpha.": { en: "Sign-ups for this edition are closed in IPAlpha.", es: "Las inscripciones de esta edición están cerradas en IPAlpha.", fr: "Les inscriptions de cette édition sont fermées dans IPAlpha.", de: "Die Anmeldungen für diese Ausgabe sind in IPAlpha geschlossen." },
+  "Só a coordenação pode pedir para incluir outro responsável.": { en: "Only the coordination can ask to include another guardian.", es: "Solo la coordinación puede pedir incluir otro responsable.", fr: "Seule la coordination peut demander d'ajouter un autre responsable.", de: "Nur die Koordination kann darum bitten, eine weitere Bezugsperson hinzuzufügen." },
+  "O IPAlpha não criou este pedido agora. Tente de novo.": { en: "IPAlpha didn't create this request now. Try again.", es: "IPAlpha no creó esta solicitud ahora. Inténtalo de nuevo.", fr: "IPAlpha n'a pas créé cette demande pour le moment. Réessayez.", de: "IPAlpha hat diese Anfrage gerade nicht erstellt. Versuch es noch einmal." },
+  "Informe o nome e o celular do responsável.": { en: "Enter the guardian's name and mobile.", es: "Indica el nombre y el celular del responsable.", fr: "Indiquez le nom et le portable du responsable.", de: "Gib Name und Handynummer der Bezugsperson an." },
+
+  // ── the family decides (parent area) ──
+  "{person} também cuida de {name}?": { en: "Does {person} also care for {name}?", es: "¿{person} también cuida de {name}?", fr: "{person} prend-il aussi soin de {name} ?", de: "Kümmert sich {person} auch um {name}?" },
+  "A coordenação de {project} pediu para incluir {person} como outro responsável por {name}. Se você aceitar, {person} poderá acompanhar {name} no Acampa Kids e no IPAlpha, como você.": {
+    en: "The {project} coordination asked to include {person} as another guardian of {name}. If you accept, {person} can follow {name} in Acampa Kids and IPAlpha, just like you.",
+    es: "La coordinación de {project} pidió incluir a {person} como otro responsable de {name}. Si aceptas, {person} podrá acompañar a {name} en Acampa Kids y en IPAlpha, como tú.",
+    fr: "La coordination de {project} a demandé d'ajouter {person} comme autre responsable de {name}. Si vous acceptez, {person} pourra suivre {name} dans Acampa Kids et IPAlpha, comme vous.",
+    de: "Die Koordination von {project} hat gebeten, {person} als weitere Bezugsperson für {name} hinzuzufügen. Wenn du zustimmst, kann {person} {name} in Acampa Kids und IPAlpha begleiten, so wie du.",
+  },
+  "Pedido para a família": { en: "A request for the family", es: "Una solicitud para la familia", fr: "Une demande pour la famille", de: "Eine Anfrage an die Familie" },
+  "Aceitar": { en: "Accept", es: "Aceptar", fr: "Accepter", de: "Annehmen" },
+  "Recusar": { en: "Decline", es: "Rechazar", fr: "Refuser", de: "Ablehnen" },
+  "Aceitando…": { en: "Accepting…", es: "Aceptando…", fr: "Acceptation…", de: "Wird angenommen…" },
+  "Recusando…": { en: "Declining…", es: "Rechazando…", fr: "Refus…", de: "Wird abgelehnt…" },
+  "Pronto! {person} agora também cuida de {name}.": { en: "Done! {person} now also cares for {name}.", es: "¡Listo! {person} ahora también cuida de {name}.", fr: "C'est fait ! {person} prend maintenant aussi soin de {name}.", de: "Fertig! {person} kümmert sich jetzt auch um {name}." },
+  "Tudo bem, o pedido foi recusado. Nada foi compartilhado.": { en: "All right, the request was declined. Nothing was shared.", es: "Muy bien, la solicitud fue rechazada. No se compartió nada.", fr: "D'accord, la demande a été refusée. Rien n'a été partagé.", de: "Alles klar, die Anfrage wurde abgelehnt. Es wurde nichts geteilt." },
+  "Este pedido já foi respondido ou não vale mais.": { en: "This request was already answered or is no longer valid.", es: "Esta solicitud ya fue respondida o ya no es válida.", fr: "Cette demande a déjà reçu une réponse ou n'est plus valable.", de: "Diese Anfrage wurde schon beantwortet oder ist nicht mehr gültig." },
+  "Não foi possível responder agora. Tente de novo.": { en: "We couldn't answer now. Try again.", es: "No se pudo responder ahora. Inténtalo de nuevo.", fr: "Impossible de répondre pour le moment. Réessayez.", de: "Die Antwort hat gerade nicht geklappt. Versuch es noch einmal." },
+  "outra pessoa": { en: "someone else", es: "otra persona", fr: "une autre personne", de: "eine weitere Person" },
+
   // ── health edit + history ──
   "Fica guardado no IPAlpha, com o cuidado que essas informações pedem. O histórico registra só quais campos mudaram, quem e quando.": {
     en: "It is kept in IPAlpha, with the care this information deserves. The history records only which fields changed, who and when.",
@@ -89,11 +149,4 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Preparando a planilha… {done} de {total}": { en: "Preparing the spreadsheet… {done} of {total}", es: "Preparando la planilla… {done} de {total}", fr: "Préparation du tableau… {done} sur {total}", de: "Tabelle wird vorbereitet … {done} von {total}" },
   "Preparando a planilha com os dados de agora…": { en: "Preparing the spreadsheet with the current data…", es: "Preparando la planilla con los datos actuales…", fr: "Préparation du tableau avec les données actuelles…", de: "Tabelle wird mit den aktuellen Daten vorbereitet …" },
   "Não foi possível aplicar este filtro agora.": { en: "We couldn't apply this filter right now.", es: "No fue posible aplicar este filtro ahora.", fr: "Impossible d'appliquer ce filtre pour l'instant.", de: "Dieser Filter konnte gerade nicht angewendet werden." },
-  // a 2nd responsável comes with a registration / import (decision 57)
-  "Outro responsável por esta criança? Inclua o nome e o celular dele na planilha de importação (colunas do 2º responsável), ou peça a quem cuida do IPAlpha para ligá-lo.": {
-    en: "Another guardian for this child? Add their name and mobile to the import spreadsheet (second guardian columns), or ask whoever looks after IPAlpha to link them.",
-    es: "¿Otro responsable de este niño o niña? Incluye su nombre y celular en la planilla de importación (columnas del 2.º responsable), o pide a quien cuida IPAlpha que lo vincule.",
-    fr: "Un autre responsable pour cet enfant ? Ajoutez son nom et son portable dans le tableau d'import (colonnes du 2e responsable), ou demandez à qui s'occupe d'IPAlpha de le relier.",
-    de: "Eine weitere Bezugsperson für dieses Kind? Trag Name und Handynummer in die Importtabelle ein (Spalten der zweiten Bezugsperson) oder bitte die IPAlpha-Verantwortlichen, sie zu verbinden.",
-  },
 };
