@@ -10,7 +10,7 @@ const TAGS_PER_CALL = 50;
 const FIXED: { tag: string; icon: ReactNode; label: string }[] = [
   { tag: "medications", icon: "💊", label: "Medicação" },
   { tag: "foodRestrictions", icon: "🍽️", label: "Alimentação" },
-  { tag: "neurodivergent", icon: "🧩", label: "Neurodivergente" },
+  { tag: "neurodivergent", icon: "🧩", label: "Neurodivergência" },
 ];
 
 const LIST_TAG: Record<string, { field: string; icon: ReactNode }> = {

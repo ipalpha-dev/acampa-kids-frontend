@@ -52,7 +52,7 @@ export function healthLines(p: HealthLike, labelOf: HealthAlertsProps["labelOf"]
   const drugs = p.drugAllergies.map(labelOf).filter(Boolean) as string[];
   const lines: { icon: ReactNode; title: string; text: string; soft?: boolean }[] = [];
   if (health.length) lines.push({ icon: "⚠️", title: "Condição de saúde", text: health.join(", ") });
-  if (p.neurodivergent) lines.push({ icon: "🧩", title: "Neurodivergente", text: "Neurodivergente" });
+  if (p.neurodivergent) lines.push({ icon: "🧩", title: "Neurodivergência", text: "Neurodivergência" });
   if (allergies.length) lines.push({ icon: "🤮", title: "Alergias", text: allergies.join(", ") });
   if (drugs.length) lines.push({ icon: <NoPillIcon />, title: "Não pode tomar", text: drugs.join(", ") });
   const meds = medicinesText(p);
@@ -98,7 +98,7 @@ export default function HealthAlerts({ person, labelOf, boxed }: HealthAlertsPro
         <span className="staff-card__alert-icon" role="img" aria-label={tx(l.title)}>
           {l.icon}
         </span>{" "}
-        {l.title === "Neurodivergente" ? tx(l.text) : l.text}
+        {l.title === "Neurodivergência" ? tx(l.text) : l.text}
       </p>
     ),
   );

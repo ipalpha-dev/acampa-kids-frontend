@@ -181,7 +181,7 @@ export function HealthFields({ token, value: d, onChange, disabled, dedup }: Hea
 
       <div className="cat-field opt-field">
         <div className="opt-field__head">
-          <Toggle checked={d.health.neurodivergent} onChange={(v) => set("neurodivergent", v)} disabled={disabled} label={tx("🧩 Neurodivergente (TEA, TDAH…)")} />
+          <Toggle checked={d.health.neurodivergent} onChange={(v) => set("neurodivergent", v)} disabled={disabled} label={tx("🧩 Neurodivergência (TEA, TDAH…)")} />
         </div>
       </div>
     </>

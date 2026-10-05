@@ -116,7 +116,8 @@ export default function IpalphaOneTap({ authOrigin, clientId, entryPoint, title,
       // the only inline value: the frame's reported content height (dynamic, runtime)
       style={height ? { height } : undefined}
       sandbox="allow-scripts allow-same-origin"
-      referrerPolicy="no-referrer"
+      // no referrerPolicy: "no-referrer" makes location.ancestorOrigins report "null" inside
+      // the frame, so the auth frame cannot tell who embeds it and stays silent (no banner)
       aria-hidden={shown ? undefined : true}
       tabIndex={shown ? undefined : -1}
     />

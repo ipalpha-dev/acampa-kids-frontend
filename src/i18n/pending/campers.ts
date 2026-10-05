@@ -401,11 +401,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Assurance maladie",
     de: "Krankenversicherung",
   },
-  "🧩 Neurodivergente": {
-    en: "🧩 Neurodivergent",
-    es: "🧩 Neurodivergente",
-    fr: "🧩 Neurodivergent",
-    de: "🧩 Neurodivergent",
+  "🧩 Neurodivergência": {
+    en: "🧩 Neurodivergence",
+    es: "🧩 Neurodivergencia",
+    fr: "🧩 Neurodivergence",
+    de: "🧩 Neurodivergenz",
   },
   "TEA, TDAH… Visível só para a organização e a equipe médica.": {
     en: "ASD, ADHD… Visible only to organizers and the medical team.",
@@ -899,11 +899,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Ce que vous changez ici apparaît pour toute l'équipe tout de suite et reste dans l'historique de l'enfant.",
     de: "Was du hier änderst, sehen alle Mitarbeitenden sofort, und es bleibt im Verlauf des Kindes gespeichert.",
   },
-  "🧩 Neurodivergente (TEA, TDAH…)": {
-    en: "🧩 Neurodivergent (ASD, ADHD…)",
-    es: "🧩 Neurodivergente (TEA, TDAH…)",
-    fr: "🧩 Neurodivergent (TSA, TDAH…)",
-    de: "🧩 Neurodivergent (ASS, ADHS…)",
+  "🧩 Neurodivergência (TEA, TDAH…)": {
+    en: "🧩 Neurodivergence (ASD, ADHD…)",
+    es: "🧩 Neurodivergencia (TEA, TDAH…)",
+    fr: "🧩 Neurodivergence (TSA, TDAH…)",
+    de: "🧩 Neurodivergenz (ASS, ADHS…)",
   },
   "Não foi possível imprimir.": {
     en: "Could not print.",
@@ -1127,11 +1127,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Allergies",
     de: "Allergien",
   },
-  "Neurodivergente": {
-    en: "Neurodivergent",
-    es: "Neurodivergente",
-    fr: "Neurodivergent",
-    de: "Neurodivergent",
+  "Neurodivergência": {
+    en: "Neurodivergence",
+    es: "Neurodivergencia",
+    fr: "Neurodivergence",
+    de: "Neurodivergenz",
   },
   "Medicação diária": {
     en: "Daily medication",

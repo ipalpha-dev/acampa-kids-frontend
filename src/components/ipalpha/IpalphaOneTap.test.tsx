@@ -33,6 +33,11 @@ describe("IpalphaOneTap", () => {
     expect(frame()!.style.height).toBe("212px");
   });
 
+  it("sets no referrerPolicy on the frame (the auth frame must see this page in ancestorOrigins)", () => {
+    const { frame } = setup();
+    expect(frame()).not.toHaveAttribute("referrerpolicy");
+  });
+
   it("ignores messages from another origin or another window", () => {
     const { frame, send, onSelect } = setup();
     send({ event: "ready", height: 200 }, "https://evil.example.test");

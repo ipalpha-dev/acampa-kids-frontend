@@ -254,7 +254,7 @@ export const PARENT_FIELD_LABEL: Record<CamperChangeField, string> = {
   insurance: "Convênio",
   insuranceCard: "Carteirinha",
   generalNotes: "Observações",
-  neurodivergent: "Neurodivergente",
+  neurodivergent: "Neurodivergência",
 };
 
 /** Which fields of a kid were edited, by whom and when (no before / after values — the data lives in IPAlpha). */

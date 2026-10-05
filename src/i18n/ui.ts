@@ -9,8 +9,6 @@ export type UiKey =
   | "login.phoneInvalid"
   | "login.genericError"
   | "login.otpSentSms"
-  | "login.otpSentMock"
-  | "login.otpSentRedirect"
   | "login.otpTitle"
   | "login.verify"
   | "login.verifying"
@@ -109,8 +107,6 @@ const pt: Catalog = {
   "login.phoneInvalid": "Digite um celular válido com DDD (ex.: (11) 98123-4567).",
   "login.genericError": "Algo deu errado. Tente novamente.",
   "login.otpSentSms": "Enviamos um SMS para {phone}",
-  "login.otpSentMock": "Código gerado (modo desenvolvimento) para {phone}",
-  "login.otpSentRedirect": "Código enviado ao celular de teste para {phone}",
   "login.otpTitle": "Digite o código",
   "login.verify": "Entrar",
   "login.verifying": "Verificando…",
@@ -201,8 +197,6 @@ const en: Catalog = {
   "login.phoneInvalid": "Enter a valid mobile with area code (e.g. (11) 98123-4567).",
   "login.genericError": "Something went wrong. Try again.",
   "login.otpSentSms": "We sent an SMS to {phone}",
-  "login.otpSentMock": "Code generated (dev mode) for {phone}",
-  "login.otpSentRedirect": "Code sent to the test phone for {phone}",
   "login.otpTitle": "Enter the code",
   "login.verify": "Sign in",
   "login.verifying": "Checking…",
@@ -293,8 +287,6 @@ const es: Catalog = {
   "login.phoneInvalid": "Escribe un celular válido con código de área (ej.: (11) 98123-4567).",
   "login.genericError": "Algo salió mal. Inténtalo de nuevo.",
   "login.otpSentSms": "Enviamos un SMS a {phone}",
-  "login.otpSentMock": "Código generado (modo desarrollo) para {phone}",
-  "login.otpSentRedirect": "Código enviado al celular de prueba para {phone}",
   "login.otpTitle": "Escribe el código",
   "login.verify": "Entrar",
   "login.verifying": "Verificando…",
@@ -385,8 +377,6 @@ const fr: Catalog = {
   "login.phoneInvalid": "Entrez un portable valide avec indicatif (ex. : (11) 98123-4567).",
   "login.genericError": "Une erreur s'est produite. Réessayez.",
   "login.otpSentSms": "Nous avons envoyé un SMS à {phone}",
-  "login.otpSentMock": "Code généré (mode dev) pour {phone}",
-  "login.otpSentRedirect": "Code envoyé au portable de test pour {phone}",
   "login.otpTitle": "Entrez le code",
   "login.verify": "Connexion",
   "login.verifying": "Vérification…",
@@ -477,8 +467,6 @@ const de: Catalog = {
   "login.phoneInvalid": "Gib eine gültige Handynummer mit Vorwahl ein (z. B. (11) 98123-4567).",
   "login.genericError": "Etwas ist schiefgelaufen. Versuch es noch einmal.",
   "login.otpSentSms": "Wir haben eine SMS an {phone} geschickt",
-  "login.otpSentMock": "Code erzeugt (Entwicklungsmodus) für {phone}",
-  "login.otpSentRedirect": "Code an das Testhandy für {phone} gesendet",
   "login.otpTitle": "Gib den Code ein",
   "login.verify": "Anmelden",
   "login.verifying": "Wird geprüft…",

@@ -488,7 +488,7 @@ const PREVIEW_COLUMNS: { key: string; label: string }[] = [
   { key: "guardianEmail", label: "E-mail" }, { key: "guardian2Name", label: "2º responsável" }, { key: "guardian2Phone", label: "Telefone do 2º" },
   { key: "emergencyContact", label: "Emergência" }, { key: "insurance", label: "Convênio" },
   { key: "insuranceCard", label: "Carteirinha" }, { key: "weightKg", label: "Peso" }, { key: "allergies", label: "Alergias" },
-  { key: "drugAllergies", label: "Alergia a remédios" }, { key: "healthIssues", label: "Condições de saúde" }, { key: "neurodivergent", label: "Neurodivergente" },
+  { key: "drugAllergies", label: "Alergia a remédios" }, { key: "healthIssues", label: "Condições de saúde" }, { key: "neurodivergent", label: "Neurodivergência" },
   { key: "dailyMedicationText", label: "Medicação diária" }, { key: "foodRestrictionText", label: "Restrição alimentar" }, { key: "healthNotes", label: "Observações médicas" },
   { key: "generalNotes", label: "Observações" },
 ];

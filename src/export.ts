@@ -131,7 +131,7 @@ function healthColumns(h: HealthInfo | null | undefined, hl: (id: string) => str
     [tx("Alergia a medicamentos")]: labels(hl, h?.drugAllergies),
     [tx("Condições de saúde")]: labels(hl, h?.healthIssues),
   };
-  if (withNeuro) row[tx("Neurodivergente")] = h ? yesNo(h.neurodivergent) : "";
+  if (withNeuro) row[tx("Neurodivergência")] = h ? yesNo(h.neurodivergent) : "";
   row[tx("Medicamentos")] = h ? medicationsText(h.medications ?? []) : "";
   row[tx("Restrições alimentares")] = h?.foodRestrictions ?? "";
   row[tx("Observações médicas")] = h?.healthNotes ?? "";
