@@ -1,4 +1,4 @@
-import { ApiError, OFFLINE_MESSAGE, command } from "./client";
+import { ApiError, OFFLINE_MESSAGE, command, signalAuthFailure } from "./client";
 import { bearer } from "../auth/store";
 import { shrinkImage } from "./files";
 
@@ -70,6 +70,7 @@ export async function searchGalleryPerson(token: string, reference: File): Promi
   const data = (await res.json().catch(() => null)) as FaceSearchResult | { error?: { code?: string; message?: string } } | null;
   if (!res.ok || !data || !("matches" in data)) {
     const error = data && "error" in data ? data.error : undefined;
+    if (!res.ok) signalAuthFailure(res.status, error?.code ?? "");
     throw new ApiError(res.status, error?.code ?? "FACE_SEARCH_FAILED", error?.message ?? "Não foi possível procurar as fotos.");
   }
   return data;
@@ -104,6 +105,7 @@ export async function uploadGalleryPhoto(token: string, input: GalleryUploadInpu
   const data = (await res.json().catch(() => null)) as { photo?: GalleryPhoto; error?: { code?: string; message?: string } } | null;
   if (!res.ok || !data?.photo) {
     waiter.cancel();
+    if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
     throw new ApiError(res.status, data?.error?.code ?? "UPLOAD_FAILED", data?.error?.message ?? "Não foi possível enviar a foto.");
   }
   await waiter.promise;

@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { saveAuth } from "../../auth/store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../i18n";
 import { applyServerData, clearStore } from "../../store";
@@ -6,11 +7,12 @@ import { rememberPeople } from "../../store/people";
 import { EMPTY_HEALTH, type Camper } from "../../api/campers";
 import ParentHomePage from "./ParentHomePage";
 import AttentionEditDialog from "./AttentionEditDialog";
+import type { LoggedUser } from "../../roles";
 
 /** Decision 52 / §19: a responsável reads and edits their own kids' health through IPAlpha's own-kids rule. */
 const CAMP = { id: "c1", label: "Acampa Kids 2026", year: 2026, active: true };
 const KID = "k1";
-const USER = { id: "p1", personId: "p1", name: "Rosa Paz", roles: ["responsavel"], activeRole: "responsavel", audience: "parent", superAdmin: false };
+const USER: LoggedUser = { id: "p1", personId: "p1", name: "Rosa Paz", roles: ["responsavel"], activeRole: "responsavel", audience: "parent", superAdmin: false };
 const ACCESS = { open: false, checkin: false, opensAt: null, closesAt: null };
 
 function record(id: string) {
@@ -18,7 +20,7 @@ function record(id: string) {
 }
 
 function signIn() {
-  localStorage.setItem("acampa.auth", JSON.stringify({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: USER, camp: CAMP, camps: [] }));
+  saveAuth({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: USER, camp: CAMP, camps: [] });
 }
 
 function stubApi(camper: Record<string, unknown>, put?: () => Response) {

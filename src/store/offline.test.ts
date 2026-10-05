@@ -190,4 +190,20 @@ describe("encrypted offline copy (decision 35)", () => {
     expect(store.offlineCopyActive()).toBe(false);
     expect(backend.peek()).toBe(sealed);
   });
+  it("endSession clears the service worker's upload / photo caches (and only those)", async () => {
+    const { store } = await freshStore();
+    const deleted: string[] = [];
+    vi.stubGlobal("caches", { delete: vi.fn(async (name: string) => (deleted.push(name), true)) });
+    await store.endOfflineSession();
+    expect(deleted.sort()).toEqual(["acampa-files", "acampa-thumbs"]);
+  });
+
+  it("a camp that is over clears the upload / photo caches too", async () => {
+    const { store } = await freshStore();
+    const deleted: string[] = [];
+    vi.stubGlobal("caches", { delete: vi.fn(async (name: string) => (deleted.push(name), true)) });
+    stubKey({ key: keyB64(11), role: "equipe", healthAllowed: false, sessionExpiresAt: future(DAY), campEndsAt: future(-1000) });
+    await store.startOfflineSession("tok", "camp-1");
+    expect(deleted.sort()).toEqual(["acampa-files", "acampa-thumbs"]);
+  });
 });

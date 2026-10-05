@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { saveAuth } from "../../auth/store";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../../components/ConfirmDialog";
 import { I18nProvider } from "../../i18n";
@@ -18,7 +19,7 @@ function record(id: string) {
 const KIDS = ["Ana Paz", "Ana Rios", "Bruno Lima", "Caio Reis", "Davi Sá", "Eva Luz", "Fábio Mar", "Gil Sol"].map((name, i) => ({ id: `k${i}`, name, hasHealth: i < 2 }));
 
 function signIn(activeRole: string, audience: "admin" | "staff") {
-  localStorage.setItem("acampa.auth", JSON.stringify({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "me", personId: "me", name: "Eu", roles: [activeRole], activeRole, audience, superAdmin: false }, camp: CAMP, camps: [] }));
+  saveAuth({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "me", personId: "me", name: "Eu", roles: [activeRole], activeRole, audience, superAdmin: false }, camp: CAMP, camps: [] });
 }
 
 function stubApi() {

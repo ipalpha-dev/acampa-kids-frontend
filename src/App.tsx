@@ -9,20 +9,22 @@ import { fetchIpalphaConfig, type IpalphaConfig } from "./auth/ipalpha";
 import {
   clearAuth,
   clearPendingOtp,
-  loadAuth,
+  fetchMe,
   loadPendingOtp,
+  loadStoredSession,
   logout,
   saveAuth,
   savePendingOtp,
   switchCamp,
   switchRole,
-  validateAuth,
   type AuthState,
   type LoginResult,
   type PendingOtp,
+  type StoredSession,
   type SwitchResult,
 } from "./auth/store";
 import { useIpalphaSignIn } from "./auth/useIpalphaSignIn";
+import styles from "./App.module.scss";
 import Dashboard from "./pages/Dashboard";
 import RoleSwitchDialog from "./components/RoleSwitchDialog";
 import OtpStep from "./pages/OtpStep";
@@ -38,7 +40,15 @@ type Session = AuthState;
 
 export default function App() {
   const { t, tx } = useI18n();
-  const [otp, setOtp] = useState<PendingOtp | null>(() => (loadAuth() ? null : loadPendingOtp()));
+  /**
+   * A token left by a previous page view: its identity (name, roles, camp) is
+   * never stored — it is read with GET /api/auth/me before the app opens.
+   */
+  const [restoring, setRestoring] = useState<StoredSession | null>(() => loadStoredSession());
+  /** /me could not be reached while restoring: offline (retry) or IPAlpha in maintenance */
+  const [restoreFailed, setRestoreFailed] = useState<"offline" | "maintenance" | null>(null);
+  const [restoreNonce, setRestoreNonce] = useState(0);
+  const [otp, setOtp] = useState<PendingOtp | null>(() => (loadStoredSession() ? null : loadPendingOtp()));
   const [phoneMasked, setPhoneMasked] = useState("");
   /** gentle note on the login screen: not in this camp's project, or the session ended */
   const [loginNote, setLoginNote] = useState<string | null>(null);
@@ -47,8 +57,8 @@ export default function App() {
   /** CAMP_ARCHIVED / CAMP_FORBIDDEN messages from anywhere in the app (see api/client.ts) */
   const [campToast, setCampToast] = useState<string | null>(null);
 
-  // restore an existing session (still within its sliding window)
-  const [session, setSession] = useState<Session | null>(() => loadAuth());
+  // the live session: memory only (auth/store keeps just the token on the device)
+  const [session, setSession] = useState<Session | null>(null);
   /** just logged in holding more than one role: ask which one before letting them in */
   const [choosingRole, setChoosingRole] = useState(false);
   /** "Entrar com IPAlpha" + One Tap: null = feature off (or not known yet) */
@@ -61,7 +71,7 @@ export default function App() {
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
-  const loggedIn = !!session;
+  const loggedIn = !!session || !!restoring;
   useEffect(() => {
     if (loggedIn) return;
     let alive = true;
@@ -78,6 +88,8 @@ export default function App() {
    */
   const endSession = useCallback((note: string | null) => {
     clearAuth();
+    setRestoring(null);
+    setRestoreFailed(null);
     clearPendingOtp();
     // the unsaved room plan holds person ids of this session's camp: it goes with the session
     clearRoomsDraft();
@@ -105,19 +117,64 @@ export default function App() {
   const showNotInProject = useCallback(() => setLoginNote(t("login.notInProject")), [t]);
   const ipalpha = useIpalphaSignIn({ config: ipalphaConfig, onSignedIn: finishLogin, onUnavailable: showMaintenance, onNotInProject: showNotInProject });
 
-  // a restored session: refresh the person's view (name read live, roles re-checked) in the background.
-  // A 401 there fires SESSION_ENDED_EVENT (handled below); offline keeps the saved session.
+  // a token from a previous page view: read who it is (GET /me, name read live, roles re-checked) before
+  // opening the app. 401 / a refusal → the login, gently; offline / maintenance → wait and retry.
   useEffect(() => {
-    const stored = sessionRef.current;
+    const stored = restoring;
     if (!stored) return;
-    validateAuth(stored.token).then((res) => {
+    let alive = true;
+    setRestoreFailed(null);
+    fetchMe(stored.token)
+      .then((res) => {
+        if (!alive) return;
+        const next: Session = { token: stored.token, tokenExpiresAt: res.tokenExpiresAt ?? stored.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps };
+        saveAuth(next);
+        setSession(next);
+        setRestoring(null);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        if (err instanceof ApiError && err.status === 0) return setRestoreFailed("offline");
+        if (err instanceof ApiError && (err.code === "IPALPHA_UNAVAILABLE" || err.status >= 500)) return setRestoreFailed("maintenance");
+        // the session is gone (401) or refused (closed access window, not in the project)
+        endSession(err instanceof ApiError && err.code.startsWith("STAFF_ACCESS") ? null : t("login.sessionEnded"));
+        if (err instanceof ApiError && err.code.startsWith("STAFF_ACCESS")) setEvicted(err);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoring, restoreNonce]);
+
+  // offline while restoring: try again as soon as the device is back online
+  useEffect(() => {
+    if (restoreFailed !== "offline") return;
+    const retry = () => setRestoreNonce((n) => n + 1);
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [restoreFailed]);
+
+  // sliding expiry + live identity: coming back to the app re-reads /me (at most every 10 minutes)
+  const lastMeAt = useRef(Date.now());
+  useEffect(() => {
+    if (!session) return;
+    const onVisible = () => {
       const current = sessionRef.current;
-      if (!res || !current || current.token !== stored.token) return;
-      const next = { ...current, user: res.user, camp: res.camp, camps: res.camps };
-      saveAuth(next);
-      setSession(next);
-    });
-  }, []);
+      if (document.visibilityState !== "visible" || !current || Date.now() - lastMeAt.current < 10 * 60_000) return;
+      lastMeAt.current = Date.now();
+      fetchMe(current.token)
+        .then((res) => {
+          const latest = sessionRef.current;
+          if (!latest || latest.token !== current.token) return;
+          const next: Session = { ...latest, tokenExpiresAt: res.tokenExpiresAt ?? latest.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps };
+          saveAuth(next);
+          setSession(next);
+        })
+        .catch(() => undefined); // a 401 fires SESSION_ENDED (handled below); offline keeps the session
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [session]);
 
   // any authenticated call answering 401 (SESSION_ENDED from core, or the session gone) → back to the login, gently
   useEffect(() => {
@@ -162,9 +219,10 @@ export default function App() {
   const campId = session?.camp.id ?? null;
   const scopeKey = session ? `${session.user.activeRole}|${session.camp.id}` : null;
   useEffect(() => {
-    // no session on this device (expired, never signed in): nothing may stay stored
+    // no session on this device (expired, never signed in): nothing may stay stored.
+    // While a stored token is being restored (/me) the sealed copy waits for it.
     if (!token || !campId) {
-      void endOfflineSession();
+      if (!restoring) void endOfflineSession();
       return;
     }
     void startOfflineSession(token, campId);
@@ -192,7 +250,7 @@ export default function App() {
     const current = sessionRef.current;
     if (!current) return;
     await endOfflineSession();
-    const next: Session = { token: current.token, tokenExpiresAt: res.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps ?? current.camps };
+    const next: Session = { token: current.token, tokenExpiresAt: res.tokenExpiresAt || current.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps ?? current.camps };
     saveAuth(next);
     setSession(next);
     // the other role has its own menu: drop the path and land on its first tab
@@ -265,6 +323,28 @@ export default function App() {
           onSwitchCamp={applyCamp}
         />
         <Toast message={campToast} onClose={() => setCampToast(null)} />
+      </>
+    );
+  }
+
+  /** A stored token whose identity is still being read (or could not be yet). */
+  if (restoring) {
+    if (restoreFailed === "maintenance") {
+      return (
+        <>
+          <VersionMark />
+          <CampingLayout>
+            <MaintenanceScene onRetry={() => setRestoreNonce((n) => n + 1)} />
+          </CampingLayout>
+        </>
+      );
+    }
+    return (
+      <>
+        <VersionMark />
+        <CampingLayout>
+          <RestoringSession offline={restoreFailed === "offline"} onRetry={() => setRestoreNonce((n) => n + 1)} onSignOut={() => endSession(null)} />
+        </CampingLayout>
       </>
     );
   }
@@ -342,6 +422,33 @@ export default function App() {
       <StaffAccessDialog error={ipalpha.accessError} onClose={ipalpha.clearAccessError} />
       <Toast message={campToast} onClose={() => setCampToast(null)} />
     </>
+  );
+}
+
+/** Opening a stored session: a calm "abrindo…", or — with no connection — a gentle note + retry. */
+function RestoringSession({ offline, onRetry, onSignOut }: { offline: boolean; onRetry: () => void; onSignOut: () => void }) {
+  const { tx } = useI18n();
+  return (
+    <div className={styles.restore} role="status" aria-live="polite">
+      <h1 className="camping-panel__title">{tx("Abrindo o acampamento…")}</h1>
+      <div className={`${styles.reveal} ${offline ? styles.revealOpen : ""}`}>
+        <div className={styles.revealInner}>
+          {offline && (
+            <>
+              <p className={styles.note}>{tx("Sem conexão com o servidor agora. Assim que a internet voltar, a gente continua de onde parou.")}</p>
+              <div className={styles.actions}>
+                <button type="button" className="button button--primary" onClick={onRetry}>
+                  {tx("Tentar de novo")}
+                </button>
+                <button type="button" className="button button--secondary" onClick={onSignOut}>
+                  {tx("Entrar com outra conta")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

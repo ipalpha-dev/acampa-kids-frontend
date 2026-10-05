@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { clearAuth } from "../auth/store";
 
 // jsdom has <dialog> but not its modal API
 if (typeof HTMLDialogElement !== "undefined" && !HTMLDialogElement.prototype.showModal) {
@@ -19,4 +20,6 @@ window.scrollTo = () => {};
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  // the live session is memory-only (auth/store): forget it between tests too
+  clearAuth();
 });

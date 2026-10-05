@@ -3,9 +3,11 @@ import { deviceLocale } from "../i18n";
 import type { CoreRole, LoggedUser } from "../roles";
 
 /**
- * The browser keeps ONLY the opaque Acampa session token (decision 32): the
- * per-role IPAlpha tokens live in the backend's session record. No phone, no
- * person data is stored here.
+ * The browser keeps ONLY the opaque Acampa session token + its (non-personal)
+ * expiry (decision 32, CONTRACTS_ACAMPA §24): the per-role IPAlpha tokens live
+ * in the backend's session record, and the person's identity (name, roles,
+ * personId, camp) is read with `GET /api/auth/me` at load and kept in memory.
+ * No name, role, personId or user object ever reaches localStorage.
  */
 const STORAGE_KEY = "acampa.auth";
 
@@ -27,35 +29,85 @@ export interface AuthState {
   camps: CampSummary[];
 }
 
-/** Saves the session in the browser; it auto-clears after the token expiry (checked on load). */
-export function saveAuth(state: AuthState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+/** What localStorage holds: the opaque token and when it stops being valid. Nothing else. */
+export interface StoredSession {
+  token: string;
+  tokenExpiresAt: string;
 }
 
-/** Returns the stored session if it's still valid (not older than the expiry date) and of the people-in-core shape. */
+/** The live session of this tab — memory only, gone with the tab. */
+let current: AuthState | null = null;
+
+function writeStored(stored: StoredSession): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: stored.token, tokenExpiresAt: stored.tokenExpiresAt }));
+  } catch {
+    // storage unavailable (private mode quota): the session lives in memory for this tab
+  }
+}
+
+function expired(iso: string): boolean {
+  const at = new Date(iso).getTime();
+  return !Number.isFinite(at) || at <= Date.now();
+}
+
+/** Keeps the session in memory and ONLY its token + expiry on the device. */
+export function saveAuth(state: AuthState): void {
+  current = state;
+  writeStored(state);
+}
+
+/** The live session (memory), or null when signed out / expired. */
 export function loadAuth(): AuthState | null {
+  if (current && expired(current.tokenExpiresAt)) return null;
+  return current;
+}
+
+/**
+ * The token left on this device by a previous page view, or null. Migrates the
+ * old shape: a stored user object (name, roles, personId…) is dropped on sight,
+ * keeping only the token + expiry; a session of the old phone-based app (a user
+ * without personId) cannot be used and is removed whole.
+ */
+export function loadStoredSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-
-    const state = JSON.parse(raw) as AuthState;
-    // a session saved by the old phone-based app has no personId: sign in again
-    if (!state.token || !state.tokenExpiresAt || !state.user?.personId || !state.camp) {
+    const parsed = JSON.parse(raw) as Partial<StoredSession> & { user?: { personId?: string } } & Record<string, unknown>;
+    const legacyPhoneSession = "user" in parsed && !parsed.user?.personId;
+    if (!parsed.token || !parsed.tokenExpiresAt || legacyPhoneSession || expired(parsed.tokenExpiresAt)) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    if (new Date(state.tokenExpiresAt) <= new Date()) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return state;
+    const stored = { token: parsed.token, tokenExpiresAt: parsed.tokenExpiresAt };
+    // anything besides the token + expiry (an old user / camp object) leaves the device now
+    if (Object.keys(parsed).some((k) => k !== "token" && k !== "tokenExpiresAt")) writeStored(stored);
+    return stored;
   } catch {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // storage unavailable
+    }
     return null;
   }
 }
 
+/** Sliding expiry: a newer `tokenExpiresAt` (from /me, a role / camp switch) replaces the kept one. Absent → unchanged. */
+export function touchExpiry(tokenExpiresAt: string | null | undefined): void {
+  if (!tokenExpiresAt) return;
+  if (current) current = { ...current, tokenExpiresAt };
+  const token = current?.token ?? loadStoredSession()?.token;
+  if (token) writeStored({ token, tokenExpiresAt });
+}
+
 export function clearAuth(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  current = null;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // storage unavailable
+  }
 }
 
 const OTP_STORAGE_KEY = "acampa.otp";
@@ -110,15 +162,26 @@ export interface MeResult {
   user: LoggedUser;
   camp: CampSummary;
   camps: CampSummary[];
+  /** sliding expiry — absent when the backend did not answer one (keep the current) */
+  tokenExpiresAt?: string;
 }
 
-/** Validates the stored token against the backend (GET /api/auth/me). null = the session is gone. */
+/**
+ * Reads the session's identity (GET /api/auth/me). Throws the ApiError: a 401
+ * also fires SESSION_ENDED (api/client.ts); OFFLINE / 503 leave the token alone.
+ */
+export async function fetchMe(token: string): Promise<MeResult> {
+  const res = await api<{ user: LoggedUser; camp: CampSummary; camps?: CampSummary[]; tokenExpiresAt?: string }>("/api/auth/me", {
+    headers: bearer(token),
+    cache: "no-store",
+  });
+  return { user: res.user, camp: res.camp, camps: res.camps ?? [], tokenExpiresAt: res.tokenExpiresAt || undefined };
+}
+
+/** Validates the token (GET /api/auth/me). null = the session is gone or the server could not be reached. */
 export async function validateAuth(token: string): Promise<MeResult | null> {
   try {
-    const res = await api<{ user: LoggedUser; camp: CampSummary; camps?: CampSummary[] }>("/api/auth/me", {
-      headers: bearer(token),
-    });
-    return { user: res.user, camp: res.camp, camps: res.camps ?? [] };
+    return await fetchMe(token);
   } catch {
     return null;
   }

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import { I18nProvider } from "./i18n";
+import { loadAuth } from "./auth/store";
 import type { LoggedUser } from "./roles";
 
 type Route = { status: number; body: unknown } | ((init?: RequestInit) => { status: number; body: unknown });
@@ -91,9 +92,13 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     await signInBySms();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/auth/otp/verify"), expect.anything()));
     expect(localStorage.getItem("acampa.otp")).toBeNull();
+    // the device keeps ONLY the opaque token + its expiry; the identity lives in memory
     const saved = JSON.parse(localStorage.getItem("acampa.auth") ?? "{}");
-    expect(saved.user.personId).toBe("p-1");
+    await waitFor(() => expect(loadAuth()?.user.personId).toBe("p-1"));
+    expect(Object.keys(saved).sort()).toEqual(["token", "tokenExpiresAt"]);
+    expect(saved.token).toBe("sess-1");
     expect(JSON.stringify(saved)).not.toContain("981234567");
+    expect(JSON.stringify(saved)).not.toContain("Marta");
   });
 
   it("NOT_IN_PROJECT on the phone step shows the gentle note and keeps the form", async () => {
@@ -142,7 +147,8 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const saved = JSON.parse(localStorage.getItem("acampa.auth") ?? "{}");
     expect(saved.token).toBe("sess-1");
-    expect(saved.user.activeRole).toBe("saude");
+    expect(saved.user).toBeUndefined();
+    expect(loadAuth()?.user.activeRole).toBe("saude");
   });
 
   it("a role that is gone in core (ROLE_FORBIDDEN) leaves the list with a gentle message", async () => {
@@ -158,7 +164,7 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     await screen.findByRole("dialog");
     fireEvent.click(screen.getByRole("button", { name: /Fotografia/ }));
     expect(await screen.findByText("Este perfil não está mais disponível para você.")).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem("acampa.auth") ?? "{}").user.roles).toEqual(["equipe"]);
+    expect(loadAuth()?.user.roles).toEqual(["equipe"]);
   });
 
   it("a 401 SESSION_ENDED anywhere returns to the login gracefully and wipes the session", async () => {
@@ -170,6 +176,66 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     expect(await screen.findByText("Sua sessão terminou. É só entrar de novo quando quiser. 🌲")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Qual é o seu celular?" })).toBeInTheDocument();
     expect(localStorage.getItem("acampa.auth")).toBeNull();
+  });
+
+  it("restores a token-only session with GET /me (identity in memory) and slides the stored expiry", async () => {
+    const before = new Date(Date.now() + 3600_000).toISOString();
+    const slid = new Date(Date.now() + 96 * 3600_000).toISOString();
+    localStorage.setItem("acampa.auth", JSON.stringify({ token: "sess-9", tokenExpiresAt: before }));
+    const fetchMock = stubApi({ ...COMMON, "GET /api/auth/me": { status: 200, body: { user: user(), camp: CAMP, tokenExpiresAt: slid } } });
+    await act(async () => {
+      renderApp();
+    });
+    await waitFor(() => expect(loadAuth()?.user.name).toBe("Marta Lima"));
+    const meCall = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/auth/me"));
+    expect((meCall?.[1]?.headers as Record<string, string>).authorization).toBe("Bearer sess-9");
+    expect(JSON.parse(localStorage.getItem("acampa.auth") ?? "{}")).toEqual({ token: "sess-9", tokenExpiresAt: slid });
+    expect(loadAuth()?.tokenExpiresAt).toBe(slid);
+  });
+
+  it("keeps the current expiry when /me answers none", async () => {
+    const before = new Date(Date.now() + 3600_000).toISOString();
+    localStorage.setItem("acampa.auth", JSON.stringify({ token: "sess-9", tokenExpiresAt: before }));
+    stubApi({ ...COMMON, "GET /api/auth/me": { status: 200, body: { user: user(), camp: CAMP } } });
+    await act(async () => {
+      renderApp();
+    });
+    await waitFor(() => expect(loadAuth()?.user.personId).toBe("p-1"));
+    expect(JSON.parse(localStorage.getItem("acampa.auth") ?? "{}")).toEqual({ token: "sess-9", tokenExpiresAt: before });
+  });
+
+  it("migrates an old stored user object: only the token + expiry stay on the device", async () => {
+    const exp = new Date(Date.now() + 3600_000).toISOString();
+    localStorage.setItem("acampa.auth", JSON.stringify({ token: "sess-old", tokenExpiresAt: exp, user: user(), camp: CAMP, camps: [] }));
+    stubApi({ ...COMMON, "GET /api/auth/me": { status: 200, body: { user: user(), camp: CAMP } } });
+    await act(async () => {
+      renderApp();
+    });
+    expect(JSON.parse(localStorage.getItem("acampa.auth") ?? "{}")).toEqual({ token: "sess-old", tokenExpiresAt: exp });
+    await waitFor(() => expect(loadAuth()?.user.name).toBe("Marta Lima"));
+    expect(localStorage.getItem("acampa.auth")).not.toContain("Marta");
+  });
+
+  it("no connection while restoring: a gentle note with retry, the token is kept", async () => {
+    localStorage.setItem("acampa.auth", JSON.stringify({ token: "sess-9", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString() }));
+    let online = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (!online) throw new TypeError("Failed to fetch");
+        const path = new URL(String(input), window.location.origin).pathname;
+        if (path === "/api/auth/me") return new Response(JSON.stringify({ user: user(), camp: CAMP }), { status: 200 });
+        return new Response(JSON.stringify(COMMON[`GET ${path}`] ? (COMMON[`GET ${path}`] as { body: unknown }).body : {}), { status: 200 });
+      }),
+    );
+    await act(async () => {
+      renderApp();
+    });
+    expect(await screen.findByText(/Sem conexão com o servidor agora/)).toBeInTheDocument();
+    expect(localStorage.getItem("acampa.auth")).toContain("sess-9");
+    online = true;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(loadAuth()?.user.personId).toBe("p-1"));
   });
 
   it("a session saved by the old phone-based app (no personId) is dropped: sign in again", async () => {

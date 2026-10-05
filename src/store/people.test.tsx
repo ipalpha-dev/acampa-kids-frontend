@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { saveAuth } from "../auth/store";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyServerData, clearStore, useCollection } from "./index";
 import { NAMES_BATCH_MAX, personInfo, rememberPeople, useNames } from "./people";
@@ -6,7 +7,7 @@ import { NAMES_BATCH_MAX, personInfo, rememberPeople, useNames } from "./people"
 const CAMP = { id: "c1", label: "Acampa", year: 2026, active: true };
 
 function signIn() {
-  localStorage.setItem("acampa.auth", JSON.stringify({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "p", personId: "p", name: "", roles: ["coordenacao"], activeRole: "coordenacao", audience: "admin", superAdmin: false }, camp: CAMP, camps: [] }));
+  saveAuth({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "p", personId: "p", name: "", roles: ["coordenacao"], activeRole: "coordenacao", audience: "admin", superAdmin: false }, camp: CAMP, camps: [] });
 }
 
 describe("people cache — live names joined to camp-ops records", () => {

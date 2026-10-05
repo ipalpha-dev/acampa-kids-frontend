@@ -1,4 +1,4 @@
-import { ApiError, OFFLINE_MESSAGE, api } from "./client";
+import { ApiError, OFFLINE_MESSAGE, api, signalAuthFailure } from "./client";
 import { bearer } from "../auth/store";
 
 const BASE = import.meta.env.VITE_API_URL || window.location.origin;
@@ -33,6 +33,7 @@ export async function aiTranscribe(token: string, audio: Blob, signal?: AbortSig
     throw new ApiError(0, "OFFLINE", OFFLINE_MESSAGE);
   }
   const data = (await res.json().catch(() => null)) as { text?: string; error?: { code?: string; message?: string } } | null;
+  if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
   if (!res.ok) throw new ApiError(res.status, data?.error?.code ?? "AI_FAILED", data?.error?.message ?? "Não foi possível transcrever o áudio.");
   return data?.text ?? "";
 }
@@ -151,6 +152,7 @@ export async function aiEdit(token: string, req: AiEditRequest, onChunk: (progre
   }
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+    signalAuthFailure(res.status, data?.error?.code ?? "");
     throw new ApiError(res.status, data?.error?.code ?? "AI_FAILED", data?.error?.message ?? "O assistente não respondeu.");
   }
   if (!res.body) return { reply: "", doc: null, docPending: false, lookups: [], thought: [] };

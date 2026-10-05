@@ -47,6 +47,19 @@ function hasBearer(options?: RequestInit): boolean {
   return Object.keys(headers).some((k) => k.toLowerCase() === "authorization");
 }
 
+/**
+ * The one place an AUTHENTICATED call's failure becomes app-wide news — the
+ * JSON client below and every raw fetch (multipart uploads, streams) call it:
+ *  - 401: core revoked / expired the role token (SESSION_ENDED) or the Acampa
+ *    session is gone — App.tsx wipes the offline copy + upload caches and
+ *    returns to the login with a gentle note;
+ *  - 503 IPALPHA_UNAVAILABLE: the camp keeps working from memory; App.tsx shows a gentle note.
+ */
+export function signalAuthFailure(status: number, code: string): void {
+  if (status === 401) window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code } }));
+  if (status === 503 && code === "IPALPHA_UNAVAILABLE") window.dispatchEvent(new CustomEvent(CORE_UNAVAILABLE_EVENT));
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;
   // FormData bodies must keep the browser-generated multipart boundary, so we
@@ -79,16 +92,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     if (code === "CAMP_ARCHIVED" || code === "CAMP_FORBIDDEN") {
       window.dispatchEvent(new CustomEvent("acampa:camp-error", { detail: { code, message } }));
     }
-    // a 401 on an authenticated call: core revoked / expired the role token
-    // (SESSION_ENDED) or the Acampa session is gone — App.tsx wipes the
-    // offline copy and returns to the login with a gentle note, from one place
-    if (res.status === 401 && hasBearer(options)) {
-      window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code } }));
-    }
-    // IPAlpha down while signed in: the camp keeps working from memory; App.tsx shows a gentle note
-    if (res.status === 503 && code === "IPALPHA_UNAVAILABLE" && hasBearer(options)) {
-      window.dispatchEvent(new CustomEvent(CORE_UNAVAILABLE_EVENT));
-    }
+    if (hasBearer(options)) signalAuthFailure(res.status, code);
     throw new ApiError(
       res.status,
       code,

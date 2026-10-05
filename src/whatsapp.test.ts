@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { saveAuth } from "./auth/store";
 import { currentCampLabel, guardianGreeting, staffGreeting } from "./whatsapp";
 
 describe("WhatsApp greetings name the current camp", () => {
   afterEach(() => localStorage.clear());
 
   it("uses the session's camp label — never a hardcoded year", () => {
-    localStorage.setItem("acampa.auth", JSON.stringify({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "me", personId: "me", name: "Flavi", roles: ["equipe"], activeRole: "equipe", audience: "staff", superAdmin: false }, camp: { id: "c1", label: "Acampa Kids 2027", year: 2027, active: true }, camps: [] }));
+    saveAuth({ token: "tok", tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString(), user: { id: "me", personId: "me", name: "Flavi", roles: ["equipe"], activeRole: "equipe", audience: "staff", superAdmin: false }, camp: { id: "c1", label: "Acampa Kids 2027", year: 2027, active: true }, camps: [] });
     expect(staffGreeting({ toName: "Cesar Lima", fromName: "Flavi Souza" })).toBe("Olá, Cesar! Aqui é Flavi, do Acampa Kids 2027.");
     expect(guardianGreeting({ guardianName: "Marcela", staffName: "Cesar", camperName: "Ana" })).toContain("aqui no Acampa Kids 2027.");
   });

@@ -1,4 +1,4 @@
-import { ApiError, OFFLINE_MESSAGE } from "./client";
+import { ApiError, OFFLINE_MESSAGE, signalAuthFailure } from "./client";
 import { bearer } from "../auth/store";
 
 // In production the API is served by the same origin through the /api Ingress.
@@ -102,6 +102,7 @@ export async function uploadImage(token: string, file: File): Promise<UploadedFi
   }
   const data = (await res.json().catch(() => null)) as { file?: UploadedFile; error?: { code?: string; message?: string } } | null;
   if (!res.ok || !data?.file) {
+    if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
     throw new ApiError(res.status, data?.error?.code ?? "UPLOAD_FAILED", data?.error?.message ?? "Não foi possível enviar a imagem.");
   }
   return data.file;

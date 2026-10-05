@@ -15,6 +15,7 @@ import type { ScoreEntry } from "../api/scores";
 import type { GalleryPhoto } from "../api/gallery";
 import type { Prescription } from "../api/medications";
 import { fetchOfflineKey, type OfflineKeyAnswer } from "../auth/store";
+import { clearSessionCaches } from "../pwa/sessionCaches";
 import { copyIsUsable, decryptJson, defaultBackend, encryptJson, importOfflineKey, stripHealth, type OfflineBackend } from "./offline";
 import { clearPeople, onPeopleChange, peopleSnapshot, peopleVersion, personInfo, rememberPeople, type PersonInfo } from "./people";
 
@@ -190,8 +191,8 @@ export async function startOfflineSession(token: string, campId: string): Promis
     }
   }
   if (info.campEndsAt && new Date(info.campEndsAt).getTime() <= Date.now()) {
-    // the camp is over: nothing is kept on the device any more
-    await backend.wipe();
+    // the camp is over: nothing is kept on the device any more (uploads / photos included)
+    await Promise.all([backend.wipe(), clearSessionCaches()]);
     return;
   }
   offlineKey = key;
@@ -202,7 +203,8 @@ export async function startOfflineSession(token: string, campId: string): Promis
 
 /**
  * Logout, role / camp switch, 401, session end, camp end: forgets the key,
- * empties the in-memory store and deletes the encrypted copy.
+ * empties the in-memory store, deletes the encrypted copy and the service
+ * worker's upload / photo caches.
  */
 export async function endOfflineSession(): Promise<void> {
   offlineEpoch++;
@@ -211,7 +213,7 @@ export async function endOfflineSession(): Promise<void> {
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = null;
   clearStore();
-  await backend.wipe();
+  await Promise.all([backend.wipe(), clearSessionCaches()]);
 }
 
 /** Is an offline key active right now (tests / diagnostics)? */
