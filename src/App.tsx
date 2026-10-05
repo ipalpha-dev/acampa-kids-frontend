@@ -1,53 +1,54 @@
-import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { ApiError } from "./api/client";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import { ApiError, SESSION_ENDED_EVENT } from "./api/client";
 import CampingLayout from "./components/CampingLayout";
 import IpalphaOneTap from "./components/ipalpha/IpalphaOneTap";
 import MaintenanceScene from "./components/MaintenanceScene";
 import StaffAccessDialog from "./components/StaffAccessDialog";
 import Toast from "./components/Toast";
 import { fetchIpalphaConfig, type IpalphaConfig } from "./auth/ipalpha";
-import { clearAuth, clearPendingOtp, loadAuth, loadPendingOtp, saveAuth, savePendingOtp, switchCamp, switchRole, validateAuth, type CampSummary } from "./auth/store";
+import {
+  clearAuth,
+  clearPendingOtp,
+  loadAuth,
+  loadPendingOtp,
+  logout,
+  saveAuth,
+  savePendingOtp,
+  switchCamp,
+  switchRole,
+  validateAuth,
+  type AuthState,
+  type LoginResult,
+  type PendingOtp,
+  type SwitchResult,
+} from "./auth/store";
 import { useIpalphaSignIn } from "./auth/useIpalphaSignIn";
 import Dashboard from "./pages/Dashboard";
 import RoleSwitchDialog from "./components/RoleSwitchDialog";
 import OtpStep from "./pages/OtpStep";
 import PhoneStep from "./pages/PhoneStep";
 import { useI18n } from "./i18n";
-import { formatBrazilPhoneClient } from "./phoneFormat";
-import type { LoggedUser, Role } from "./roles";
+import type { CoreRole } from "./roles";
 import { navigate } from "./router";
-import { clearStore } from "./store";
+import { endOfflineSession, startOfflineSession } from "./store";
 import { connectRealtime, disconnectRealtime } from "./store/realtime";
 
-type Step = "phone" | "otp" | "done";
-
-interface OtpContext {
-  phoneE164: string;
-  expiresAt: string;
-  delivery: "sms" | "mock" | "redirect";
-}
-
-interface Session {
-  user: LoggedUser;
-  token: string;
-  tokenExpiresAt: string;
-  camp: CampSummary;
-  camps: CampSummary[];
-}
+type Session = AuthState;
 
 export default function App() {
   const { t, tx } = useI18n();
-  const [step, setStep] = useState<Step>("phone");
+  const [otp, setOtp] = useState<PendingOtp | null>(() => (loadAuth() ? null : loadPendingOtp()));
   const [phoneMasked, setPhoneMasked] = useState("");
-  const [otp, setOtp] = useState<OtpContext | null>(null);
+  /** gentle note on the login screen: not in this camp's project, or the session ended */
+  const [loginNote, setLoginNote] = useState<string | null>(null);
   /** set when the server kicked the person out because the team's access window closed */
   const [evicted, setEvicted] = useState<ApiError | null>(null);
   /** CAMP_ARCHIVED / CAMP_FORBIDDEN messages from anywhere in the app (see api/client.ts) */
   const [campToast, setCampToast] = useState<string | null>(null);
 
-  // restore an existing session (still within its 4-day window)
-  const [session, setSession] = useState<Session | null>(null);
-  /** just logged in holding more than one profile: ask which one before letting them in */
+  // restore an existing session (still within its sliding window)
+  const [session, setSession] = useState<Session | null>(() => loadAuth());
+  /** just logged in holding more than one role: ask which one before letting them in */
   const [choosingRole, setChoosingRole] = useState(false);
   /** "Entrar com IPAlpha" + One Tap: null = feature off (or not known yet) */
   const [ipalphaConfig, setIpalphaConfig] = useState<IpalphaConfig | null>(null);
@@ -56,8 +57,10 @@ export default function App() {
   /** the One Tap banner said none/close: hidden for the rest of this page view */
   const [oneTapDismissed, setOneTapDismissed] = useState(false);
   const [configNonce, setConfigNonce] = useState(0);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
 
-  const loggedIn = step === "done";
+  const loggedIn = !!session;
   useEffect(() => {
     if (loggedIn) return;
     let alive = true;
@@ -67,49 +70,59 @@ export default function App() {
     };
   }, [loggedIn, configNonce]);
 
-  /** Same landing for every login path (SMS code or IPAlpha): save, then the profile chooser when there is more than one. */
-  function finishLogin({ token, tokenExpiresAt, user, camp, camps }: { token: string; tokenExpiresAt: string; user: LoggedUser; camp: CampSummary; camps?: CampSummary[] }) {
+  /**
+   * Ends the session on this device: the offline copy is wiped (its key dies
+   * with the session), the socket closed, and the login comes back with an
+   * optional gentle note.
+   */
+  const endSession = useCallback((note: string | null) => {
+    clearAuth();
     clearPendingOtp();
-    const next = { token, tokenExpiresAt, user, camp, camps: camps ?? [] };
+    disconnectRealtime();
+    void endOfflineSession();
+    setSession(null);
+    setChoosingRole(false);
+    setOtp(null);
+    setPhoneMasked("");
+    setLoginNote(note);
+  }, []);
+
+  /** Same landing for every login path (SMS code or IPAlpha): save, then the role chooser when there is more than one. */
+  function finishLogin({ token, tokenExpiresAt, user, camp, camps }: LoginResult) {
+    clearPendingOtp();
+    setOtp(null);
+    setLoginNote(null);
+    const next: Session = { token, tokenExpiresAt, user, camp, camps: camps ?? [] };
     saveAuth(next);
     setSession(next);
-    // the login always lands on the highest-priority profile: let them
-    // pick when they hold more than one (mãe que também é da equipe)
     setChoosingRole(user.roles.length > 1);
-    setStep("done");
   }
 
   const showMaintenance = useCallback(() => setMaintenance(true), []);
-  const ipalpha = useIpalphaSignIn({ config: ipalphaConfig, onSignedIn: finishLogin, onUnavailable: showMaintenance });
+  const showNotInProject = useCallback(() => setLoginNote(t("login.notInProject")), [t]);
+  const ipalpha = useIpalphaSignIn({ config: ipalphaConfig, onSignedIn: finishLogin, onUnavailable: showMaintenance, onNotInProject: showNotInProject });
+
+  // a restored session: refresh the person's view (name read live, roles re-checked) in the background.
+  // A 401 there fires SESSION_ENDED_EVENT (handled below); offline keeps the saved session.
   useEffect(() => {
-    const stored = loadAuth();
-    if (!stored) {
-      // an SMS was already sent and is still valid → go straight to the code step with the real expiry
-      const pending = loadPendingOtp();
-      if (pending) {
-        setOtp(pending);
-        setPhoneMasked(formatBrazilPhoneClient(pending.phoneE164));
-        setStep("otp");
-      }
-      return;
-    }
-    // a session saved before camps existed has no `camp` yet — fill it in from the server
-    if (stored.camp) {
-      setSession({ user: stored.user, token: stored.token, tokenExpiresAt: stored.tokenExpiresAt, camp: stored.camp, camps: stored.camps ?? [] });
-      setStep("done");
-      return;
-    }
+    const stored = sessionRef.current;
+    if (!stored) return;
     validateAuth(stored.token).then((res) => {
-      if (!res) {
-        resetToLogin();
-        return;
-      }
-      const next = { token: stored.token, tokenExpiresAt: stored.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps };
+      const current = sessionRef.current;
+      if (!res || !current || current.token !== stored.token) return;
+      const next = { ...current, user: res.user, camp: res.camp, camps: res.camps };
       saveAuth(next);
       setSession(next);
-      setStep("done");
     });
   }, []);
+
+  // any authenticated call answering 401 (SESSION_ENDED from core, or the session gone) → back to the login, gently
+  useEffect(() => {
+    if (!session) return;
+    const onEnded = () => endSession(t("login.sessionEnded"));
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, [session, endSession, t]);
 
   useEffect(() => {
     function onCampError(e: Event) {
@@ -128,71 +141,85 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  function resetToLogin() {
-    setSession(null);
-    setChoosingRole(false);
-    setStep("phone");
-    setPhoneMasked("");
-    setOtp(null);
-    clearPendingOtp();
-  }
-
-  // live data feed: one WebSocket for the whole session; the store keeps a
-  // localStorage copy so the app keeps working when the connection drops
+  // the encrypted offline copy belongs to ONE session + role + camp: a new scope starts a new copy
   const token = session?.token ?? null;
+  const campId = session?.camp.id ?? null;
+  const scopeKey = session ? `${session.user.activeRole}|${session.camp.id}` : null;
+  useEffect(() => {
+    // no session on this device (expired, never signed in): nothing may stay stored
+    if (!token || !campId) {
+      void endOfflineSession();
+      return;
+    }
+    void startOfflineSession(token, campId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, scopeKey]);
+
+  // live data feed: one WebSocket per session scope (a role / camp switch reconnects with the new scope)
   useEffect(() => {
     if (!token) return;
     connectRealtime(token, {
       onUnauthorized: (reason) => {
-        // session revoked / expired on the server → back to the login, nothing kept on the phone
-        clearAuth();
-        clearStore();
-        resetToLogin();
+        const activeRole = sessionRef.current?.user.audience;
+        endSession(reason === "access-window-closed" ? null : t("login.sessionEnded"));
         if (reason === "access-window-closed") {
-          setEvicted(new ApiError(401, "STAFF_ACCESS_ENDED", "O acampamento acabou.", { audience: session?.user.activeRole === "parent" ? "parent" : "staff" }));
+          setEvicted(new ApiError(401, "STAFF_ACCESS_ENDED", "O acampamento acabou.", { audience: activeRole === "parent" ? "parent" : "staff" }));
         }
       },
     });
     return () => disconnectRealtime();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, scopeKey]);
 
-  /** a new session for the SAME person: the old data belongs to the old scope, so it is wiped before the new socket brings its snapshot */
-  async function applyRole(role: Role) {
-    if (!session) return;
-    const res = await switchRole(session.token, role);
-    clearStore();
-    const next = { token: res.token, tokenExpiresAt: res.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps ?? session.camps };
+  /** Applies a role / camp switch answer: same token, new scope → the old offline copy is wiped before the new socket brings its snapshot. */
+  async function applySwitch(res: SwitchResult) {
+    const current = sessionRef.current;
+    if (!current) return;
+    await endOfflineSession();
+    const next: Session = { token: current.token, tokenExpiresAt: res.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps ?? current.camps };
     saveAuth(next);
     setSession(next);
-    // the other profile has its own menu: the screen we were on (usually
-    // #/profile, where the chip lives) means nothing there → drop the path and
-    // let the dashboard land on the new profile's first tab. `replace` so Back
-    // doesn't bounce into the previous role's page.
+    // the other role has its own menu: drop the path and land on its first tab
     navigate("/", { replace: true });
   }
 
-  /** admin, or an organizer of the active camp: switches into another year — same wipe-and-reconnect dance as `applyRole` */
+  async function applyRole(role: CoreRole) {
+    const current = sessionRef.current;
+    if (!current) return;
+    try {
+      await applySwitch(await switchRole(current.token, role));
+    } catch (err) {
+      // the role is gone in core: it leaves this session's list
+      if (err instanceof ApiError && err.code === "ROLE_FORBIDDEN") {
+        const next = { ...current, user: { ...current.user, roles: current.user.roles.filter((r) => r !== role) } };
+        saveAuth(next);
+        setSession(next);
+        throw new ApiError(err.status, err.code, t("login.roleGone"));
+      }
+      throw err;
+    }
+  }
+
+  /** coordenação / super admin: switches into another year */
   async function applyCamp(campId: string) {
-    if (!session) return;
-    const res = await switchCamp(session.token, campId);
-    clearStore();
-    const next = { token: res.token, tokenExpiresAt: res.tokenExpiresAt, user: res.user, camp: res.camp, camps: res.camps ?? session.camps };
-    saveAuth(next);
-    setSession(next);
-    navigate("/", { replace: true });
+    const current = sessionRef.current;
+    if (!current) return;
+    await applySwitch(await switchCamp(current.token, campId));
   }
 
-  /**
-   * Holds more than one profile: the choice comes BEFORE the app, over the
-   * login scenery — never on top of a home page they didn't ask for.
-   */
-  if (step === "done" && session && choosingRole) {
+  async function handleLogout() {
+    const current = sessionRef.current;
+    if (current) await logout(current.token);
+    endSession(null);
+  }
+
+  /** Holds more than one role: the choice comes BEFORE the app, over the login scenery. */
+  if (session && choosingRole) {
     return (
       <>
         <VersionMark />
         <CampingLayout>
-          <h1 className="camping-panel__title">{t("login.almostThere", { name: session.user.name.split(" ")[0] })}</h1>
+          <h1 className="camping-panel__title">{session.user.name ? t("login.almostThere", { name: session.user.name.split(" ")[0] }) : t("login.chooseProfile")}</h1>
         </CampingLayout>
         <RoleSwitchDialog
           open
@@ -208,7 +235,7 @@ export default function App() {
     );
   }
 
-  if (step === "done" && session) {
+  if (session) {
     return (
       <>
         <VersionMark />
@@ -217,10 +244,7 @@ export default function App() {
           token={session.token}
           camp={session.camp}
           camps={session.camps}
-          onLoggedOut={() => {
-            clearStore();
-            resetToLogin();
-          }}
+          onLogout={handleLogout}
           onSwitchRole={applyRole}
           onSwitchCamp={applyCamp}
         />
@@ -239,23 +263,23 @@ export default function App() {
         }}
       />
     );
-  } else if (step === "otp" && otp) {
+  } else if (otp) {
     content = (
       <OtpStep
-        key={otp.phoneE164}
-        phoneE164={otp.phoneE164}
-        phoneMasked={formatBrazilPhoneClient(otp.phoneE164)}
+        key={otp.challenge}
+        challenge={otp.challenge}
+        phoneMasked={otp.phoneHint}
         expiresAt={otp.expiresAt}
-        delivery={otp.delivery}
-        onExpiryChange={(iso) => {
-          const next = { ...otp, expiresAt: iso };
-          savePendingOtp(next);
-          setOtp(next);
-        }}
+        codeLength={otp.codeLength}
         onVerified={finishLogin}
         onBack={() => {
           clearPendingOtp();
-          setStep("phone");
+          setOtp(null);
+        }}
+        onNotInProject={() => {
+          clearPendingOtp();
+          setOtp(null);
+          showNotInProject();
         }}
         onUnavailable={showMaintenance}
       />
@@ -264,19 +288,24 @@ export default function App() {
     content = (
       <PhoneStep
         phone={phoneMasked}
-        onPhoneChange={setPhoneMasked}
-        onSent={({ phoneE164, expiresAt, delivery }) => {
-          savePendingOtp({ phoneE164, expiresAt, delivery });
-          setOtp({ phoneE164, expiresAt, delivery });
-          setStep("otp");
+        onPhoneChange={(v) => {
+          setPhoneMasked(v);
+          if (loginNote) setLoginNote(null);
         }}
+        note={loginNote}
+        onSent={(pending) => {
+          savePendingOtp(pending);
+          setLoginNote(null);
+          setOtp(pending);
+        }}
+        onNotInProject={showNotInProject}
         onUnavailable={showMaintenance}
         ipalpha={ipalphaConfig ? { busy: ipalpha.busy, error: ipalpha.error, notice: ipalpha.notice, onStart: () => ipalpha.start() } : undefined}
       />
     );
   }
 
-  const showOneTap = !!ipalphaConfig && step === "phone" && !maintenance && !oneTapDismissed;
+  const showOneTap = !!ipalphaConfig && !otp && !maintenance && !oneTapDismissed;
 
   return (
     <>

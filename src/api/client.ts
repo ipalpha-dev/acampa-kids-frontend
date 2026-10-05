@@ -34,6 +34,17 @@ const BASE = import.meta.env.VITE_API_URL || window.location.origin;
 /** Writes need the server; when it can't be reached this is what the user sees. */
 export const OFFLINE_MESSAGE = "Sem conexão com o servidor. Verifique o Wi-Fi do acampamento e tente novamente.";
 
+/** Fired on `window` when an authenticated call answers 401 (see App.tsx). */
+export const SESSION_ENDED_EVENT = "acampa:session-ended";
+
+function hasBearer(options?: RequestInit): boolean {
+  const headers = options?.headers;
+  if (!headers) return false;
+  if (headers instanceof Headers) return headers.has("authorization");
+  if (Array.isArray(headers)) return headers.some(([k]) => k.toLowerCase() === "authorization");
+  return Object.keys(headers).some((k) => k.toLowerCase() === "authorization");
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;
   // FormData bodies must keep the browser-generated multipart boundary, so we
@@ -65,6 +76,12 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     // may not enter: App.tsx listens for this to toast / bounce back, from one place
     if (code === "CAMP_ARCHIVED" || code === "CAMP_FORBIDDEN") {
       window.dispatchEvent(new CustomEvent("acampa:camp-error", { detail: { code, message } }));
+    }
+    // a 401 on an authenticated call: core revoked / expired the role token
+    // (SESSION_ENDED) or the Acampa session is gone — App.tsx wipes the
+    // offline copy and returns to the login with a gentle note, from one place
+    if (res.status === 401 && hasBearer(options)) {
+      window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code } }));
     }
     throw new ApiError(
       res.status,

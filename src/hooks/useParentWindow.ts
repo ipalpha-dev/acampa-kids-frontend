@@ -52,7 +52,7 @@ export function useParentWindow(enabled: boolean): ParentAccess {
   }, [enabled, edge, open, checkin]);
 
   /** the staff ids the parent keeps outside the window: the important contacts */
-  const contactIds = (settings?.parentContacts ?? []).map((c) => c.staffId).join(",");
+  const contactIds = (settings?.parentContacts ?? []).map((c) => c.personId).join(",");
 
   // open → closed, and any stale snapshot: only the important contacts may stay on the phone
   const wasOpen = useRef(false);

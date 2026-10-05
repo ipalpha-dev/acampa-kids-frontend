@@ -107,7 +107,7 @@ export function useStaffDetail(staffId: string): StaffDetail | null | undefined 
 }
 
 export interface MyRoom {
-  /** the logged-in person's staff record (matched by phone) */
+  /** the logged-in person's staff record (same id as the person) */
   me: Staff;
   bedroom: Bedroom | null;
   /** the kids under MY care (Camper.caretakerId === me) — empty for a helper */
@@ -120,15 +120,15 @@ export interface MyRoom {
 
 /**
  * The room view for the logged-in team member: `null` while syncing,
- * `undefined` when no staff record carries this phone.
+ * `undefined` when this person has no staff record in the camp.
  */
-export function useMyRoom(phone: string): MyRoom | null | undefined {
+export function useMyRoom(personId: string): MyRoom | null | undefined {
   const staff = useCollection("staff");
   const campers = useCollectionOrEmpty("campers");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   return useMemo(() => {
     if (!staff) return null;
-    const me = staff.find((s) => s.phone === phone);
+    const me = staff.find((s) => s.id === personId);
     if (!me) return undefined;
     const bedroom = me.bedroom ? (bedrooms.find((b) => b.id === me.bedroom) ?? null) : null;
     return {
@@ -138,7 +138,7 @@ export function useMyRoom(phone: string): MyRoom | null | undefined {
       campers: me.bedroom ? campers.filter((k) => k.bedroom === me.bedroom && k.caretakerId !== me.id).sort(byName) : [],
       roommates: me.bedroom ? staff.filter((s) => s.bedroom === me.bedroom && s.id !== me.id).sort(compareRoomStaff) : [],
     };
-  }, [staff, campers, bedrooms, phone]);
+  }, [staff, campers, bedrooms, personId]);
 }
 
 export interface MyKid {
@@ -178,7 +178,7 @@ export function useParentHome(): ParentHome | null {
       roomStaff: k.bedroom ? staff.filter((s) => s.bedroom === k.bedroom && s.id !== k.caretakerId).sort(compareRoomStaff) : [],
     }));
     const contacts = (settings?.parentContacts ?? []).flatMap((c) => {
-      const s = staffById.get(c.staffId);
+      const s = staffById.get(c.personId);
       return s ? [{ id: c.id, title: c.title, staff: s }] : [];
     });
     return { kids, contacts };
@@ -200,16 +200,16 @@ export interface MyPrepRole {
  * função that falls on their position), de-duplicated — what their Preparação page
  * lists. For non-admins the server already scoped the events to their own
  * roles, but the same computation works on the full data an admin receives.
- * `null` while syncing; empty when the phone isn't a staff member.
+ * `null` while syncing; empty when the person isn't a staff member.
  */
-export function useMyPrepRoles(phone: string): MyPrepRole[] | null {
+export function useMyPrepRoles(personId: string): MyPrepRole[] | null {
   const staff = useCollection("staff");
   const events = useCollection("events");
   const roles = useCollectionOrEmpty("roles");
   const teams = useCollectionOrEmpty("teams");
   return useMemo(() => {
     if (!staff || !events) return null;
-    const me = staff.find((s) => s.phone === phone);
+    const me = staff.find((s) => s.id === personId);
     if (!me) return [];
     const roleById = new Map(roles.map((r) => [r.id, r]));
     const myTeam = me.team ? teams.find((t) => t.id === me.team) : null;
@@ -229,7 +229,7 @@ export function useMyPrepRoles(phone: string): MyPrepRole[] | null {
       else if (me.active) for (const id of e.roles) if (autoRoleCovers(roleById.get(id), me.roomRole)) add(roleById.get(id), "", e);
     }
     return [...acc.values()].sort((x, y) => byName(x.role, y.role));
-  }, [staff, events, roles, teams, phone]);
+  }, [staff, events, roles, teams, personId]);
 }
 
 export function useRoleDetail(roleId: string): RoleDetail | null | undefined {

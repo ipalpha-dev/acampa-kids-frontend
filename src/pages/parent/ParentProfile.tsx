@@ -4,7 +4,7 @@ import ParentKidTabs from "../../components/ParentKidTabs";
 import { formatCpf } from "../../cpf";
 import { useI18n } from "../../i18n";
 import { formatBrazilPhoneClient } from "../../phoneFormat";
-import { roleMeta, type LoggedUser, type Role } from "../../roles";
+import { roleMeta, sortRoles, type CoreRole, type LoggedUser } from "../../roles";
 import { useParentHome, type MyKid } from "../../store/derive";
 
 interface ParentProfileProps {
@@ -12,7 +12,7 @@ interface ParentProfileProps {
   onLogout: () => void;
   loggingOut: boolean;
   /** switches the session to another profile the same person holds (mãe que também é da equipe) */
-  onSwitchRole: (role: Role) => Promise<void>;
+  onSwitchRole: (role: CoreRole) => Promise<void>;
 }
 
 /** The emergency block of ONE kid — what the registration form collected, read-only. */
@@ -76,11 +76,11 @@ export default function ParentProfile({ user, onLogout, loggingOut, onSwitchRole
   const data = useParentHome();
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
   /** the same person may also be on the team / an admin — one tap enters that profile */
-  const otherRoles = user.roles.filter((r) => r !== user.activeRole);
-  const [switchingTo, setSwitchingTo] = useState<Role | null>(null);
+  const otherRoles = sortRoles(user.roles.filter((r) => r !== user.activeRole));
+  const [switchingTo, setSwitchingTo] = useState<CoreRole | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
 
-  async function enterAs(role: Role) {
+  async function enterAs(role: CoreRole) {
     if (switchingTo) return;
     setSwitchingTo(role);
     setSwitchError(null);
@@ -106,15 +106,13 @@ export default function ParentProfile({ user, onLogout, loggingOut, onSwitchRole
     <div className="admin-page">
       <header className="admin-head">
         <h1 className="admin-title detail-title">
-          <ParentIcon size={40} /> {user.name}
+          <ParentIcon size={40} /> {user.name || tx("Perfil")}
         </h1>
       </header>
-      <p className="admin-intro">{tx("Você entrou como {role}.", { role: tx(meta.personLabel) })}</p>
+      <p className="admin-intro">{tx("Você entrou como {role}.", { role: tx(meta.label) })}</p>
 
       <section className="detail-card">
         <dl className="detail-grid">
-          <dt>{tx("Celular")}</dt>
-          <dd>{formatBrazilPhoneClient(user.phone)}</dd>
           <dt>{tx("Perfil")}</dt>
           <dd>
             {/* the one they are already in: a plain label, nothing to tap */}

@@ -1,7 +1,12 @@
 import { api } from "../api/client";
 import { deviceLocale } from "../i18n";
-import type { LoggedUser } from "../roles";
+import type { CoreRole, LoggedUser } from "../roles";
 
+/**
+ * The browser keeps ONLY the opaque Acampa session token (decision 32): the
+ * per-role IPAlpha tokens live in the backend's session record. No phone, no
+ * person data is stored here.
+ */
 const STORAGE_KEY = "acampa.auth";
 
 /** One camp in the registry, as a session carries it. */
@@ -15,7 +20,7 @@ export interface CampSummary {
 
 export interface AuthState {
   token: string;
-  tokenExpiresAt: string; // ISO
+  tokenExpiresAt: string; // ISO — sliding (sessionIdleHours)
   user: LoggedUser;
   camp: CampSummary;
   /** every camp this session may switch into — empty when it can't switch years */
@@ -27,14 +32,18 @@ export function saveAuth(state: AuthState): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/** Returns the stored session if it's still valid (not older than the expiry date). */
+/** Returns the stored session if it's still valid (not older than the expiry date) and of the people-in-core shape. */
 export function loadAuth(): AuthState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
 
     const state = JSON.parse(raw) as AuthState;
-    if (!state.token || !state.tokenExpiresAt) return null;
+    // a session saved by the old phone-based app has no personId: sign in again
+    if (!state.token || !state.tokenExpiresAt || !state.user?.personId || !state.camp) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     if (new Date(state.tokenExpiresAt) <= new Date()) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
@@ -51,13 +60,19 @@ export function clearAuth(): void {
 
 const OTP_STORAGE_KEY = "acampa.otp";
 
+/**
+ * The SMS code that was sent, so leaving the browser (to read the SMS) and
+ * coming back keeps the real expiry. The challenge is sealed by the backend;
+ * only a MASKED phone is kept, for the "enviamos para …" line.
+ */
 export interface PendingOtp {
-  phoneE164: string;
+  challenge: string;
   expiresAt: string; // ISO — when the SMS code stops being valid
-  delivery: "sms" | "mock" | "redirect";
+  codeLength: number;
+  /** "(11) •••••-4567" — display only */
+  phoneHint: string;
 }
 
-/** Remembers the SMS that was sent so leaving the browser and coming back keeps the real expiry. */
 export function savePendingOtp(state: PendingOtp): void {
   localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(state));
 }
@@ -69,7 +84,10 @@ export function loadPendingOtp(): PendingOtp | null {
     if (!raw) return null;
 
     const state = JSON.parse(raw) as PendingOtp;
-    if (!state.phoneE164 || !state.expiresAt) return null;
+    if (!state.challenge || !state.expiresAt) {
+      localStorage.removeItem(OTP_STORAGE_KEY);
+      return null;
+    }
     if (new Date(state.expiresAt) <= new Date()) {
       localStorage.removeItem(OTP_STORAGE_KEY);
       return null;
@@ -88,8 +106,14 @@ export function bearer(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
 }
 
-/** Validates the stored token against the backend (GET /api/auth/me). */
-export async function validateAuth(token: string): Promise<{ user: LoggedUser; camp: CampSummary; camps: CampSummary[] } | null> {
+export interface MeResult {
+  user: LoggedUser;
+  camp: CampSummary;
+  camps: CampSummary[];
+}
+
+/** Validates the stored token against the backend (GET /api/auth/me). null = the session is gone. */
+export async function validateAuth(token: string): Promise<MeResult | null> {
   try {
     const res = await api<{ user: LoggedUser; camp: CampSummary; camps?: CampSummary[] }>("/api/auth/me", {
       headers: bearer(token),
@@ -102,10 +126,12 @@ export async function validateAuth(token: string): Promise<{ user: LoggedUser; c
 
 export interface OtpRequestResult {
   success: boolean;
-  phone: string;
+  /** sealed relay challenge — goes back with the code */
+  challenge: string;
+  codeLength: number;
   expiresAt: string;
   expireMinutes: number;
-  delivery: "sms" | "mock" | "redirect";
+  delivery: "sms";
 }
 
 export async function requestOtp(phoneE164: string): Promise<OtpRequestResult> {
@@ -115,45 +141,70 @@ export async function requestOtp(phoneE164: string): Promise<OtpRequestResult> {
   });
 }
 
-export interface OtpVerifyResult {
+/** Answer of every login path (SMS code or IPAlpha popup). */
+export interface LoginResult {
   success: boolean;
   token: string;
+  tokenExpiresAt: string;
+  sessionIdleHours?: number;
+  user: LoggedUser;
+  camp: CampSummary;
+  camps?: CampSummary[];
+}
+/** @deprecated name kept for the IPAlpha popup module */
+export type OtpVerifyResult = LoginResult;
+
+export async function verifyOtp(challenge: string, code: string): Promise<LoginResult> {
+  return api<LoginResult>("/api/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ challenge, code }),
+  });
+}
+
+/** Role / camp switch: the SAME token keeps working; the server answers the new view of the session. */
+export interface SwitchResult {
+  success: boolean;
   tokenExpiresAt: string;
   user: LoggedUser;
   camp: CampSummary;
   camps?: CampSummary[];
 }
 
-export async function verifyOtp(phoneE164: string, code: string): Promise<OtpVerifyResult> {
-  return api<OtpVerifyResult>("/api/auth/otp/verify", {
-    method: "POST",
-    body: JSON.stringify({ phone: phoneE164, code, locale: deviceLocale() }),
-  });
-}
-
 /**
- * Switches the session to another profile the SAME person holds (parent ⇄
- * team): the server revokes this session and issues a new token. No SMS.
+ * Acts as another role the person holds (no SMS). Re-checked live in core: a
+ * role that is gone answers 403 ROLE_FORBIDDEN and leaves `user.roles`.
  */
-export async function switchRole(token: string, role: LoggedUser["activeRole"]): Promise<OtpVerifyResult> {
-  return api<OtpVerifyResult>("/api/auth/role", {
+export async function switchRole(token: string, role: CoreRole): Promise<SwitchResult> {
+  return api<SwitchResult>("/api/auth/role", {
     method: "POST",
     headers: bearer(token),
     body: JSON.stringify({ role }),
   });
 }
 
-/**
- * Switches the session into another camp (year): the server revokes this
- * session and issues a new one in the target camp. Admin, or an organizer of
- * the active camp, only.
- */
-export async function switchCamp(token: string, campId: string): Promise<OtpVerifyResult> {
-  return api<OtpVerifyResult>("/api/auth/camp", {
+/** Switches the session into another camp (year) — coordenação / super admin only. */
+export async function switchCamp(token: string, campId: string): Promise<SwitchResult> {
+  return api<SwitchResult>("/api/auth/camp", {
     method: "POST",
     headers: bearer(token),
     body: JSON.stringify({ campId }),
   });
+}
+
+/** `GET /api/auth/offline-key` — the per-session key of the encrypted offline copy (never persisted). */
+export interface OfflineKeyAnswer {
+  /** base64, 32 bytes */
+  key: string;
+  alg: "AES-GCM";
+  role: CoreRole;
+  /** health may be kept offline only by saúde / coordenação */
+  healthAllowed: boolean;
+  sessionExpiresAt: string;
+  campEndsAt: string | null;
+}
+
+export async function fetchOfflineKey(token: string): Promise<OfflineKeyAnswer> {
+  return api<OfflineKeyAnswer>("/api/auth/offline-key", { headers: bearer(token), cache: "no-store" });
 }
 
 export async function logout(token: string): Promise<void> {
@@ -163,4 +214,11 @@ export async function logout(token: string): Promise<void> {
     // best effort — clear locally anyway
   }
   clearAuth();
+}
+
+/** "(11) •••••-4567" from an E.164 Brazilian number — the only form of the phone the app keeps. */
+export function maskPhone(e164: string): string {
+  const digits = e164.replace(/\D/g, "").replace(/^55/, "");
+  if (digits.length < 6) return "";
+  return `(${digits.slice(0, 2)}) •••••-${digits.slice(-4)}`;
 }

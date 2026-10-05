@@ -111,15 +111,12 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
   /** the draft as it was right before the last Distribuir — what "Desfazer" restores (null = nothing to undo) */
   const [undoDistribution, setUndoDistribution] = useState<{ draft: RoomsDraft; summary: string } | null>(null);
 
-  /** admins + everyone on an admin list: they have another job, so Distribuir never puts them in a kids' room */
-  const excludeStaffIds = useMemo(() => {
-    const s = settings;
-    if (!s) return new Set<string>();
-    return new Set<string>([
-      ...s.organizers.staffIds, ...s.gameOrganizers.staffIds, ...s.scoreHelpers.staffIds, ...s.medicalStaff.staffIds,
-      ...s.vestHelpers.staffIds, ...s.photographers.staffIds, ...s.parentContacts.map((c) => c.staffId),
-    ]);
-  }, [settings]);
+  /**
+   * The parents' important contacts have another job, so Distribuir never puts
+   * them in a kids' room. (Helper roles live in IPAlpha now; whoever should
+   * stay out of the rooms is simply left out by hand.)
+   */
+  const excludeStaffIds = useMemo(() => new Set<string>((settings?.parentContacts ?? []).map((c) => c.personId)), [settings]);
   /** the SMS preview (who would be texted + the exact message), loaded when the dialog opens */
   const [preview, setPreview] = useState<{ messages: RoomsAppliedMessage[]; smsEnabled: boolean } | null>(null);
   /** whether the example messages are expanded in the dialog */

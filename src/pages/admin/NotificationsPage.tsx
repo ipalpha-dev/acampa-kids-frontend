@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
-import { listSampleEmails, sendSampleEmails, updateSettings, welcomePreview, type NotificationSettings, type SampleEmail } from "../../api/settings";
+import { updateSettings, welcomePreview, type NotificationSettings } from "../../api/settings";
+import { namesFor } from "../../store/people";
 import { useCollection } from "../../store";
 import { useConfirm } from "../../components/ConfirmDialog";
 import Dialog from "../../components/Dialog";
 import Toggle from "../../components/Toggle";
 import { useRoute } from "../../router";
 import { ICONS } from "../../icons";
-import { roleMeta } from "../../roles";
 import CheckinReminderCard from "./CheckinReminderCard";
 import PageFooter from "../../components/PageFooter";
 import { useI18n } from "../../i18n";
@@ -48,20 +48,20 @@ function buildGroups(tx: Tx): NotifGroup[] {
     {
       id: "staff",
       title: tx("Para a equipe"),
-      icon: roleMeta("staff").icon,
+      icon: ICONS.staff,
       hint: tx("SMS para quem está no cadastro da equipe."),
       reminder: true,
       options: [
         {
           key: "enrolments",
-          icon: roleMeta("staff").icon,
+          icon: ICONS.staff,
           title: tx("Boas-vindas e novas responsabilidades"),
           text: tx("Quando o app é liberado para a equipe (início do período de acesso) cada pessoa recebe, uma única vez, um SMS de boas-vindas com o link do app. Quem vira organizador (da programação ou dos jogos / placar), ajudante do placar, ajudante do check-in / ônibus, equipe médica, responsável pelos coletes ou contato dos pais recebe o SMS na hora."),
           welcome: "staff",
         },
         {
           key: "staffChanges",
-          icon: roleMeta("staff").icon,
+          icon: ICONS.staff,
           title: tx("Mudança no cadastro da equipe"),
           text: tx("Quando o quarto, a função no quarto (líder ↔ auxiliar), o time ou o transporte de alguém da equipe é alterado, a própria pessoa recebe um SMS."),
         },
@@ -106,7 +106,7 @@ function buildGroups(tx: Tx): NotifGroup[] {
         },
         {
           key: "parentEdits",
-          icon: roleMeta("health_staff").icon,
+          icon: ICONS.health,
           title: tx("Pais alteraram os pontos de atenção"),
           text: tx("Quando um pai ou mãe altera os dados médicos da criança (alergias, medicação, convênio…), a equipe médica, os administradores e o líder do quarto recebem um SMS. Se mudar só as observações, apenas o líder do quarto é avisado."),
         },
@@ -121,12 +121,12 @@ function buildGroups(tx: Tx): NotifGroup[] {
     {
       id: "parents",
       title: tx("Para os pais"),
-      icon: roleMeta("parent").icon,
+      icon: ICONS.parent,
       hint: tx("SMS para responsáveis — só enquanto a janela de acesso dos pais estiver aberta, quando fizer sentido."),
       options: [
         {
           key: "parentWelcome",
-          icon: roleMeta("parent").icon,
+          icon: ICONS.parent,
           title: tx("Boas-vindas aos pais"),
           text: (
             <>
@@ -203,9 +203,8 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
       if (value && welcome) {
         const preview = (await welcomePreview(token))[welcome];
         const who = welcome === "staff" ? tx("pessoas da equipe") : tx("responsáveis");
-        const names =
-          preview.names.slice(0, 8).join(", ") +
-          (preview.names.length > 8 ? tx(" e mais {n}", { n: preview.names.length - 8 }) : "");
+        const shown = await namesFor(preview.personIds.slice(0, 8));
+        const names = shown.join(", ") + (preview.personIds.length > 8 ? tx(" e mais {n}", { n: preview.personIds.length - 8 }) : "");
         const ok = await confirm({
           emoji: "📲",
           title: preview.count > 0 ? tx("Enviar SMS para {count} {who} agora?", { count: preview.count, who }) : tx("Ligar boas-vindas?"),
@@ -261,16 +260,6 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
       </header>
       <p className="admin-intro">{tx("Quem precisa recebe um SMS. Quando há e-mail, o detalhe vai por e-mail.")}</p>
 
-      {settings && !settings.smsEnabled && (
-        <p className="message message--error">
-          {tx("⚠️ O envio de SMS não está configurado no servidor (COMTELE_API_KEY). As mensagens estão sendo apenas registradas no console.")}
-        </p>
-      )}
-      {settings && !settings.mailEnabled && (
-        <p className="message message--warn">
-          {tx("✉️ O envio de e-mail não está configurado no servidor (SENDGRID_API_KEY / MAIL_FROM / PUBLIC_ORIGIN). Os e-mails equivalentes são recusados até isso estar preenchido.")}
-        </p>
-      )}
       {settings && settings.staffAccessWindow && !settings.staffAccessWindow.open && (
         <p className="message message--warn">
           {tx("A equipe está sem acesso ao sistema, então não recebe notificações.")}{" "}
@@ -282,22 +271,6 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
             }}
           >
             {tx("Ajustar período de acesso")}
-          </a>
-        </p>
-      )}
-      {settings?.smsRedirect.enabled && (
-        <p className="message message--error">
-          📵 <strong>{tx("Redirecionamento de SMS ligado")}</strong>
-          {tx(": nenhum aviso (nem código de login) chega à equipe ou aos pais — tudo vai para os celulares de teste. ")}
-          <strong>{tx("Desligue antes do acampamento começar.")}</strong>{" "}
-          <a
-            href="#/trials"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate("/trials");
-            }}
-          >
-            {tx("Ajustar em Testes")}
           </a>
         </p>
       )}
@@ -316,7 +289,6 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
         </p>
       )}
       {error && <p className="message message--error">{error}</p>}
-      {settings && <SampleEmailsCard token={token} />}
 
       {settings &&
         groups.map((g) => (
@@ -371,142 +343,3 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function SampleEmailsCard({ token }: { token: string }) {
-  const { tx } = useI18n();
-  const [open, setOpen] = useState(false);
-  const [emails, setEmails] = useState<SampleEmail[] | null>(null);
-  const [savedEmail, setSavedEmail] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-
-  const shown = editing || !savedEmail;
-  const email = shown ? draft.trim().toLowerCase() : (savedEmail ?? "");
-  const valid = EMAIL_RE.test(email);
-
-  async function openDialog() {
-    setError(null);
-    setDone(null);
-    setOpen(true);
-    setBusy("load");
-    try {
-      const r = await listSampleEmails(token);
-      setEmails(r.emails);
-      setSavedEmail(r.adminEmail);
-      setDraft(r.adminEmail ?? "");
-      setEditing(!r.adminEmail);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function send(id: string, title: string) {
-    if (!valid || busy) return;
-    setBusy(id);
-    setError(null);
-    setDone(null);
-    try {
-      const r = await sendSampleEmails(token, email, true, id);
-      setSavedEmail(r.adminEmail);
-      setDraft(r.adminEmail ?? email);
-      setEditing(false);
-      setDone(r.failed.length ? tx("Não deu para enviar {title}.", { title }) : tx("{title} enviado para {email}.", { title, email: r.email }));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const parents = emails?.filter((e) => e.audience === "parent") ?? [];
-  const staff = emails?.filter((e) => e.audience === "staff") ?? [];
-
-  return (
-    <>
-      <p className="cat-form__actions" style={{ margin: "0 0 20px" }}>
-        <button type="button" className="button button--secondary" onClick={() => void openDialog()}>
-          {tx("Receber amostras dos e-mails")}
-        </button>
-      </p>
-      <Dialog open={open} onClose={() => !busy && setOpen(false)} title={tx("Amostras dos e-mails")} width={640} autofocus={shown}>
-        <div className="cat-form">
-          <h2 className="cat-form__title">{tx("Receber as amostras")}</h2>
-          <p className="cat-hint">
-            {tx("Um clique envia uma amostra. O assunto começa com")}{" "}
-            <strong>{tx("Teste - Pais")}</strong> {tx("ou")} <strong>{tx("Teste - Equipe")}</strong>
-            {tx(". Nomes e dados são de exemplo.")}
-          </p>
-          {savedEmail && !editing ? (
-            <p className="cat-hint">
-              {tx("Este e-mail vai para")} <strong>{savedEmail}</strong>
-              <button
-                type="button"
-                className="icon-btn icon-btn--bare"
-                title={tx("Trocar e-mail")}
-                aria-label={tx("Trocar e-mail")}
-                onClick={() => {
-                  setDraft(savedEmail);
-                  setEditing(true);
-                }}
-              >
-                <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" />
-              </button>
-            </p>
-          ) : (
-            <label className="cat-field cat-field--grow">
-              <span className="cat-field__label">{tx("Seu e-mail")}</span>
-              <input
-                className="cat-input"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                placeholder={tx("ex.: nome@email.com")}
-                value={draft}
-                disabled={!!busy}
-                autoFocus={shown}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              {draft.trim() && !valid && <p className="cat-hint cat-hint--error">{tx("Informe um e-mail válido.")}</p>}
-              {savedEmail && editing && <p className="cat-hint">{tx("Ao enviar, este endereço entra no seu cadastro da equipe.")}</p>}
-            </label>
-          )}
-          {emails && (
-            <>
-              <h3 className="detail-h2">{tx("Para os pais")}</h3>
-              <SampleEmailList items={parents} busy={busy} disabled={!valid || !!busy} sendingLabel={tx("Enviando…")} sendLabel={tx("Enviar")} onSend={(id, title) => void send(id, title)} />
-              <h3 className="detail-h2">{tx("Para a equipe")}</h3>
-              <SampleEmailList items={staff} busy={busy} disabled={!valid || !!busy} sendingLabel={tx("Enviando…")} sendLabel={tx("Enviar")} onSend={(id, title) => void send(id, title)} />
-            </>
-          )}
-          {error && <p className="message message--error">{error}</p>}
-          {done && <p className="message message--ok">{done}</p>}
-          <div className="cat-form__actions">
-            <button type="button" className="button button--secondary" disabled={!!busy} onClick={() => setOpen(false)}>
-              {tx("Fechar")}
-            </button>
-          </div>
-        </div>
-      </Dialog>
-    </>
-  );
-}
-
-function SampleEmailList({ items, busy, disabled, sendingLabel, sendLabel, onSend }: { items: SampleEmail[]; busy: string | null; disabled: boolean; sendingLabel: string; sendLabel: string; onSend: (id: string, title: string) => void }) {
-  return (
-    <ul style={{ listStyle: "none", margin: "0 0 12px", padding: 0 }}>
-      {items.map((e) => (
-        <li key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 36 }}>
-          <span style={{ flex: 1, minWidth: 0 }}>{e.title}</span>
-          <button type="button" className="button button--primary button--sm" disabled={disabled} onClick={() => onSend(e.id, e.title)}>
-            {busy === e.id ? sendingLabel : sendLabel}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}

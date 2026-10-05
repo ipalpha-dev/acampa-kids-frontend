@@ -4,7 +4,7 @@ import SearchField from "../components/SearchField";
 import { checkinStaff, undoCheckinStaff, type Staff } from "../api/staff";
 import { useConfirm } from "../components/ConfirmDialog";
 import Breadcrumbs from "../components/Breadcrumbs";
-import { roleMeta } from "../roles";
+import { ICONS } from "../icons";
 import { useRoute } from "../router";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import { collatorLocale, useI18n } from "../i18n";
@@ -155,7 +155,7 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
       {checkinHomePath && <Breadcrumbs items={[{ label: tx("Check-in"), onClick: () => navigate(checkinHomePath) }, { label: tx("Equipe") }]} />}
       <header className="admin-head">
         <h1 className="admin-title detail-title">
-          <img className="audience-icon" src={roleMeta("staff").icon} alt="" aria-hidden="true" style={{ height: 36, width: "auto" }} />
+          <img className="audience-icon" src={ICONS.staff} alt="" aria-hidden="true" style={{ height: 36, width: "auto" }} />
           {tx("Check-in da equipe")}
         </h1>
         <span className="checkin-progress" title={tx("Pessoas da equipe que já chegaram")}>

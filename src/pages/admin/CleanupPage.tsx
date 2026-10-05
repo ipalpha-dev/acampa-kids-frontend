@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { handoverCamp } from "../../api/admins";
 import { fetchCleanupMarks, runCleanup, type CleanupGroup, type StaffKeepGroup } from "../../api/cleanup";
 import type { CampSummary } from "../../auth/store";
 import { useConfirm } from "../../components/ConfirmDialog";
 import CreateCampDialog from "../../components/CreateCampDialog";
-import Dialog from "../../components/Dialog";
 import OptionCards, { type OptionCard } from "../../components/OptionCards";
-import PhoneInput from "../../components/PhoneInput";
-import Toggle from "../../components/Toggle";
 import { useCollection } from "../../store";
 import type { Settings } from "../../api/settings";
 import { useRoute } from "../../router";
 import { setWizardDismissed } from "../../wizard/state";
 import { ICONS } from "../../icons";
-import { roleMeta } from "../../roles";
-import { toE164 } from "../../phone";
 import { useI18n } from "../../i18n";
 
 interface CleanupPageProps {
@@ -23,7 +17,7 @@ interface CleanupPageProps {
   onSwitchCamp: (campId: string) => Promise<void>;
 }
 
-type NextCampChoice = "create" | "cleanup" | "wizard";
+type NextCampChoice = "create" | "wizard";
 
 interface Block {
   key: CleanupGroup;
@@ -87,27 +81,19 @@ const BLOCKS: readonly Block[] = [
 ];
 
 /**
- * The admin lists the Equipe block may SPARE. All off by default: without a
- * toggle on, the whole team goes (only the admins' own records stay).
+ * The camp-ops lists the Equipe block may SPARE (helper roles themselves live
+ * in IPAlpha). All off by default: without a toggle on, the whole team goes.
  */
 const KEEP: readonly { key: StaffKeepGroup; label: string; icon?: string; emoji?: string }[] = [
-  { key: "organizers", label: "Organizadores", icon: ICONS.organizer },
-  { key: "gameOrganizers", label: "Organizadores dos jogos", emoji: "🏆" },
-  { key: "scoreHelpers", label: "Ajudantes do placar", emoji: "🎯" },
-  { key: "medicalStaff", label: "Equipe médica", icon: roleMeta("health_staff").icon },
-  { key: "checkinHelpers", label: "Ajudantes do check-in", emoji: "✅" },
   { key: "busHelpers", label: "Ajudantes do ônibus", icon: ICONS.transport },
-  { key: "vestHelpers", label: "Coletes", emoji: "🦺" },
-  { key: "photographers", label: "Fotógrafos", icon: ICONS.camera },
   { key: "parentContacts", label: "Contatos dos pais", emoji: "📞" },
 ];
 
-/** The staff ids one admin list holds (each list has its own shape). */
+/** The person ids one list holds (each list has its own shape). */
 function idsOf(settings: Settings | null | undefined, group: StaffKeepGroup): string[] {
   if (!settings) return [];
-  if (group === "busHelpers") return settings.busHelpers.helpers.map((h) => h.staffId);
-  if (group === "parentContacts") return settings.parentContacts.map((p) => p.staffId);
-  return settings[group].staffIds;
+  if (group === "busHelpers") return settings.busHelpers.helpers.map((h) => h.personId);
+  return settings.parentContacts.map((p) => p.personId);
 }
 
 /**
@@ -119,7 +105,7 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
   const { tx } = useI18n();
   const confirm = useConfirm();
   const { navigate } = useRoute();
-  const [busy, setBusy] = useState<CleanupGroup | "all" | "handover" | null>(null);
+  const [busy, setBusy] = useState<CleanupGroup | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [marks, setMarks] = useState({ welcomes: 0, notices: 0 });
@@ -127,7 +113,6 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
   /** Programação only: the admin asked for the funções (and their texts) to go too */
   const rolesRef = useRef(false);
   const [reload, setReload] = useState(0);
-  const [handoverOpen, setHandoverOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   const settings = useCollection("settings");
@@ -232,9 +217,6 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
       title: tx("Novo acampamento"),
       subtitle: tx("Guarda {year} como está e começa {nextYear} do zero.", { year: camp.year, nextYear: camp.year + 1 }),
     },
-    ...(isSuper
-      ? [{ key: "cleanup" as const, icon: ICONS.cleanup, title: tx("Limpar este acampamento"), subtitle: tx("Apaga os blocos deste ano e passa para outro admin.") }]
-      : []),
     { key: "wizard", icon: ICONS.wizard, title: tx("Abrir o assistente") },
   ];
 
@@ -356,9 +338,6 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
             if (key === "create") {
               setError(null);
               setCreateOpen(true);
-            } else if (key === "cleanup") {
-              setError(null);
-              setHandoverOpen(true);
             } else {
               setWizardDismissed(false);
               navigate("/wizard");
@@ -367,111 +346,6 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
         />
       </section>
       <CreateCampDialog open={createOpen} token={token} currentYear={camp.year} onClose={() => setCreateOpen(false)} onSwitchCamp={onSwitchCamp} />
-      {isSuper && (
-        <HandoverDialog
-          open={handoverOpen}
-          busy={busy === "handover"}
-          error={error}
-          onClose={() => busy !== "handover" && setHandoverOpen(false)}
-          onSubmit={async (admin) => {
-            if (busy) return;
-            setBusy("handover");
-            setError(null);
-            setDone(null);
-            try {
-              const r = await handoverCamp(token, admin);
-              setHandoverOpen(false);
-              setReload((n) => n + 1);
-              setDone(
-                tx("{name} agora administra. {n} login(s) apagado(s).{mail}", {
-                  name: r.admin.name,
-                  n: r.usersRemoved,
-                  mail: admin.notify ? (r.mailed ? tx(" E-mail enviado.") : tx(" O e-mail não saiu.")) : "",
-                }),
-              );
-            } catch (e) {
-              setError(e instanceof Error ? e.message : tx("Algo deu errado."));
-            } finally {
-              setBusy(null);
-            }
-          }}
-        />
-      )}
     </div>
-  );
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function HandoverDialog({
-  open,
-  busy,
-  error,
-  onClose,
-  onSubmit,
-}: {
-  open: boolean;
-  busy: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: (admin: { name: string; phone: string; email: string; notify: boolean }) => Promise<void>;
-}) {
-  const { tx } = useI18n();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [notify, setNotify] = useState(true);
-  const e164 = toE164(phone);
-  const emailOk = EMAIL_RE.test(email.trim());
-  const ready = !!name.trim() && !!e164 && emailOk;
-
-  useEffect(() => {
-    if (!open) return;
-    setName("");
-    setPhone("");
-    setEmail("");
-    setNotify(true);
-  }, [open]);
-
-  return (
-    <Dialog open={open} onClose={onClose} title={tx("Limpar tudo e forçar o assistente")} width={520} dismissible={!busy} autofocus>
-      <form
-        className="cat-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!ready || busy || !e164) return;
-          void onSubmit({ name: name.trim(), phone: e164, email: email.trim().toLowerCase(), notify });
-        }}
-      >
-        <h2 className="cat-form__title">{tx("Novo administrador")}</h2>
-        <p className="admin-intro">
-          {tx("Apaga o acampamento e todos os logins, menos o seu. Cria este admin e, no primeiro login dele, o assistente abre — Configurações fica bloqueado até concluir ou sair.")}
-        </p>
-        <label className="cat-field">
-          <span className="cat-field__label">{tx("Nome")}</span>
-          <input className="cat-input" value={name} maxLength={80} disabled={busy} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="cat-field">
-          <span className="cat-field__label">{tx("E-mail")}</span>
-          <input className="cat-input" type="email" inputMode="email" autoComplete="email" placeholder={tx("ex.: nome@email.com")} value={email} maxLength={160} disabled={busy} onChange={(e) => setEmail(e.target.value)} />
-          {email.trim() && !emailOk && <p className="cat-hint cat-hint--error">{tx("Informe um e-mail válido.")}</p>}
-        </label>
-        <label className="cat-field">
-          <span className="cat-field__label">{tx("Celular")}</span>
-          <PhoneInput value={phone} onChange={setPhone} disabled={busy} />
-        </label>
-        <Toggle checked={notify} disabled={busy} label={tx("Avisar por e-mail")} onChange={setNotify} />
-        <p className="cat-hint">{tx("⚠️ Não tem volta.")}</p>
-        {error && <p className="message message--error">{error}</p>}
-        <div className="cat-form__actions">
-          <button type="button" className="button button--secondary" disabled={busy} onClick={onClose}>
-            {tx("Cancelar")}
-          </button>
-          <button type="submit" className="button button--danger" disabled={busy || !ready}>
-            {busy ? tx("Limpando…") : tx("Limpar e passar")}
-          </button>
-        </div>
-      </form>
-    </Dialog>
   );
 }

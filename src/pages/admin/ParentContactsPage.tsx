@@ -13,10 +13,10 @@ interface ParentContactsPageProps {
 interface ContactDraft {
   id: string | null;
   title: string;
-  staffId: string;
+  personId: string;
 }
 
-const EMPTY_DRAFT: ContactDraft = { id: null, title: "", staffId: "" };
+const EMPTY_DRAFT: ContactDraft = { id: null, title: "", personId: "" };
 function contactId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -49,7 +49,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   const staffById = useMemo(() => new Map(staff.map((person) => [person.id, person])), [staff]);
-  const selectedStaff = draft.staffId ? staffById.get(draft.staffId) ?? null : null;
+  const selectedStaff = draft.personId ? staffById.get(draft.personId) ?? null : null;
   const editing = draft.id !== null;
   const validDraft = draft.title.trim().length > 0 && !!selectedStaff?.active;
 
@@ -86,7 +86,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
     const nextContact: ParentContact = {
       id: draft.id ?? contactId(),
       title: draft.title.trim(),
-      staffId: draft.staffId,
+      personId: draft.personId,
     };
     const nextContacts = draft.id
       ? contacts.map((contact) => (contact.id === draft.id ? nextContact : contact))
@@ -178,7 +178,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
         ) : (
           <ol className="contact-list">
             {contacts.map((contact, index) => {
-              const person = staffById.get(contact.staffId);
+              const person = staffById.get(contact.personId);
               return (
                 <li key={contact.id} className="contact-item">
                   <div className="contact-item__main">
@@ -208,8 +208,8 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
         title={tx("Escolher pessoa da equipe")}
         staff={staff}
         occupied={new Map()}
-        onPick={(staffId) => {
-          setDraft((current) => ({ ...current, staffId }));
+        onPick={(personId) => {
+          setDraft((current) => ({ ...current, personId }));
           setPickerOpen(false);
         }}
         onClose={() => setPickerOpen(false)}

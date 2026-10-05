@@ -40,7 +40,7 @@ export default function MySchedulePage({ user }: MySchedulePageProps) {
   const [instructionsFor, setInstructionsFor] = useState<MyEvent | null>(null);
   const [showPast, setShowPast] = useState(false);
   const first = user.name.split(" ")[0];
-  const me = useMemo(() => staff.find((s) => s.phone === user.phone), [staff, user.phone]);
+  const me = useMemo(() => staff.find((s) => s.id === user.personId), [staff, user.personId]);
   const myFaceSrc = me
     ? me.roomRole === "caretaker"
       ? staffSex(me, bedrooms) === "M"

@@ -18,9 +18,7 @@ import CheckinSettingsPage from "../pages/admin/CheckinSettingsPage";
 import RoomAssignPage from "../pages/admin/RoomAssignPage";
 import BedroomsPage from "../pages/admin/BedroomsPage";
 import CamperImportPage from "../pages/admin/CamperImportPage";
-import SmsRedirectCard from "../pages/admin/SmsRedirectCard";
 import StaffImportPage from "../pages/admin/StaffImportPage";
-import StaffListEditor from "../pages/admin/StaffListEditor";
 import { useRoute } from "../router";
 import { useCollection, useCollectionOrEmpty, useHydrated } from "../store";
 import { ICONS } from "../icons";
@@ -722,8 +720,6 @@ function NotificationsGateCard({ token }: { token: string }) {
   const settings = useCollection("settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const redirect = settings?.smsRedirect;
-  const hasTestPhone = !!(redirect?.staffPhone || redirect?.parentPhone);
   const onCount = settings ? ALL_NOTIFICATION_KEYS.filter((k) => settings.notifications[k]).length : 0;
 
   async function setAll(value: boolean) {
@@ -747,22 +743,14 @@ function NotificationsGateCard({ token }: { token: string }) {
         </h2>
         <Toggle
           checked={onCount === ALL_NOTIFICATION_KEYS.length}
-          disabled={!settings || busy || (!hasTestPhone && onCount === 0)}
+          disabled={!settings || busy}
           label={onCount === ALL_NOTIFICATION_KEYS.length ? tx("Todas ligadas") : onCount > 0 ? tx("{n} ligadas", { n: onCount }) : tx("Todas desligadas")}
           onChange={(v) => void setAll(v)}
         />
       </div>
-      <p className="cat-hint">
-        {tx("As notificações só podem ficar ligadas quando o")} <strong>{tx("redirecionamento de SMS")}</strong> {tx("tem celular de teste preenchido — enquanto não tiver, tudo continua desligado (ninguém recebe SMS de mentira). Ligue-as aqui ou uma a uma em Notificações.")}
-      </p>
-      {hasTestPhone ? (
-        onCount > 0 && onCount < ALL_NOTIFICATION_KEYS.length ? (
-          <p className="message message--warn">{tx("{on} de {total} notificações ligadas.", { on: onCount, total: ALL_NOTIFICATION_KEYS.length })}</p>
-        ) : null
-      ) : (
-        <p className="message message--warn">
-          {tx("Sem celular de teste: preencha o “Redirecionar SMS” acima para poder ligar as notificações com segurança.")}
-        </p>
+      <p className="cat-hint">{tx("Os avisos saem por SMS e e-mail pelo IPAlpha, com os modelos de Configurações → Mensagens. Ligue-os aqui ou um a um em Notificações.")}</p>
+      {onCount > 0 && onCount < ALL_NOTIFICATION_KEYS.length && (
+        <p className="message message--warn">{tx("{on} de {total} notificações ligadas.", { on: onCount, total: ALL_NOTIFICATION_KEYS.length })}</p>
       )}
       {error && <p className="message message--error">{error}</p>}
     </section>
@@ -772,36 +760,14 @@ function NotificationsGateCard({ token }: { token: string }) {
 function ConfigStep({ token }: { token: string }) {
   const { tx } = useI18n();
   const settings = useCollection("settings");
-  const [organizerIds, setOrganizerIds] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (settings) setOrganizerIds(settings.organizers.staffIds);
-  }, [settings]);
-
-  async function saveOrganizers(nextIds: string[]) {
-    if (busy) return;
-    const previous = organizerIds;
-    setOrganizerIds(nextIds);
-    setBusy(true);
-    setError(null);
-    try {
-      await updateSettings(token, { organizers: { staffIds: nextIds } });
-    } catch (err) {
-      setOrganizerIds(previous);
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const [error] = useState<string | null>(null);
 
   return (
     <div className="wizard-config">
       <section className="wizard-card">
         <h2 className="wizard-card__title">{tx("⚙️ Configurações importantes")}</h2>
         <p className="admin-intro">
-          {tx("As janelas de acesso e de check-in, quem organiza, e o redirecionamento de SMS para os testes. Cada card salva por si — nada precisa ser preenchido de uma vez.")}
+          {tx("As janelas de acesso e de check-in e os avisos. Quem serve em cada papel (organização, saúde, check-in…) é definido no IPAlpha. Cada card salva por si — nada precisa ser preenchido de uma vez.")}
         </p>
         {error && <p className="message message--error">{error}</p>}
       </section>
@@ -814,19 +780,6 @@ function ConfigStep({ token }: { token: string }) {
         <CheckinSettingsPage token={token} />
       </div>
 
-      <section className="cat-form">
-        <StaffListEditor
-          title={<span><img className="audience-icon" src={ICONS.organizer} alt="" aria-hidden="true" /> {tx("Organizadores")}</span>}
-          hint={<>{tx("Acesso de administração (acampantes, equipe, quartos, programação…) sem ser admin")}</>}
-          value={organizerIds}
-          onChange={(ids) => void saveOrganizers(ids)}
-          disabled={busy}
-          pickerTitle={tx("Adicionar organizador")}
-          empty={tx("Ninguém escolhido ainda. Só o admin administra o app.")}
-        />
-      </section>
-
-      <SmsRedirectCard token={token} />
       <NotificationsGateCard token={token} />
     </div>
   );
@@ -936,7 +889,7 @@ function DoneStep({ onExit }: { onExit: () => void }) {
     { label: tx("Documentos"), value: tx("{prep} preparação(ões) · {instr} instrução(ões)", { prep: preparation.length, instr: instructions.length }), ok: preparation.length > 0 && instructions.length > 0 },
     {
       label: tx("Janelas e listas"),
-      value: tx("{checkin} · {n} organizador(es)", { checkin: settings?.checkinWindow.from ? tx("check-in ✓") : tx("check-in —"), n: settings?.organizers.staffIds.length ?? 0 }),
+      value: settings?.checkinWindow.from ? tx("check-in ✓") : tx("check-in —"),
       ok: !!settings?.checkinWindow.from,
     },
     { label: tx("Ônibus"), value: tx("{vehicles} veículo(s) · {placed}/{total} crianças alocadas", { vehicles: transports.length, placed, total: campers.length }), ok: transports.length > 0 },

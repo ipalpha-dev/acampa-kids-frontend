@@ -2,7 +2,7 @@ import { useState } from "react";
 import Dialog from "./Dialog";
 import { ICONS } from "../icons";
 import { useI18n } from "../i18n";
-import { roleMeta, type LoggedUser, type Role } from "../roles";
+import { roleMeta, sortRoles, type CoreRole, type LoggedUser } from "../roles";
 
 interface RoleSwitchDialogProps {
   open: boolean;
@@ -10,7 +10,7 @@ interface RoleSwitchDialogProps {
   onClose: () => void;
   user: LoggedUser;
   /** enters `role` instead (a fresh token, no new SMS) */
-  onSwitch: (role: Role) => Promise<void>;
+  onSwitch: (role: CoreRole) => Promise<void>;
 }
 
 /**
@@ -25,11 +25,11 @@ interface RoleSwitchDialogProps {
  */
 export default function RoleSwitchDialog({ open, onClose, user, onSwitch }: RoleSwitchDialogProps) {
   const { tx, t } = useI18n();
-  const [busy, setBusy] = useState<Role | null>(null);
+  const [busy, setBusy] = useState<CoreRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const current = user.activeRole;
 
-  async function pick(role: Role) {
+  async function pick(role: CoreRole) {
     if (busy) return;
     // the session already IS this role: nothing to ask the server for
     if (role === current) return onClose();
@@ -56,13 +56,14 @@ export default function RoleSwitchDialog({ open, onClose, user, onSwitch }: Role
           {error && <p className="message message--error">{error}</p>}
 
           <ul className="role-switch__list">
-            {user.roles.map((role) => {
+            {sortRoles(user.roles).map((role) => {
               const meta = roleMeta(role);
               return (
                 <li key={role}>
                   <button
                     type="button"
                     className={`role-switch__option role-switch__option--${meta.color}`}
+                    aria-current={role === current ? "true" : undefined}
                     disabled={!!busy}
                     onClick={() => pick(role)}
                   >

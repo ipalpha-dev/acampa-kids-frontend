@@ -13,7 +13,6 @@ import {
 import { useCollection, useCollectionOrEmpty } from "../../store";
 import { useCategories, useLabelOf } from "../../store/derive";
 import { formatBrazilPhoneClient } from "../../phoneFormat";
-import { roleMeta } from "../../roles";
 import DetailStack from "./DetailStack";
 import { useRoute } from "../../router";
 import HealthAlerts from "../../components/HealthAlerts";
@@ -393,7 +392,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
 
           {staff.length === 0 && (
             <div className={`admin-empty${canDropImport ? " admin-empty--drop" : ""}${canDropImport && emptyDropOver ? " admin-empty--over" : ""}`}>
-              <img className="admin-empty__icon" src={roleMeta("staff").icon} alt="" aria-hidden="true" />
+              <img className="admin-empty__icon" src={ICONS.staff} alt="" aria-hidden="true" />
               <p>{tx("Ninguém na equipe ainda.")}{!readOnly && ` ${tx("Cadastre o primeiro voluntário!")}`}</p>
               {!readOnly && (
                 <button type="button" className="button button--primary" onClick={() => navigate("/staff/new")}>

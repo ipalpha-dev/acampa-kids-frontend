@@ -42,16 +42,16 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
 
   const vehicles = useMemo(() => transports.slice().sort((a, b) => a.order - b.order), [transports]);
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
-  const placed = new Set(value.map((h) => h.staffId));
+  const placed = new Set(value.map((h) => h.personId));
 
   const shown = vehicles.filter((v) => value.some((h) => h.vehicleId === v.id));
   const target = adding?.step === "person" ? vehicles.find((v) => v.id === adding.vehicleId) ?? null : null;
 
-  function add(vehicleId: string, staffId: string) {
-    if (!placed.has(staffId)) onChange([...value, { staffId, vehicleId }]);
+  function add(vehicleId: string, personId: string) {
+    if (!placed.has(personId)) onChange([...value, { personId, vehicleId }]);
     setAdding(null);
   }
-  const remove = (staffId: string) => onChange(value.filter((h) => h.staffId !== staffId));
+  const remove = (personId: string) => onChange(value.filter((h) => h.personId !== personId));
 
   const addButton = (vehicleId?: string, label = tx("➕ Adicionar pessoa")) => (
     <button type="button" className="button button--secondary list-head__add" disabled={disabled || vehicles.length === 0} onClick={() => setAdding(vehicleId ? { step: "person", vehicleId } : { step: "vehicle" })}>
@@ -80,7 +80,7 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
           {shown.map((v) => {
             const people = value
               .filter((h) => h.vehicleId === v.id)
-              .map((h) => staffById.get(h.staffId))
+              .map((h) => staffById.get(h.personId))
               .filter((s): s is Staff => !!s);
             return (
               <li key={v.id} className="bus-helpers__vehicle">

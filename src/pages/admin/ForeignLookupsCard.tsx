@@ -2,6 +2,7 @@ import { useState } from "react";
 import { resetForeignLookups } from "../../api/settings";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollection } from "../../store";
+import { useNames } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 interface ForeignLookupsCardProps {
@@ -17,6 +18,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
   const { tx } = useI18n();
   const settings = useCollection("settings");
   const offenders = settings?.foreignLookupOffenders ?? [];
+  const nameOf = useNames(offenders.flatMap((o) => [o.personId, ...o.camperIds]));
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +63,9 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
       </p>
       <ul className="foreign-lookup-list">
         {offenders.map((o) => (
-          <li key={o.staffId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
+          <li key={o.personId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
             <div>
-              <strong>{o.name}</strong>
+              <strong>{nameOf(o.personId) || "—"}</strong>
               <span className="foreign-lookup-list__count">
                 {o.count === 1
                   ? tx("{n} criança", { n: o.count })
@@ -71,7 +73,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
                 {o.blocked ? tx(" · bloqueado") : ""}
               </span>
             </div>
-            {o.names.length > 0 && <p className="foreign-lookup-list__names">{o.names.join(", ")}</p>}
+            {o.camperIds.length > 0 && <p className="foreign-lookup-list__names">{o.camperIds.map((id) => nameOf(id)).filter(Boolean).join(", ")}</p>}
           </li>
         ))}
       </ul>

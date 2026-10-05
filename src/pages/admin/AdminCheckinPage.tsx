@@ -1,6 +1,5 @@
 import { ICONS } from "../../icons";
 import { useI18n } from "../../i18n";
-import { roleMeta } from "../../roles";
 import { useRoute } from "../../router";
 
 const OPTIONS = [
@@ -19,7 +18,7 @@ const OPTIONS = [
   {
     key: "staff",
     path: "/checkin/staff",
-    icon: roleMeta("staff").icon,
+    icon: ICONS.staff,
     title: "Equipe",
   },
   {

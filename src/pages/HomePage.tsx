@@ -133,7 +133,7 @@ function BirthdayBanner({ birthdays, onOpen }: { birthdays: RoomBirthday[]; onOp
  */
 export default function HomePage({ user, token, medical = false }: HomePageProps) {
   const { tx } = useI18n();
-  const data = useMyRoom(user.phone);
+  const data = useMyRoom(user.personId);
   const labelOf = useLabelOf();
   const settings = useCollection("settings");
   const bedrooms = useCollection("bedrooms") ?? [];

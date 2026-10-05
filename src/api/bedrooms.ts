@@ -1,6 +1,5 @@
 import { api, command } from "./client";
 import { bearer } from "../auth/store";
-import { roleMeta } from "../roles";
 import { ICONS } from "../icons";
 
 export const BEDROOM_GROUPS = ["girls", "boys", "staff"] as const;
@@ -18,7 +17,7 @@ export function bedroomGroupsForSex(sex: "F" | "M" | null | undefined, probable?
 export const GROUP_META: Record<BedroomGroup, { label: string; icon?: string; face?: string; color: string }> = {
   girls: { label: "Meninas", icon: ICONS.girls, face: ICONS.girlFace, color: "pink" },
   boys: { label: "Meninos", icon: ICONS.boys, face: ICONS.boyFace, color: "blue" },
-  staff: { label: "Equipe", icon: roleMeta("staff").icon, color: "green" },
+  staff: { label: "Equipe", icon: ICONS.staff, color: "green" },
 };
 
 export interface Bedroom {

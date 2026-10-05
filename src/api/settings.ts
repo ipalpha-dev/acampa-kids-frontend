@@ -62,14 +62,9 @@ export interface CheckinWindow {
   open: boolean;
 }
 
-/** A list of team members (check-in helpers, organizers, medical team). */
-export interface StaffList {
-  staffIds: string[];
-}
-
-/** One bus helper at the door of one vehicle (`transporte` option id) — independent from the person's own `transportation` */
+/** One `checkin-onibus` person at the door of one vehicle — the role lives in IPAlpha, the vehicle here */
 export interface BusHelper {
-  staffId: string;
+  personId: string;
   vehicleId: string;
 }
 
@@ -77,11 +72,11 @@ export interface BusHelperList {
   helpers: BusHelper[];
 }
 
-/** A staff member and the purpose shown beside them on the future parent contacts screen. */
+/** A person and the purpose shown beside them on the parents' contacts screen. */
 export interface ParentContact {
   id: string;
   title: string;
-  staffId: string;
+  personId: string;
 }
 
 export interface Settings {
@@ -93,22 +88,8 @@ export interface Settings {
   checkinWindow: CheckinWindow;
   /** separate window for boarding the return bus to church */
   busReturnWindow: CheckinWindow;
-  /** church check-in helpers: inside the window they receive every camper (health included) */
-  checkinHelpers: StaffList;
-  /** bus helpers: each linked to ONE vehicle; inside the window they receive the kids of that vehicle, names only (`Camper.redacted`) */
+  /** `checkin-onibus` people: each linked to ONE vehicle; inside the window they receive the kids of that vehicle, names only (`Camper.redacted`) */
   busHelpers: BusHelperList;
-  /** ORGANIZERS (no window): the admin's access, minus the organizers list, categories, notifications and about */
-  organizers: StaffList;
-  /** game organizers (Settings → Jogos, no window): edit the programme + write the scoreboard (Placar) */
-  gameOrganizers: StaffList;
-  /** score helpers (no window): bulk QR scan by event only; no per-team points, no zero, delete only their own scans */
-  scoreHelpers: StaffList;
-  /** medical team (no window): every camper in full, every bedroom and vehicle, the whole time — read-only */
-  medicalStaff: StaffList;
-  /** vest (colete) helpers (no window): hand out / take back the team vests; see everyone as name + phone only */
-  vestHelpers: StaffList;
-  /** photographers (no window): upload the camp's photos and decide when each one is published */
-  photographers: StaffList;
   /** ordered staff contacts that will be shared with parents */
   parentContacts: ParentContact[];
   /** when ORDINARY team members (on no list) may use the app; both ends null = always */
@@ -129,13 +110,7 @@ export interface Settings {
   galleryPublished: boolean;
   /** the "do your check-in" SMS to the whole team, scheduled for one instant */
   checkinReminder: CheckinReminder;
-  /** Settings → Testes: while on, every SMS for the team / the parents (login code + notifications) goes to the test phones instead */
-  smsRedirect: SmsRedirect;
-  /** false when the server has no SMS provider configured (texts are only logged) */
-  smsEnabled: boolean;
-  /** false when the server has no SendGrid API key / from-address (emails are only logged) */
-  mailEnabled: boolean;
-  /** read-only: this session is the deployment owner (SUPER_ADMIN_PHONE) — the only one who sees / edits ⚙️ → Sementes */
+  /** read-only: this session is a deployment owner (SUPER_ADMIN_PERSON_IDS) — the only one who sees / edits ⚙️ → Sementes */
   superAdmin: boolean;
   /**
    * Staff who scanned ≥3 kids outside their scope (emergency QR). Empty when
@@ -145,21 +120,12 @@ export interface Settings {
   updatedAt: string | null;
 }
 
-/** One staff member past the out-of-scope emergency-QR alert threshold. */
+/** One team member past the out-of-scope emergency-QR alert threshold (names read live). */
 export interface ForeignLookupOffender {
-  staffId: string;
-  name: string;
+  personId: string;
   count: number;
-  names: string[];
+  camperIds: string[];
   blocked: boolean;
-}
-
-export interface SmsRedirect {
-  enabled: boolean;
-  /** E.164 — catches everything meant for the team; null = the team's texts are dropped while enabled */
-  staffPhone: string | null;
-  /** E.164 — catches everything meant for the parents; null = the parents' texts are dropped while enabled */
-  parentPhone: string | null;
 }
 
 /** Igreja Presbiteriana em Alphaville (same default as the backend). */
@@ -177,14 +143,7 @@ export interface SettingsPatch {
   notifications?: Partial<NotificationSettings>;
   checkinWindow?: { from: string | null; until: string | null };
   busReturnWindow?: { from: string | null; until: string | null };
-  checkinHelpers?: StaffList;
   busHelpers?: BusHelperList;
-  organizers?: StaffList;
-  gameOrganizers?: StaffList;
-  scoreHelpers?: StaffList;
-  medicalStaff?: StaffList;
-  vestHelpers?: StaffList;
-  photographers?: StaffList;
   parentContacts?: ParentContact[];
   staffAccessWindow?: { from: string | null; until: string | null };
   parentAccessWindow?: { from: string | null; until: string | null };
@@ -194,41 +153,17 @@ export interface SettingsPatch {
   wizardMode?: boolean;
   galleryPublished?: boolean;
   checkinReminder?: { at: string | null };
-  /** partial: only the keys sent are changed (admin only) */
-  smsRedirect?: Partial<SmsRedirect>;
 }
 
+/** Who would get the welcome SMS right now (person ids; names read live). */
 export interface WelcomePreview {
-  staff: { count: number; windowOpen: boolean; names: string[] };
-  parents: { count: number; windowOpen: boolean; names: string[] };
+  staff: { count: number; windowOpen: boolean; personIds: string[] };
+  parents: { count: number; windowOpen: boolean; personIds: string[] };
 }
 
 /** How many people would get the welcome SMS right now if the toggle were on (never welcomed, phone, window open). */
 export async function welcomePreview(token: string): Promise<WelcomePreview> {
   return api<WelcomePreview>("/api/settings/welcome-preview", { headers: bearer(token) });
-}
-
-export interface SampleEmail {
-  id: string;
-  audience: "parent" | "staff";
-  title: string;
-  subject: string;
-}
-
-export interface SampleEmails {
-  emails: SampleEmail[];
-  adminEmail: string | null;
-  mailEnabled: boolean;
-}
-
-/** Catalog of every notification email the camp can send, plus this admin's roster email. */
-export async function listSampleEmails(token: string): Promise<SampleEmails> {
-  return api<SampleEmails>("/api/settings/sample-emails", { headers: bearer(token) });
-}
-
-/** Sends one sample (`id`) — or every sample when omitted — to `email`. When `save` is true, that address is written on the admin's roster. */
-export async function sendSampleEmails(token: string, email: string, save = true, id?: string): Promise<SampleEmails & { sent: number; total: number; failed: string[]; email: string }> {
-  return command("/api/settings/sample-emails", { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ email, save, id }) }, ["staff"]);
 }
 
 /** Clears every check-in (kids' church + both bus trips, team) and the audit log — for rehearsing the process. */

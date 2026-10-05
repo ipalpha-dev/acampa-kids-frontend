@@ -1,5 +1,4 @@
 import { ROOM_ROLE_META } from "../api/staff";
-import { roleMeta } from "../roles";
 import { ICONS } from "../icons";
 import { useI18n } from "../i18n";
 
@@ -50,7 +49,7 @@ export default function AudiencePicker({ value, onChange, disabled }: AudiencePi
 export type PrepAudience = "parent" | "caretaker" | "helper";
 
 export const PREP_AUDIENCE_META: Record<PrepAudience, { label: string; icon: string; hint: string }> = {
-  parent: { label: "Pais", icon: roleMeta("parent").icon, hint: "ou responsáveis pelas crianças" },
+  parent: { label: "Pais", icon: ICONS.parent, hint: "ou responsáveis pelas crianças" },
   caretaker: { ...DOC_AUDIENCE_META.caretaker, hint: "quem cuida de crianças" },
   helper: { ...DOC_AUDIENCE_META.helper, hint: "os auxiliares de quarto" },
 };

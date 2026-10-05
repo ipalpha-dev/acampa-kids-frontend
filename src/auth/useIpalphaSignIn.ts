@@ -35,10 +35,12 @@ interface Options {
   onSignedIn: (res: OtpVerifyResult) => void;
   /** IPALPHA_UNAVAILABLE: core is down → the maintenance scene. */
   onUnavailable: () => void;
+  /** NOT_IN_PROJECT: signed in, but no role in this camp's project → the gentle login note. */
+  onNotInProject: () => void;
 }
 
 /** Popup sign-in with IPAlpha (CONTRACTS_ACAMPA §5): blank popup on the gesture → start → hand-off → complete. */
-export function useIpalphaSignIn({ config, onSignedIn, onUnavailable }: Options): IpalphaSignIn {
+export function useIpalphaSignIn({ config, onSignedIn, onUnavailable, onNotInProject }: Options): IpalphaSignIn {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,8 +48,8 @@ export function useIpalphaSignIn({ config, onSignedIn, onUnavailable }: Options)
   const [accessError, setAccessError] = useState<ApiError | null>(null);
   const popupRef = useRef<Window | null>(null);
   const alive = useRef(true);
-  const callbacks = useRef({ onSignedIn, onUnavailable });
-  callbacks.current = { onSignedIn, onUnavailable };
+  const callbacks = useRef({ onSignedIn, onUnavailable, onNotInProject });
+  callbacks.current = { onSignedIn, onUnavailable, onNotInProject };
 
   useEffect(() => {
     alive.current = true;
@@ -70,8 +72,8 @@ export function useIpalphaSignIn({ config, onSignedIn, onUnavailable }: Options)
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "IPALPHA_DENIED") {
         setNotice(t("login.ipalphaDenied"));
-      } else if (err instanceof ApiError && err.code === "NO_PROFILE") {
-        setError(t("login.ipalphaNoProfile"));
+      } else if (err instanceof ApiError && err.code === "NOT_IN_PROJECT") {
+        callbacks.current.onNotInProject();
       } else if (err instanceof ApiError && (err.code === "ACCOUNT_FROZEN" || err.code === "OFFLINE")) {
         setError(err.message);
       } else {

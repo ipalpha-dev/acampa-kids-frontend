@@ -66,7 +66,7 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
   const staff = useCollection("staff");
   const events = useCollectionOrEmpty("events");
   const settings = useCollection("settings");
-  const me = useMemo(() => staff?.find((s) => s.phone === user.phone) ?? null, [staff, user.phone]);
+  const me = useMemo(() => staff?.find((s) => s.id === user.personId) ?? null, [staff, user.personId]);
   /** first event of the programme = departure (events come sorted by date/time, but sort defensively) */
   const first = useMemo(() => [...events].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0] ?? null, [events]);
   const departure = first?.date ?? null;

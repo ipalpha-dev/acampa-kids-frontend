@@ -1,12 +1,11 @@
-import { api, command } from "./client";
+import { api } from "./client";
 import { bearer } from "../auth/store";
 
-/** One admin account, as the setup wizard shows it. */
+/** One person holding `coordenacao` (names read live; the role itself is granted in Mordomia). */
 export interface AdminAccount {
-  id: string;
+  personId: string;
   name: string;
-  phone: string;
-  /** the SUPER_ADMIN_PHONE account: cannot lose the admin role */
+  /** a deployment owner (SUPER_ADMIN_PERSON_IDS) */
   superAdmin: boolean;
 }
 
@@ -14,47 +13,9 @@ export interface AdminsInfo {
   admins: AdminAccount[];
   /** public URL of the app (empty when APP_URL is not configured) */
   appUrl: string;
-  /** whether an SMS can actually carry the invite link */
-  smsEnabled: boolean;
 }
 
-/** Everyone who manages the app + the link an invite carries. */
+/** Everyone who coordinates the camp + the app link. Read-only: roles are granted in Mordomia (IPAlpha). */
 export async function listAdmins(token: string): Promise<AdminsInfo> {
   return api<AdminsInfo>("/api/admins", { headers: bearer(token) });
-}
-
-export interface AddedAdmin {
-  admin: AdminAccount;
-  appUrl: string;
-  /** true when the invite SMS went out */
-  smsSent: boolean;
-}
-
-/**
- * Grants the admin role to a phone (login + roster records are created when
- * needed) and texts the person the app link. `sendSms: false` skips the text.
- */
-export async function addAdmin(token: string, input: { name: string; phone: string; sendSms?: boolean }): Promise<AddedAdmin> {
-  return command<AddedAdmin>(
-    "/api/admins",
-    { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify(input) },
-    ["staff"],
-  );
-}
-
-/** SUPER ADMIN: reset the camp, keep only the deployment owner, create the new admin and force their wizard. */
-export async function handoverCamp(
-  token: string,
-  body: { name: string; phone: string; email: string; notify: boolean },
-): Promise<{ usersRemoved: number; mailed: boolean; admin: { id: string; name: string; phone: string } }> {
-  return command(
-    "/api/admins/handover",
-    { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify(body) },
-    ["campers", "staff", "bedrooms", "transports", "teams", "scores", "roles", "events", "occurrences", "medications", "gallery", "settings"],
-  );
-}
-
-/** Removes the admin role from an account (never your own, never the deployment owner's). */
-export async function removeAdmin(token: string, id: string): Promise<void> {
-  await command(`/api/admins/${id}`, { method: "DELETE", headers: bearer(token) }, ["staff"]);
 }

@@ -15,23 +15,21 @@ import { patchCollection, useCollection } from "../store";
  * (medical team, organizers, score helpers): they keep every kid the server
  * sent, camp or not.
  *
- * @param enabled  the logged-in user is a team member (staff / health_staff)
- * @param phone    the logged-in user's phone (to find their staff record)
+ * @param enabled  the acting role is a room-scoped team role (not saúde / organização / pontuação)
+ * @param personId the logged-in person (their staff record has the same id)
  * @param during   the camp is happening right now (campPhase#useCampTiming)
  */
-export function useCampWindow(enabled: boolean, phone: string, during: boolean): void {
+export function useCampWindow(enabled: boolean, personId: string, during: boolean): void {
   const staff = useCollection("staff");
   const settings = useCollection("settings");
-  const me = staff?.find((s) => s.phone === phone) ?? null;
+  const me = staff?.find((s) => s.id === personId) ?? null;
   const isCaretaker = me?.roomRole === "caretaker";
   const myId = me?.id ?? null;
   // wait for both collections so a medical/organizer login is never mistaken
   // for an ordinary caretaker on the first paint (that used to wipe the kids)
   const ready = enabled && staff !== null && settings !== null;
-  const keepAll =
-    !!me &&
-    !!settings &&
-    (settings.medicalStaff.staffIds.includes(me.id) || settings.organizers.staffIds.includes(me.id) || settings.scoreHelpers.staffIds.includes(me.id));
+  // saúde / organização / pontuação are not room-scoped: the caller passes enabled=false for them
+  const keepAll = false;
 
   // camp in progress → over: a caretaker keeps only their own kids
   const wasDuring = useRef(false);

@@ -4,7 +4,6 @@ import { useCollection } from "../../store";
 import { useConfirm } from "../../components/ConfirmDialog";
 import SpotMap from "../../components/SpotMap";
 import BusHelpersEditor from "./BusHelpersEditor";
-import StaffListEditor from "./StaffListEditor";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { speakWhen } from "../../dates";
 import { ICONS } from "../../icons";
@@ -86,7 +85,6 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
   const [until, setUntil] = useState("");
   const [returnFrom, setReturnFrom] = useState("");
   const [returnUntil, setReturnUntil] = useState("");
-  const [church, setChurch] = useState<string[]>([]);
   const [bus, setBus] = useState<BusHelper[]>([]);
   const [spots, setSpots] = useState<SpotDraft[]>([]);
   const confirm = useConfirm();
@@ -98,7 +96,6 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
     setUntil(toLocalInput(s.checkinWindow.until));
     setReturnFrom(toLocalInput(s.busReturnWindow?.from ?? null));
     setReturnUntil(toLocalInput(s.busReturnWindow?.until ?? null));
-    setChurch(s.checkinHelpers.staffIds);
     setBus(s.busHelpers.helpers);
     setSpots(s.checkinLocations.map(toDraft));
   }
@@ -124,23 +121,7 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
     }
   }
 
-  /** Staff lists save immediately when a person is added, removed or reassigned. */
-  async function saveChurch(nextIds: string[]) {
-    if (busy) return;
-    const previous = church;
-    setChurch(nextIds);
-    setBusy("church");
-    setError(null);
-    try {
-      await updateSettings(token, { checkinHelpers: { staffIds: nextIds } });
-    } catch (err) {
-      setChurch(previous);
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
-    } finally {
-      setBusy(null);
-    }
-  }
-
+  /** The bus helpers' vehicles save immediately when a person is added, removed or reassigned. */
   async function saveBus(nextHelpers: BusHelper[]) {
     if (busy) return;
     const previous = bus;
@@ -317,21 +298,12 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
         </div>
       </form>
 
-      {/* ── 2. church helpers ── */}
+      {/* ── 2. church helpers: the `checkin` role in IPAlpha ── */}
       <section className="cat-form">
-        <StaffListEditor
-          title={tx("⛪ Ajudantes do check-in na igreja")}
-          hint={
-            <>
-              {tx("Durante a janela, veem")} <strong>{tx("todas as crianças")}</strong>{tx(" (com os dados de saúde, para conferir com os pais)")}
-            </>
-          }
-          value={church}
-          onChange={(ids) => void saveChurch(ids)}
-          disabled={!!busy}
-          pickerTitle={tx("Adicionar ajudante da igreja")}
-          empty={tx("Ninguém escolhido. Só o admin faz o check-in na igreja.")}
-        />
+        <h2 className="cat-form__title">{tx("⛪ Ajudantes do check-in na igreja")}</h2>
+        <p className="cat-hint">
+          {tx("Quem ajuda no check-in é quem tem o papel “Check-in na igreja” no IPAlpha (Mordomia → Projetos → Acampa Kids). Durante a janela, essas pessoas veem todas as crianças.")}
+        </p>
       </section>
 
       {/* ── 3. bus helpers ── */}
