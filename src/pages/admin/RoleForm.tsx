@@ -25,7 +25,7 @@ interface RoleFormProps {
 
 export default function RoleForm({ token, role, busy, onSubmit, onCancel, embedded, hideDocs }: RoleFormProps) {
   useHideScanFab();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const editing = !!role;
   const [name, setName] = useState(role?.name ?? "");
   const [emoji, setEmoji] = useState(role?.emoji ?? "🎯");
@@ -69,7 +69,7 @@ export default function RoleForm({ token, role, busy, onSubmit, onCancel, embedd
         detailPlaceholder: byPosition || !hasDetail || detailFromTeam ? "" : detailPlaceholder.trim(),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

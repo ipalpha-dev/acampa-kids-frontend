@@ -53,7 +53,6 @@ import { useCheckinHelper, type HelperAccess } from "../hooks/useCheckinHelper";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useParentWindow } from "../hooks/useParentWindow";
 import { useCampWindow } from "../hooks/useCampWindow";
-import { useRosterNames } from "../hooks/useRosterNames";
 import { useCollection, useCollectionOrEmpty, useHydrated } from "../store";
 import WizardPage from "../wizard/WizardPage";
 import { campIsZeroed, setWizardDismissed, wizardDismissed } from "../wizard/state";
@@ -224,8 +223,6 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
   const isParent = user.audience === "parent";
   const helper = useCheckinHelper(user.activeRole, user.personId, isTeam, endsAt);
   const parentAccess = useParentWindow(isParent);
-  // live names of the kids / team this role may see, paged in the background
-  useRosterNames(token);
   useCampWindow(isTeam && !helper.medical && !helper.organizer && !helper.scoreHelper, user.personId, during);
   const settings = useCollection("settings");
   const roomsDraft = !!settings?.kidsRoomsDraft;
@@ -343,8 +340,9 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
   const wizardOpen = view === "wizard";
   const hydrated = useHydrated();
   const wizardAutoEntered = useRef(false);
-  const campersList = useCollectionOrEmpty("campers");
-  const staffList = useCollectionOrEmpty("staff");
+  // the shell only counts records here: names are read by the screen being viewed, not by the shell
+  const campersList = useCollectionOrEmpty("campers", { names: false });
+  const staffList = useCollectionOrEmpty("staff", { names: false });
   const bedroomsList = useCollectionOrEmpty("bedrooms");
   const eventsList = useCollectionOrEmpty("events");
   const transportsList = useCollectionOrEmpty("transports");
@@ -884,7 +882,7 @@ function ProfileView({
   /** coordenação only: reopen the setup wizard */
   onOpenWizard?: () => void;
 }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const meta = roleMeta(user.activeRole);
   const otherRoles = sortRoles(user.roles.filter((r) => r !== user.activeRole));
   const [switchingTo, setSwitchingTo] = useState<CoreRole | null>(null);
@@ -900,7 +898,7 @@ function ProfileView({
     try {
       await onSwitchRole(role);
     } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : tx("Não foi possível trocar de perfil."));
+      setSwitchError(te(err, "Não foi possível trocar de perfil."));
       setSwitchingTo(null);
     }
   }
@@ -913,7 +911,7 @@ function ProfileView({
     try {
       await onSwitchCamp(id);
     } catch (err) {
-      setCampSwitchError(err instanceof Error ? err.message : tx("Não foi possível trocar de ano."));
+      setCampSwitchError(te(err, "Não foi possível trocar de ano."));
       setSwitchingCampTo(null);
     }
   }

@@ -33,7 +33,7 @@ interface AttentionEditDialogProps {
  * which fields changed and lets the team know. Nothing is kept on the device.
  */
 export default function AttentionEditDialog({ token, open, camper: k, health, generalNotes: notes, onSaved, onClose }: AttentionEditDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   /** IPAlpha may leave fields out: read them as "nothing informed" */
   const h: HealthInfo = { ...EMPTY_HEALTH, ...health };
   const categories = useCategories("camper");
@@ -156,7 +156,7 @@ export default function AttentionEditDialog({ token, open, camper: k, health, ge
       onClose();
     } catch (e) {
       // IPAlpha's own-kids rule refused this profile: nothing was saved, say so kindly
-      setError(isHealthForbidden(e) ? tx("O IPAlpha não deixou salvar as informações de saúde pelo seu perfil. Nada foi alterado — fale com a coordenação, que pode ajudar.") : e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(isHealthForbidden(e) ? tx("O IPAlpha não deixou salvar as informações de saúde pelo seu perfil. Nada foi alterado — fale com a coordenação, que pode ajudar.") : te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

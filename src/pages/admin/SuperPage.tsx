@@ -26,7 +26,7 @@ interface SuperPageProps {
  * list and a link to the assistant's seed templates.
  */
 export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const { navigate } = useRoute();
   const confirm = useConfirm();
   const settings = useCollection("settings");
@@ -69,7 +69,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
       await updateCamp(token, c.id, { active: true });
       await onSwitchCamp(c.id);
     } catch (e) {
-      setRowError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setRowError(te(e, "Algo deu errado."));
       setRowBusy(null);
     }
   }
@@ -90,7 +90,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
       await updateCamp(token, c.id, { archived: true });
       setReload((r) => r + 1);
     } catch (e) {
-      setRowError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setRowError(te(e, "Algo deu errado."));
     } finally {
       setRowBusy(null);
     }
@@ -197,7 +197,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
 }
 
 function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | null; token: string; onClose: () => void; onSaved: (c: CampRow) => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [label, setLabel] = useState("");
   const [year, setYear] = useState("");
   const [busy, setBusy] = useState(false);
@@ -221,7 +221,7 @@ function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | n
       const updated = await updateCamp(token, camp.id, { label: label.trim(), year: yearNumber });
       onSaved({ ...camp, label: updated.label, year: updated.year });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -265,7 +265,7 @@ function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | n
 type DeleteStep = "confirm" | "code";
 
 function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow | null; token: string; onClose: () => void; onDeleted: (removed: number) => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [step, setStep] = useState<DeleteStep>("confirm");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +291,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
       setExpiresAt(res.expiresAt);
       setStep("code");
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -313,7 +313,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           setCode("");
         }
       }
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

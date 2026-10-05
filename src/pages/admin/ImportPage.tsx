@@ -185,8 +185,8 @@ export function failureOf(tx: Tx, reason: string | null): { text: string; resuma
 }
 
 /** A friendly sentence for every refusal the import routes answer. */
-export function importErrorMessage(tx: Tx, err: unknown): string {
-  if (!(err instanceof ApiError)) return tx("Algo deu errado. Tente novamente.");
+export function importErrorMessage(tx: Tx, err: unknown, te: (err: unknown, fallbackPt?: string) => string): string {
+  if (!(err instanceof ApiError)) return te(err);
   switch (err.code) {
     case "OFFLINE":
       return tx("Sem conexão com o servidor. Verifique a internet e tente de novo.");
@@ -215,12 +215,13 @@ export function importErrorMessage(tx: Tx, err: unknown): string {
       if (err.reason === "notImportOwner") return tx("Só quem começou esta importação pode continuá-la.");
       return tx("O IPAlpha não permitiu esta importação para o seu perfil.");
     default:
-      return err.message || tx("Algo deu errado. Tente novamente.");
+      // any other refusal: by code / translated message (i18n/errors.ts)
+      return te(err);
   }
 }
 
 export default function ImportPage({ token, subject: initialSubject, onDone }: ImportPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const { navigate } = useRoute();
   const confirm = useConfirm();
   const [subject, setSubject] = useState<ImportSubject>(initialSubject);
@@ -366,7 +367,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       setConflicts(0);
       setView(created);
     } catch (err) {
-      setError(importErrorMessage(tx, err));
+      setError(importErrorMessage(tx, err, te));
     } finally {
       setBusy(null);
     }
@@ -382,7 +383,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
         const next = await patchImport(token, id, d);
         if (viewRef.current?.id === id) setView(next);
       })
-      .catch((err) => setError(importErrorMessage(tx, err)))
+      .catch((err) => setError(importErrorMessage(tx, err, te)))
       .finally(() => setSaving((n) => n - 1));
   }
 
@@ -395,7 +396,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       await queue.current;
       setView(await applyImport(token, v.id));
     } catch (err) {
-      setError(importErrorMessage(tx, err));
+      setError(importErrorMessage(tx, err, te));
       void refresh();
     } finally {
       setBusy(null);
@@ -420,7 +421,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       await cancelImport(token, v.id);
       startOver();
     } catch (err) {
-      setError(importErrorMessage(tx, err));
+      setError(importErrorMessage(tx, err, te));
     } finally {
       setBusy(null);
     }
@@ -445,7 +446,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       setResults((prev) => [...prev, ...page.items.filter((b) => !prev.some((p) => p.batch === b.batch))]);
       setNextCursor(page.nextCursor);
     } catch (err) {
-      setError(importErrorMessage(tx, err));
+      setError(importErrorMessage(tx, err, te));
     } finally {
       setLoadingMore(false);
     }

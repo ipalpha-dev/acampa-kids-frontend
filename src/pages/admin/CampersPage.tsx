@@ -73,7 +73,7 @@ const NAME_HEALTH_DEBOUNCE_MS = 400;
 
 /** Admin: the campers (kids) — one continuous list, detail view and create/edit form; read-only for the care team. */
 export default function CampersPage({ token, camp, camps, readOnly = false, locked = false }: CampersPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const otherCamps = useMemo(() => camps.filter((c) => c.id !== camp.id), [camps, camp.id]);
   const [importSheetOpen, setImportSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(() => takePendingToast());
@@ -166,7 +166,7 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
       navigate("/campers", { replace: true });
       setToast(tx("{name} não está mais neste acampamento.", { name: first }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     }
   }
 
@@ -185,7 +185,7 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
       if (kind === "medical") await downloadMedicalCampersXlsx(ctx, campers, bedrooms, labelOf, staff);
       else await downloadCampersXlsx(ctx, campers, bedrooms, labelOf, staff);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Não foi possível preparar a planilha agora."));
+      setError(te(e, "Não foi possível preparar a planilha agora."));
     } finally {
       setExporting(null);
     }

@@ -20,7 +20,7 @@ const BEDS_MAX = 50;
 
 /** Create / edit a bedroom: number, wing and bed layout (bunk + single). */
 export default function BedroomForm({ bedroom, defaultGroup, busy, onSubmit, onCancel }: BedroomFormProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
   const editing = !!bedroom;
@@ -44,7 +44,7 @@ export default function BedroomForm({ bedroom, defaultGroup, busy, onSubmit, onC
     try {
       await onSubmit({ name: name.trim(), group, bunkBeds, singleBeds, notes: notes.trim() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

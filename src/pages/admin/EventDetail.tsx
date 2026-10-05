@@ -30,7 +30,7 @@ interface EventDetailProps {
 }
 
 export default function EventDetail({ token, event: e, roles, staff, crumbs, onEdit, onOpenStaff }: EventDetailProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [addTo, setAddTo] = useState<ScheduleRole | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
     try {
       await updateEvent(token, e.id, { visibleToParents: next });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setSavingParents(false);
     }
@@ -66,7 +66,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
       await assignStaff(token, e.id, editDetail.staffId, editDetail.role.id, editDetail.value.trim(), editDetail.color);
       setEditDetail(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setSavingDetail(false);
     }
@@ -99,7 +99,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
     try {
       await unassignStaff(token, e.id, staffId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -124,7 +124,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
     try {
       await updateEvent(token, e.id, { roles: e.roles.filter((id) => id !== role.id) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -149,7 +149,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
             {speakDay(e.date)} · {e.startTime}
             {e.endTime && `–${e.endTime}`}
           </dd>
-          <dt>{tx("Pais")}</dt>
+          <dt>{tx("Famílias")}</dt>
           <dd>
             <Toggle checked={parentsSee} onChange={(v) => void handleParentsVisible(v)} disabled={savingParents} label={<><ParentIcon size={16} /> {parentsSee ? tx("veem") : tx("não veem")}</>} />
           </dd>
@@ -388,8 +388,7 @@ export default function EventDetail({ token, event: e, roles, staff, crumbs, onE
                   <button
                     key={c.hex}
                     type="button"
-                    className={`swatch ${editDetail.color.toLowerCase() === c.hex ? "swatch--on" : ""}`}
-                    style={{ background: c.hex }}
+                    className={`swatch swatch--detail-${c.key} ${editDetail.color.toLowerCase() === c.hex ? "swatch--on" : ""}`}
                     title={tx(c.name)}
                     aria-label={tx(c.name)}
                     aria-pressed={editDetail.color.toLowerCase() === c.hex}

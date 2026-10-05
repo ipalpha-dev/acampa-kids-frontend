@@ -55,7 +55,7 @@ const ARRIVE_MS = 600;
  * are always the ones at the top.
  */
 export default function MedicationChecklist({ token, day, variant = "page", title, now, initialSearch = "" }: MedicationChecklistProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
   /**
    * the kid opened in the popup — the list (and the search) stay exactly as
@@ -128,7 +128,7 @@ export default function MedicationChecklist({ token, day, variant = "page", titl
     try {
       await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível salvar a marcação."));
+      setError(te(err, "Não foi possível salvar a marcação."));
     } finally {
       setPending((p) => {
         const n = new Set(p);

@@ -15,7 +15,7 @@ interface ForeignLookupsCardProps {
  * "Zerar contadores" unblocks anyone at ≥5 and clears the SMS-alert mark.
  */
 export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const offenders = settings?.foreignLookupOffenders ?? [];
   const nameOf = useNames(offenders.flatMap((o) => [o.personId, ...o.camperIds]));
@@ -42,7 +42,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
     try {
       await resetForeignLookups(token);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

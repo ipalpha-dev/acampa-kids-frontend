@@ -17,7 +17,7 @@ interface CamperFieldDialogProps {
 
 /** Admin: change ONE quick field of a kid (team or transportation) from the detail page. */
 export default function CamperFieldDialog({ token, open, camper: k, field, onClose }: CamperFieldDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const META: Record<CamperQuickField, { title: string }> = {
     team: { title: tx("Trocar de time") },
     transportation: { title: tx("Trocar o transporte") },
@@ -42,7 +42,7 @@ export default function CamperFieldDialog({ token, open, camper: k, field, onClo
       await updateCamper(token, k.id, { [field]: value });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

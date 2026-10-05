@@ -231,7 +231,7 @@ function selectionHtml(editor: Editor): { html: string; from: number; to: number
  * puts the previous HTML back.
  */
 export default function AiAssistantPanel({ open, onClose, editor, token, context, title, onApplied }: AiAssistantPanelProps) {
-  const { tx, tag } = useI18n();
+  const { tx, tag, te } = useI18n();
   const quick = [
     { label: tx("Melhorar"), prompt: tx("Melhore a escrita: deixe o texto mais claro e simpático, mantendo o sentido.") },
     { label: tx("✂️ Resumir"), prompt: tx("Resuma o texto mantendo as informações essenciais.") },
@@ -513,7 +513,7 @@ export default function AiAssistantPanel({ open, onClose, editor, token, context
       }
     } catch (err) {
       if ((err as Error)?.name === "AbortError") patch(replyId, { pending: false, error: tx("Cancelado.") });
-      else patch(replyId, { pending: false, error: err instanceof Error ? err.message : tx("O assistente não respondeu.") });
+      else patch(replyId, { pending: false, error: te(err, "O assistente não respondeu.") });
       if (clip) setItems((l) => l.map((x) => (x.id === userId && x.voice?.transcribing ? { ...x, voice: { ...x.voice, transcribing: false } } : x)));
     } finally {
       setBusy(false);

@@ -66,7 +66,7 @@ const COLORS_BY_WING: Record<BedroomGroup, readonly CrewColor[]> = {
  * the left takes it off the vehicle.
  */
 export default function BusAssignPage({ token }: BusAssignPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const storedBedrooms = useCollection("bedrooms");
   const storedTransports = useCollection("transports");
   const campers = useCollectionOrEmpty("campers");
@@ -155,7 +155,7 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
       try {
         for (const s of moving) await updateStaff(token, s.id, { transportation: busId });
       } catch (e) {
-        setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+        setError(te(e, "Algo deu errado."));
       } finally {
         setSaving((prev) => {
           const next = new Set(prev);
@@ -172,7 +172,7 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
     try {
       for (const k of moving) await updateCamper(token, k.id, { transportation: busId });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setSaving((prev) => {
         const next = new Set(prev);
@@ -344,7 +344,7 @@ export default function BusAssignPage({ token }: BusAssignPageProps) {
       }))
     )
       return;
-    await deleteTransport(token, v.id).catch((e) => setError(e instanceof Error ? e.message : tx("Algo deu errado.")));
+    await deleteTransport(token, v.id).catch((e) => setError(te(e, "Algo deu errado.")));
   }
 
   if (!bedrooms || !vehicles) {

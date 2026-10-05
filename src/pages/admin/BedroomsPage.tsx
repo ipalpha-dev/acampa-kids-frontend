@@ -51,7 +51,7 @@ function modeOf(segments: string[], params: URLSearchParams): Mode {
 
 /** Admin: bedrooms grouped by wing, each with its bed layout and occupancy; read-only for the medical team. */
 export default function BedroomsPage({ token, readOnly = false }: BedroomsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // from the local store (localStorage + live WebSocket feed) — occupancy is kept fresh by the server push
   const stored = useCollection("bedrooms");
   const bedrooms = useMemo(() => (stored ? sortRooms(stored) : null), [stored]);
@@ -103,7 +103,7 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
       await withBusy(() => deleteBedroom(token, b.id));
       navigate("/bedrooms", { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     }
   }
 

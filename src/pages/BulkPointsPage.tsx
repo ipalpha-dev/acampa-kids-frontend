@@ -37,7 +37,7 @@ function normalize(s: string): string {
  * the other hand, checks the kid in by itself).
  */
 export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPointsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const events = useCollection("events");
   const campers = useCollectionOrEmpty("campers");
   const scores = useCollectionOrEmpty("scores");
@@ -117,7 +117,7 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
       setCheering((m) => new Map(m).set(camperId, res.score.id));
       cheerTimers.current.set(camperId, window.setTimeout(() => stopCheer(camperId), CHEER_MS));
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusyId(null);
     }
@@ -131,7 +131,7 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
     try {
       await deleteScore(token, scoreId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setUndoingId(null);
       if (camperId) stopCheer(camperId);
@@ -145,7 +145,7 @@ export default function BulkPointsPage({ token, onClose, parentLabel }: BulkPoin
     try {
       await repointEventScans(token, eventId, points);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setRepointing(false);
     }

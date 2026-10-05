@@ -80,7 +80,7 @@ function StepIcon({ step, sex, className = "" }: { step: Step; sex?: "F" | "M" |
  * For the coordenação and the `coletes` role; the helper sees only the name (the phone is read on tap).
  */
 export default function VestPage({ token, checkinHomePath }: VestPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollection("staff");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const settings = useCollection("settings");
@@ -167,7 +167,7 @@ export default function VestPage({ token, checkinHomePath }: VestPageProps) {
       await setStaffVest(token, s.id, action);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       return false;
     } finally {
       setPending((p) => {

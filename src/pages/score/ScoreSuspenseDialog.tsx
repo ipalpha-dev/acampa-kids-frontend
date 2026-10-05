@@ -45,7 +45,7 @@ const HOURS_LATER = [1, 3, 6];
  * recording and seeing points until the automatic reveal.
  */
 export default function ScoreSuspenseDialog({ token, open, onClose, current }: ScoreSuspenseDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [from, setFrom] = useState("");
   const [until, setUntil] = useState("");
   const [busy, setBusy] = useState(false);
@@ -82,7 +82,7 @@ export default function ScoreSuspenseDialog({ token, open, onClose, current }: S
       await setScoreSuspense(token, window);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

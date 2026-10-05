@@ -47,7 +47,7 @@ interface BusCheckinPageProps {
  * the medical team (same screens, nothing to tap).
  */
 export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false, basePath = "/bus", trip = "outbound", checkinHomePath, otherTripAvailable = true, reportPath }: BusCheckinPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const campers = useCollection("campers");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const transports = useCollectionOrEmpty("transports");
@@ -146,7 +146,7 @@ export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false,
       if (on) await undoCheckinCamper(token, k.id, checkinKind);
       else await checkinCamper(token, k.id, checkinKind);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setPending((p) => {
         const n = new Set(p);
@@ -182,7 +182,7 @@ export default function BusCheckinPage({ token, onlyVehicleId, readOnly = false,
       setScanNotice({ kind: "ok", text: tx("✅ {name} entrou no ônibus da {trip}.", { name: camper.name || "…", trip: tripShort }) });
     } catch (e) {
       setScannerOpen(false);
-      setScanNotice({ kind: "error", text: e instanceof Error ? e.message : tx("Não foi possível ler este QR code.") });
+      setScanNotice({ kind: "error", text: te(e, "Não foi possível ler este QR code.") });
     } finally {
       setScanBusy(false);
     }

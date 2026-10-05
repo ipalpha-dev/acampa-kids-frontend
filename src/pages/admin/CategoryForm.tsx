@@ -34,7 +34,7 @@ interface CategoryFormProps {
 export default function CategoryForm({ token, category, busy, onSubmit, onCancel }: CategoryFormProps) {
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const editing = !!category;
   const [name, setName] = useState(category?.name ?? "");
   const [emoji, setEmoji] = useState(category?.emoji ?? "🏷️");
@@ -83,7 +83,7 @@ export default function CategoryForm({ token, category, busy, onSubmit, onCancel
     try {
       await onSubmit(input);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

@@ -52,7 +52,7 @@ function useCountdown(expiresAt: string): number {
 /** Step 2 — the code sent by IPAlpha (length from the server), countdown, wrong-code limit, new code. */
 export default function OtpStep({ challenge, phoneMasked, expiresAt, codeLength, onVerified, onBack, onNotInProject, onUnavailable }: OtpStepProps) {
   const t = useT();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export default function OtpStep({ challenge, phoneMasked, expiresAt, codeLength,
           setAccessError(err);
           setCode("");
         } else if (err instanceof ApiError) {
-          setError(err.message);
+          setError(te(err));
           if (err.code === "OTP_INVALID" && err.attemptsLeft != null) {
             setAttemptsLeft(err.attemptsLeft);
             setCode("");
@@ -107,7 +107,7 @@ export default function OtpStep({ challenge, phoneMasked, expiresAt, codeLength,
         setLoading(false);
       }
     },
-    [challenge, codeLength, onVerified, onUnavailable, onNotInProject, t],
+    [challenge, codeLength, onVerified, onUnavailable, onNotInProject, t, te],
   );
 
   if (frozenMinutes != null) {

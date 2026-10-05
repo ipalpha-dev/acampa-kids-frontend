@@ -46,7 +46,7 @@ export default function CategoriesPage({ token }: CategoriesPageProps) {
   const { segments, navigate } = useRoute();
   const { mode, selectedId: routeId } = modeOf(segments);
   const confirm = useConfirm();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,7 +85,7 @@ export default function CategoriesPage({ token }: CategoriesPageProps) {
 
   async function handleDelete(cat: Category) {
     if (!(await confirm({ emoji: "🗑️", title: tx('Excluir a categoria "{name}"?', { name: cat.name }), message: tx("Suas {n} opções também serão excluídas. Isso não pode ser desfeito.", { n: cat.options.length }), confirmLabel: tx("Excluir"), danger: true }))) return;
-    await withBusy(() => deleteCategory(token, cat.id)).catch((e) => setError(e.message));
+    await withBusy(() => deleteCategory(token, cat.id)).catch((e) => setError(te(e)));
     navigate("/categories", { replace: true });
   }
 
@@ -96,7 +96,7 @@ export default function CategoriesPage({ token }: CategoriesPageProps) {
     const j = i + dir;
     if (j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    await withBusy(() => reorderCategories(token, ids)).catch((e) => setError(e.message));
+    await withBusy(() => reorderCategories(token, ids)).catch((e) => setError(te(e)));
   }
 
   // ── option CRUD (delegated to CategoryOptions) ─────────────────────────

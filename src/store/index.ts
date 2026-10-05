@@ -14,10 +14,12 @@ import type { Team } from "../api/teams";
 import type { ScoreEntry } from "../api/scores";
 import type { GalleryPhoto } from "../api/gallery";
 import type { Prescription } from "../api/medications";
+import { onAuthSuccess } from "../api/client";
 import { fetchOfflineKey, type OfflineKeyAnswer } from "../auth/store";
 import { clearSessionCaches } from "../pwa/sessionCaches";
 import { copyIsUsable, decryptJson, defaultBackend, encryptJson, importOfflineKey, stripHealth, type OfflineBackend } from "./offline";
 import { clearPeople, onPeopleChange, peopleSnapshot, peopleVersion, personInfo, rememberPeople, type PersonInfo } from "./people";
+import { useRosterNames, type RosterKind } from "./roster";
 
 /**
  * Local-first data store.
@@ -27,7 +29,8 @@ import { clearPeople, onPeopleChange, peopleSnapshot, peopleVersion, personInfo,
  * WebSocket (see ./realtime.ts): a full snapshot on connect and an update after
  * every change. Writes go through the REST API; their result is confirmed by
  * the server's push. Records carry camp operations only — names come from the
- * people cache (./people.ts), health and contacts are read per person on demand.
+ * people cache (./people.ts), read for the screen being viewed (./roster.ts);
+ * health and contacts are read per person on demand.
  *
  * On the device the state survives ONLY as the encrypted, role-scoped offline
  * copy (./offline.ts, decision 35) — never in localStorage.
@@ -100,6 +103,14 @@ let offlineEpoch = 0;
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 const MAX_TIMEOUT = 2 ** 31 - 1;
+/**
+ * The session's idle length as this device measured it when the key arrived
+ * (`sessionExpiresAt` − the answer's arrival): never longer than the real
+ * sessionIdleHours, so an expiry estimated from it never outlives the session.
+ */
+let idleMs: number | null = null;
+/** The backend slides at most once a minute: estimates stay this far on the safe side. */
+const SLIDE_SLACK_MS = 60_000;
 
 interface OfflinePayload {
   data: Partial<ServerCollections>;
@@ -162,6 +173,7 @@ export async function startOfflineSession(token: string, campId: string): Promis
   const epoch = ++offlineEpoch;
   offlineKey = null;
   offlineInfo = null;
+  idleMs = null;
   let answer: OfflineKeyAnswer;
   try {
     answer = await fetchOfflineKey(token);
@@ -169,6 +181,7 @@ export async function startOfflineSession(token: string, campId: string): Promis
     return;
   }
   if (epoch !== offlineEpoch) return;
+  const measured = new Date(answer.sessionExpiresAt).getTime() - Date.now();
   let key: CryptoKey;
   try {
     key = await importOfflineKey(answer.key);
@@ -197,9 +210,41 @@ export async function startOfflineSession(token: string, campId: string): Promis
   }
   offlineKey = key;
   offlineInfo = info;
+  idleMs = Number.isFinite(measured) && measured > SLIDE_SLACK_MS ? measured : null;
   scheduleExpiry();
   persist();
 }
+
+/**
+ * The session slid (decision 30 — sessionIdleHours is an IDLE limit): the copy
+ * and its self-wipe timer follow the new expiry instead of the one the key
+ * answered at the start. Fed by GET /api/auth/me / role / camp answers
+ * (App.tsx) and by every authenticated request the server accepted (below).
+ * Only ever moves forward; a jump under a minute is ignored (the backend
+ * slides at most once a minute).
+ */
+export function extendOfflineSession(sessionExpiresAt: string | null | undefined): void {
+  if (!offlineInfo || !sessionExpiresAt) return;
+  const next = new Date(sessionExpiresAt).getTime();
+  const current = new Date(offlineInfo.sessionExpiresAt).getTime();
+  if (!Number.isFinite(next) || (Number.isFinite(current) && next - current < SLIDE_SLACK_MS)) return;
+  offlineInfo = { ...offlineInfo, sessionExpiresAt: new Date(next).toISOString() };
+  scheduleExpiry();
+  // the stored meta carries the expiry too: rewrite it so a reopening reads the slid one
+  persist();
+}
+
+/** When the offline copy will wipe itself for the session's sake (tests / diagnostics), or null. */
+export function offlineSessionExpiresAt(): string | null {
+  return offlineInfo?.sessionExpiresAt ?? null;
+}
+
+// every accepted authenticated request slid the session on the server: estimate the new expiry
+// on the safe side (request start + the measured idle length − the backend's one-minute step)
+onAuthSuccess((startedAt) => {
+  if (!offlineInfo || idleMs === null) return;
+  extendOfflineSession(new Date(startedAt + idleMs - SLIDE_SLACK_MS).toISOString());
+});
 
 /**
  * Logout, role / camp switch, 401, session end, camp end: forgets the key,
@@ -210,6 +255,7 @@ export async function endOfflineSession(): Promise<void> {
   offlineEpoch++;
   offlineKey = null;
   offlineInfo = null;
+  idleMs = null;
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = null;
   clearStore();
@@ -308,14 +354,32 @@ function view<K extends CollectionName>(name: K): Collections[K] | undefined {
   return raw as unknown as Collections[K];
 }
 
+export interface CollectionOptions {
+  /**
+   * Kids / team only: read the names this screen is missing (default). Pass
+   * `false` from app-wide hooks that never show names (the shell, helper
+   * checks), so names are read only for the screen being viewed (./roster.ts).
+   */
+  names?: boolean;
+}
+
+function rosterKind(name: CollectionName, opts?: CollectionOptions): RosterKind | null {
+  if (opts?.names === false) return null;
+  return name === "campers" || name === "staff" ? name : null;
+}
+
 /** One collection, or `null` while this device has never received it. */
-export function useCollection<K extends CollectionName>(name: K): Collections[K] | null {
-  return useSyncExternalStore(subscribe, () => view(name) ?? null);
+export function useCollection<K extends CollectionName>(name: K, opts?: CollectionOptions): Collections[K] | null {
+  const value = useSyncExternalStore(subscribe, () => view(name) ?? null);
+  const online = useSyncExternalStore(subscribe, () => state.connection === "online");
+  const kind = rosterKind(name, opts);
+  useRosterNames(kind, kind ? (value as { id: string; name?: string }[] | null) : null, online);
+  return value;
 }
 
 /** Same, but never null (empty list until synced). */
-export function useCollectionOrEmpty<K extends CollectionName>(name: K): Collections[K] {
-  return useSyncExternalStore(subscribe, () => view(name) ?? (EMPTY as unknown as Collections[K]));
+export function useCollectionOrEmpty<K extends CollectionName>(name: K, opts?: CollectionOptions): Collections[K] {
+  return useCollection(name, opts) ?? (EMPTY as unknown as Collections[K]);
 }
 
 /** Non-hook read of the joined view (assistant context, exports). */

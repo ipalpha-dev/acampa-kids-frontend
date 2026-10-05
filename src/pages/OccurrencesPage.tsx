@@ -32,7 +32,7 @@ const normalize = (value: string) =>
 
 
 export default function OccurrencesPage({ token, audience }: OccurrencesPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const occurrences = useCollection("occurrences");
   const campers = useCollection("campers");
   const staff = useCollection("staff");
@@ -73,7 +73,7 @@ export default function OccurrencesPage({ token, audience }: OccurrencesPageProp
       setCreating(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível registrar a ocorrência."));
+      setError(te(err, "Não foi possível registrar a ocorrência."));
     } finally {
       setBusy(false);
     }

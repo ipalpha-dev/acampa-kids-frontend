@@ -226,7 +226,7 @@ export default function WizardPage({ token, user, camp, camps, onExit }: WizardP
 // ── intro ───────────────────────────────────────────────────────────────────
 
 export function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => void; onSkip: () => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   /** the fictional sample exists only in preview / dev (GET /api/wizard/sample → {enabled}) */
   const [sampleEnabled, setSampleEnabled] = useState(false);
   useEffect(() => {
@@ -253,7 +253,7 @@ export function IntroStep({ token, onNext, onSkip }: { token: string; onNext: ()
     } catch (e) {
       // the server says the sample is off here after all: the option simply goes away
       if (e instanceof ApiError && e.code === "SAMPLE_DISABLED") setSampleEnabled(false);
-      else setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      else setError(te(e, "Algo deu errado."));
     } finally {
       setTesting(false);
     }
@@ -327,7 +327,7 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
 const spotDraft = (v: string) => v.replace(",", ".");
 
 function VenueStep({ token, places, onNext }: { token: string; places: KnownPlace[]; onNext: () => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const recalled = useRef(recalledWizardPlace()).current;
@@ -381,7 +381,7 @@ function VenueStep({ token, places, onNext }: { token: string; places: KnownPlac
       rememberWizardPlace({ id: placeId, name: name.trim() || "Acampamento", address: address.trim() });
       setApplied(created);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -473,7 +473,7 @@ function addDays(iso: string, days: number): string {
 }
 
 function ScheduleStep({ token, roles, events }: { token: string; roles: TemplateRole[]; events: TemplateEvent[] }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const existingEvents = useCollectionOrEmpty("events");
   const existingRoles = useCollectionOrEmpty("roles");
   const [firstDay, setFirstDay] = useState(nextFriday);
@@ -547,7 +547,7 @@ function ScheduleStep({ token, roles, events }: { token: string; roles: Template
       }
       setApplied(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -623,7 +623,7 @@ function ScheduleStep({ token, roles, events }: { token: string; roles: Template
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const instructions = useCollectionOrEmpty("instructions");
   const preparation = useCollectionOrEmpty("preparation");
   const settings = useCollection("settings");
@@ -649,7 +649,7 @@ function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
       await createInstruction(token, { title: docs.addressTitle, emoji: docs.addressEmoji, audience: "all", content });
       setCreatedAddress(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -663,7 +663,7 @@ function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
       await createPrepSection(token, { title: docs.prepTitle, emoji: docs.prepEmoji, audiences: ["parent", "caretaker", "helper"], content: docs.prepContent });
       setCreatedPrep(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -730,7 +730,7 @@ const ALL_NOTIFICATION_KEYS: (keyof NotificationSettings)[] = [
 ];
 
 function NotificationsGateCard({ token }: { token: string }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -743,7 +743,7 @@ function NotificationsGateCard({ token }: { token: string }) {
     try {
       await updateSettings(token, { notifications: Object.fromEntries(ALL_NOTIFICATION_KEYS.map((k) => [k, value])) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -834,7 +834,7 @@ function RoomsStep({ token }: { token: string }) {
 // ── buses (prefilled from the seeds) ───────────────────────────────────────
 
 function BusesStep({ token, fleet }: { token: string; fleet: SeedBus[] }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const transports = useCollectionOrEmpty("transports");
   const hydrated = useHydrated();
   const [seeding, setSeeding] = useState(false);
@@ -858,7 +858,7 @@ function BusesStep({ token, fleet }: { token: string; fleet: SeedBus[] }) {
           await createTransport(token, input);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+        setError(te(e, "Algo deu errado."));
       } finally {
         setSeeding(false);
       }

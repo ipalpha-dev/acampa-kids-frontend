@@ -17,7 +17,7 @@ interface ScoreDraftCardProps {
  * flow (QR scan included) before the camp.
  */
 export default function ScoreDraftCard({ token }: ScoreDraftCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const { during } = useCampTiming();
   const [busy, setBusy] = useState(false);
@@ -31,7 +31,7 @@ export default function ScoreDraftCard({ token }: ScoreDraftCardProps) {
     try {
       await updateSettings(token, { scoreDraft: value });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

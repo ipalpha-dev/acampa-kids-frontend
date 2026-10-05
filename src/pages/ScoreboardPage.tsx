@@ -54,7 +54,7 @@ type Pending = { team: Team; sign: 1 | -1 };
  *   #/scoreboard/event/:id   — what one programme event produced
  */
 export default function ScoreboardPage({ token, userId, canEdit, canScan, showTeamsButton = false, onTeams, teamsParent = false }: ScoreboardPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const teams = useCollection("teams");
   const settings = useCollection("settings");
   const suspense = useScoreSuspense(settings?.scoreHideWindow);
@@ -88,7 +88,7 @@ export default function ScoreboardPage({ token, userId, canEdit, canScan, showTe
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

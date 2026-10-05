@@ -73,7 +73,7 @@ type Wing = "all" | "girls" | "boys";
 
 /** The camp staff (equipe) list + create/edit form (admin); read-only for programme organizers. */
 export default function StaffPage({ token, camp, camps, readOnly = false }: StaffPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const otherCamps = useMemo(() => camps.filter((c) => c.id !== camp.id), [camps, camp.id]);
   const [importSheetOpen, setImportSheetOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(() => takePendingToast());
@@ -163,7 +163,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
         labelOf,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setExporting(null);
     }
@@ -181,7 +181,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
       await withBusy(() => deleteStaff(token, member.id));
       navigate("/staff", { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     }
   }
 

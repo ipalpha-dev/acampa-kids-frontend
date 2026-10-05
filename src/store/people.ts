@@ -6,10 +6,9 @@ import { bearer, loadAuth } from "../auth/store";
  * Live names of the people the viewer may know (CONTRACTS_ACAMPA §15/§16).
  *
  * Camp-ops records only carry person ids; the name, nickname and sex (decision
- * 39 — shown like the name) are read from IPAlpha when displayed: the paged
- * lists (`GET /api/campers`, `GET /api/staff`) fill this cache page by page in
- * the background, and `POST /api/people/names` (≤ 200 per call) resolves any
- * other id on screen. In memory only — on the device it survives solely inside
+ * 39 — shown like the name) are read from IPAlpha when displayed: a screen
+ * that lists kids / team pages its list on demand (./roster.ts), and
+ * `POST /api/people/names` (≤ 200 per call) resolves any other id on screen. In memory only — on the device it survives solely inside
  * the encrypted offline copy (./offline.ts).
  */
 export interface PersonInfo {
@@ -25,6 +24,8 @@ export const NAMES_BATCH_MAX = 200;
 
 let people = new Map<string, PersonInfo>();
 let version = 0;
+/** bumps whenever the cache is emptied (logout, role / camp switch): per-scope name work starts over */
+let epoch = 0;
 const listeners = new Set<() => void>();
 const changeHooks = new Set<() => void>();
 
@@ -75,8 +76,10 @@ export function peopleSnapshot(): PersonInfo[] {
 }
 
 export function clearPeople(): void {
+  epoch++;
   pending.clear();
   inflight.clear();
+  unknown.clear();
   if (people.size === 0) return;
   people = new Map();
   emit();
@@ -84,6 +87,11 @@ export function clearPeople(): void {
 
 export function peopleVersion(): number {
   return version;
+}
+
+/** Changes every time the cache is emptied — a new session scope. */
+export function peopleEpoch(): number {
+  return epoch;
 }
 
 export function usePeopleVersion(): number {
@@ -94,11 +102,13 @@ export function usePeopleVersion(): number {
 
 const pending = new Set<string>();
 const inflight = new Set<string>();
+/** ids the server answered without a name (not the viewer's to know): not asked again in this scope */
+const unknown = new Set<string>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Asks for the names of ids not known yet (coalesced, ≤ 200 per call). Unknown / not allowed ids simply stay unnamed. */
 export function requestNames(ids: readonly (string | null | undefined)[]): void {
-  for (const id of ids) if (id && !people.has(id) && !inflight.has(id)) pending.add(id);
+  for (const id of ids) if (id && !people.has(id) && !inflight.has(id) && !unknown.has(id)) pending.add(id);
   if (pending.size === 0 || flushTimer) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
@@ -115,10 +125,14 @@ async function flushNames(): Promise<void> {
   for (let i = 0; i < ids.length; i += NAMES_BATCH_MAX) {
     const batch = ids.slice(i, i + NAMES_BATCH_MAX);
     try {
+      const scope = epoch;
       const res = await api<{ items: PersonInfo[] }>("/api/people/names", { method: "POST", headers: bearer(token), body: JSON.stringify({ personIds: batch }) });
+      if (scope !== epoch) continue;
       rememberPeople(res.items);
+      const named = new Set(res.items.map((it) => it.personId));
+      for (const id of batch) if (!named.has(id)) unknown.add(id);
     } catch {
-      // offline / not allowed: the screen keeps its placeholder
+      // offline / server trouble: the screen keeps its placeholder and asks again later
     } finally {
       for (const id of batch) inflight.delete(id);
     }

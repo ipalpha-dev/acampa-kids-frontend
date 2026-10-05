@@ -13,7 +13,7 @@ export function normName(s: string): string {
 
 /** one name of the preference field, with whatever the parents added in parentheses kept aside */
 export interface PrefName {
-  /** the name used for matching ("Helena Cima") */
+  /** the name used for matching ("Ana Exemplo") */
   name: string;
   /** the remark in parentheses, if any ("irmã", "não sabe o sobrenome, sala Lídia") — never matched, always shown */
   note: string;
@@ -22,7 +22,7 @@ export interface PrefName {
 /**
  * The names of a kid's "prefere dividir quarto com" field. Parents write the
  * list however they like: "Ana, Bruno e Carla" / "Ana; Bruno" / "Ana e Bruno".
- * Anything in parentheses is a remark, not a name ("Helena Cima (irmã)",
+ * Anything in parentheses is a remark, not a name ("Ana Exemplo (irmã)",
  * "Eloah (não sabe o sobrenome, sala Lídia)"): it is lifted out before the
  * split — so a comma inside it never cuts a name in two — and handed back as
  * the entry's `note`. A " · " tail is the bed note the import appends

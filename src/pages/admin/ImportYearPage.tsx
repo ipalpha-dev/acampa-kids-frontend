@@ -24,7 +24,7 @@ interface ImportYearPageProps {
 
 /** Acampantes / Equipe → Importar → Outro ano: pick people from another camp and copy just them into this year. */
 export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone }: ImportYearPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sorted = useMemo(() => otherCamps.slice().sort((a, b) => b.year - a.year), [otherCamps]);
   const [sourceId, setSourceId] = useState<string | null>(sorted[0]?.id ?? null);
   const [search, setSearch] = useState("");
@@ -52,7 +52,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
         setRows(r);
         setSelected((prev) => new Set([...prev].filter((id) => r.some((row) => row.id === id))));
       })
-      .catch((e) => alive && setError(e instanceof Error ? e.message : tx("Algo deu errado.")))
+      .catch((e) => alive && setError(te(e, "Algo deu errado.")))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -102,7 +102,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
       );
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setImporting(false);
     }

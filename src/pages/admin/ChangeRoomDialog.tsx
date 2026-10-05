@@ -25,7 +25,7 @@ interface ChangeRoomDialogProps {
  * Works on the current room too: to hand the kid to another caretaker.
  */
 export default function ChangeRoomDialog({ token, open, camper: k, onClose }: ChangeRoomDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const staff = useCollectionOrEmpty("staff");
   const [bedroom, setBedroom] = useState<string | null>(k.bedroom);
@@ -73,7 +73,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
       await moveCamper(token, k.id, bedroom, caretakerId);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

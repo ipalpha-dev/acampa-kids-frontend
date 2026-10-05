@@ -24,7 +24,7 @@ const normalize = (s: string) =>
     .toLowerCase();
 
 export default function AddRoleDialog({ token, open, roles, excludeIds, where, onAdd, onClose }: AddRoleDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [step, setStep] = useState<"choice" | "pick" | "create">("choice");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -59,7 +59,7 @@ export default function AddRoleDialog({ token, open, roles, excludeIds, where, o
       await onAdd(roleId);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -73,7 +73,7 @@ export default function AddRoleDialog({ token, open, roles, excludeIds, where, o
       await onAdd(created.id);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

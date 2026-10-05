@@ -25,7 +25,7 @@ const LEAVE_MS = 650;
 
 /** Departure day roll call for the team: name + one tap to mark as arrived. */
 export default function StaffCheckinPage({ token, checkinHomePath }: StaffCheckinPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollection("staff");
   const transports = useCollectionOrEmpty("transports");
   const busIds = useMemo(() => new Set(transports.filter((t) => t.kind === "bus").map((t) => t.id)), [transports]);
@@ -88,7 +88,7 @@ export default function StaffCheckinPage({ token, checkinHomePath }: StaffChecki
       else await checkinStaff(token, s.id);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       return false;
     } finally {
       setPending((p) => {

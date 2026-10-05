@@ -31,7 +31,7 @@ const MAX_DESC = 1_000;
  * user try again with a tweaked description before inserting.
  */
 export default function AiImageDialog({ open, onClose, token, onInsert, suggestion }: AiImageDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [models, setModels] = useState<AiImageModel[]>([]);
   const [model, setModel] = useState(() => localStorage.getItem(MODEL_KEY) ?? "");
   const [description, setDescription] = useState("");
@@ -83,7 +83,7 @@ export default function AiImageDialog({ open, onClose, token, onInsert, suggesti
       const img = await aiImage(token, { description: desc, shape, model: model || undefined, style }, ctrl.signal);
       setResult({ dataUrl: img.dataUrl, label: img.label, ms: img.ms });
     } catch (err) {
-      if ((err as Error)?.name !== "AbortError") setError(err instanceof Error ? err.message : tx("Não foi possível gerar a imagem."));
+      if ((err as Error)?.name !== "AbortError") setError(te(err, "Não foi possível gerar a imagem."));
     } finally {
       setBusy(false);
       abortRef.current = null;
@@ -101,7 +101,7 @@ export default function AiImageDialog({ open, onClose, token, onInsert, suggesti
       onInsert(up, caption.trim());
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível guardar a imagem."));
+      setError(te(err, "Não foi possível guardar a imagem."));
     } finally {
       setInserting(false);
     }

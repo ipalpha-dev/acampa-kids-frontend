@@ -157,12 +157,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: " (avec les données de santé, pour vérifier avec les parents)",
     de: " (mit Gesundheitsdaten, zum Abgleich mit den Eltern)",
   },
-  "Adicionar ajudante da igreja": {
-    en: "Add church helper",
-    es: "Añadir ayudante de la iglesia",
-    fr: "Ajouter un aide de l'église",
-    de: "Helfer in der Kirche hinzufügen",
-  },
   "Ninguém escolhido. Só o admin faz o check-in na igreja.": {
     en: "No one chosen. Only the admin does church check-in.",
     es: "Nadie elegido. Solo el admin hace el check-in en la iglesia.",

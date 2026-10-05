@@ -11,9 +11,9 @@ export const DOC_AUDIENCE_META: Record<DocAudience, { label: string; icon: strin
   helper: { label: ROOM_ROLE_META.helper.label + "es", icon: ROOM_ROLE_META.helper.icon!, hint: "só os auxiliares de quarto" },
 };
 
-/** The paper-cut icon of an audience, at a given pixel size. */
-function AudienceIcon({ src, size }: { src: string; size?: number }) {
-  return <img className="audience-icon" src={src} alt="" aria-hidden="true" style={size ? { width: size, height: size } : undefined} />;
+/** The paper-cut icon of an audience — `large` for the big tap targets (sizes live in styles.scss). */
+function AudienceIcon({ src, large = false }: { src: string; large?: boolean }) {
+  return <img className={large ? "audience-icon audience-icon--lg" : "audience-icon"} src={src} alt="" aria-hidden="true" />;
 }
 
 interface AudiencePickerProps {
@@ -33,7 +33,7 @@ export default function AudiencePicker({ value, onChange, disabled }: AudiencePi
           const on = value === a;
           return (
             <button key={a} type="button" className={`big-option ${on ? "big-option--on" : ""}`} aria-pressed={on} disabled={disabled} onClick={() => onChange(a)}>
-              <span className="big-option__emoji" aria-hidden="true"><AudienceIcon src={DOC_AUDIENCE_META[a].icon} size={32} /></span>
+              <span className="big-option__emoji" aria-hidden="true"><AudienceIcon src={DOC_AUDIENCE_META[a].icon} large /></span>
               <span className="big-option__label">{tx(DOC_AUDIENCE_META[a].label)}</span>
               <span className="big-option__hint">{tx(DOC_AUDIENCE_META[a].hint)}</span>
             </button>
@@ -49,7 +49,7 @@ export default function AudiencePicker({ value, onChange, disabled }: AudiencePi
 export type PrepAudience = "parent" | "caretaker" | "helper";
 
 export const PREP_AUDIENCE_META: Record<PrepAudience, { label: string; icon: string; hint: string }> = {
-  parent: { label: "Pais", icon: ICONS.parent, hint: "ou responsáveis pelas crianças" },
+  parent: { label: "Famílias", icon: ICONS.parent, hint: "responsáveis pelas crianças" },
   caretaker: { ...DOC_AUDIENCE_META.caretaker, hint: "quem cuida de crianças" },
   helper: { ...DOC_AUDIENCE_META.helper, hint: "os auxiliares de quarto" },
 };
@@ -73,7 +73,7 @@ export function PrepAudiencePicker({ value, onChange, disabled }: PrepAudiencePi
           const on = value.includes(a);
           return (
             <button key={a} type="button" className={`big-option ${on ? "big-option--on" : ""}`} aria-pressed={on} disabled={disabled} onClick={() => toggle(a)}>
-              <span className="big-option__emoji" aria-hidden="true"><AudienceIcon src={PREP_AUDIENCE_META[a].icon} size={32} /></span>
+              <span className="big-option__emoji" aria-hidden="true"><AudienceIcon src={PREP_AUDIENCE_META[a].icon} large /></span>
               <span className="big-option__label">{tx(PREP_AUDIENCE_META[a].label)}</span>
               <span className="big-option__hint">{tx(PREP_AUDIENCE_META[a].hint)}</span>
             </button>

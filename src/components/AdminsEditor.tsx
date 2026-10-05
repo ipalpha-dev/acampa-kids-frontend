@@ -14,7 +14,7 @@ interface AdminsEditorProps {
  * every role of the project lives — this only shows the current list.
  */
 export default function AdminsEditor({ token, user }: AdminsEditorProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [info, setInfo] = useState<AdminsInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ export default function AdminsEditor({ token, user }: AdminsEditorProps) {
     let alive = true;
     listAdmins(token)
       .then((res) => alive && setInfo(res))
-      .catch((err) => alive && setError(err instanceof Error ? err.message : tx("Algo deu errado.")));
+      .catch((err) => alive && setError(te(err, "Algo deu errado.")));
     return () => {
       alive = false;
     };

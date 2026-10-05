@@ -37,7 +37,7 @@ const DEFAULT_ON: readonly CampImportBlock[] = ["categories"];
 
 /** "Outros anos": pick a source year and the blocks to copy from it — the wizard step for `campImport.ts`. */
 export default function PreviousYearStep({ token, camp, camps }: PreviousYearStepProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const others = useMemo(() => camps.filter((c) => c.id !== camp.id).sort((a, b) => b.year - a.year), [camps, camp.id]);
   const [sourceId, setSourceId] = useState<string | null>(others[0]?.id ?? null);
   const [summaries, setSummaries] = useState<Record<string, CampImportSummary | null>>({});
@@ -95,7 +95,7 @@ export default function PreviousYearStep({ token, camp, camps }: PreviousYearSte
       });
       setResult(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

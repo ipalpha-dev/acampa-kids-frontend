@@ -35,7 +35,7 @@ const sameMinute = (a: string | null, b: string | null) => (a ? Math.floor(new D
  * it is sent once per date — picking a new date re-arms it.
  */
 export default function CheckinReminderCard({ token, embedded }: CheckinReminderCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const [at, setAt] = useState("");
   const [busy, setBusy] = useState<"date" | "toggle" | null>(null);
@@ -62,7 +62,7 @@ export default function CheckinReminderCard({ token, embedded }: CheckinReminder
       await updateSettings(token, patch);
       if (kind === "date") setSaved(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

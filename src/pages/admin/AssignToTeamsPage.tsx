@@ -28,7 +28,7 @@ interface BoardContext { prefs: PreferenceMap; preferenceUnits: KidUnit[]; bedro
 
 /** Immediate team board: every drop writes to MongoDB and the WebSocket updates all clients. */
 export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const teams = useCollection("teams");
   const campers = useCollectionOrEmpty("campers");
   const bedrooms = useCollectionOrEmpty("bedrooms");
@@ -67,7 +67,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
     try {
       await assignPeopleToTeam(token, unit.kind, ids, teamId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível mudar o time."));
+      setError(te(err, "Não foi possível mudar o time."));
     } finally {
       setBusyIds((current) => { const next = new Set(current); for (const id of ids) next.delete(id); return next; });
       setDragging(null);
@@ -84,7 +84,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
       await autoAssignCamperTeams(token, automaticGroups(campers, mode, context));
       setAutoOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível distribuir as crianças."));
+      setError(te(err, "Não foi possível distribuir as crianças."));
     } finally {
       setAutoBusy(false);
     }

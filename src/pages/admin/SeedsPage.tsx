@@ -37,7 +37,7 @@ const REACH_PT: Record<Reach, string> = { manual: "Só escalados", caretaker: "L
  * brings back the values the app ships with.
  */
 export default function SeedsPage({ token }: SeedsPageProps) {
-  const { tx, tag } = useI18n();
+  const { tx, tag, te } = useI18n();
   const settings = useCollection("settings");
   const { navigate } = useRoute();
   const confirm = useConfirm();
@@ -60,7 +60,7 @@ export default function SeedsPage({ token }: SeedsPageProps) {
         setSaved(s);
         if (s) setDraft(structuredCopy(s));
       })
-      .catch((e) => alive && setError(e instanceof Error ? e.message : tx("Não foi possível carregar as sementes.")))
+      .catch((e) => alive && setError(te(e, "Não foi possível carregar as sementes.")))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -86,7 +86,7 @@ export default function SeedsPage({ token }: SeedsPageProps) {
       setDraft(structuredCopy(s));
       setSavedOk(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -108,7 +108,7 @@ export default function SeedsPage({ token }: SeedsPageProps) {
       setSaved(null);
       setDraft(defaultSeeds());
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

@@ -222,6 +222,18 @@ export async function fetchCamper(token: string, id: string): Promise<Camper & {
   return res.camper;
 }
 
+/** `GET /api/campers/:id/responsibles` — who to talk to about a kid: names only, never health (404 CAMPER_NOT_FOUND when out of scope). */
+export interface CamperResponsibles {
+  camper: { id: string; name: string };
+  responsibles: Responsible[];
+}
+
+/** The kid's responsáveis (names only) — the WhatsApp button reads phones per responsável, on tap. */
+export async function fetchCamperResponsibles(token: string, id: string): Promise<CamperResponsibles> {
+  const res = await api<CamperResponsibles>(`/api/campers/${encodeURIComponent(id)}/responsibles`, { headers: bearer(token), cache: "no-store" });
+  return { camper: res.camper, responsibles: res.responsibles ?? [] };
+}
+
 /** The fields a PARENT may edit on their own kid ("Informações de saúde"). Everything but `generalNotes` is medical. */
 export type ParentEditableField = "allergies" | "drugAllergies" | "healthIssues" | "medications" | "foodRestrictions" | "healthNotes" | "weightKg" | "insurance" | "insuranceCard" | "generalNotes";
 export type ParentPatch = Partial<Omit<HealthInfo, "neurodivergent"> & { generalNotes: string }>;

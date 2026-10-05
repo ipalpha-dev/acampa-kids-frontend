@@ -26,7 +26,7 @@ interface EventFormProps {
 
 export default function EventForm({ token, event, defaultDate, busy, onSubmit, onCancel }: EventFormProps) {
   useHideScanFab();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const editing = !!event;
   const [date, setDate] = useState(event?.date ?? defaultDate ?? todayIso());
   const [title, setTitle] = useState(event?.title ?? "");
@@ -58,7 +58,7 @@ export default function EventForm({ token, event, defaultDate, busy, onSubmit, o
         visibleToParents,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

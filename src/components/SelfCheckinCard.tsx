@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSelfCheckinStatus, selfCheckin, type SelfCheckinStatus } from "../api/staff";
 import { ApiError } from "../api/client";
-import { describeGeoError, distanceMeters, formatDistance, readPosition, type DevicePosition } from "../geo";
+import { distanceMeters, GeoError, formatDistance, readPosition, type DevicePosition } from "../geo";
 import type { LoggedUser } from "../roles";
 import { speakTime } from "../dates";
 import { useCollection, useCollectionOrEmpty } from "../store";
@@ -63,7 +63,7 @@ function remember(date: string) {
  * still check in later. Once checked in, the green "done" card shows inline.
  */
 export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollection("staff");
   const events = useCollectionOrEmpty("events");
   const settings = useCollection("settings");
@@ -137,7 +137,8 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
       p = await readPosition();
       setPos(p);
     } catch (err) {
-      setError(describeGeoError(err));
+      // GeoError already speaks the device language (geo.ts); anything else goes through the error texts
+      setError(err instanceof GeoError ? err.message : te(err));
       setPhase("idle");
       return;
     }
@@ -150,7 +151,7 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
         // someone from the admin table beat us to it — the store update will flip the card
         setError(null);
       } else {
-        setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+        setError(te(err, "Algo deu errado."));
       }
     } finally {
       setPhase("idle");
@@ -224,7 +225,7 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
           {tx("Ao chegar em {place}, confirme sua presença aqui", { place: placeLabel })}
         </p>
 
-        {blocked && <p className="message message--error">{blocked.message}</p>}
+        {blocked && <p className="message message--error">{te(blocked)}</p>}
         {error && <p className="message message--error">{error}</p>}
         {distance !== null && !error && (
           <p className="cat-hint">

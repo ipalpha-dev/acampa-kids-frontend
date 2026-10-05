@@ -277,11 +277,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Préfère partager la chambre avec",
     de: "Möchte das Zimmer teilen mit",
   },
-  "ex.: Bernardo Faria, Lucas (primo)": {
-    en: "e.g. Bernardo Faria, Lucas (cousin)",
-    es: "ej.: Bernardo Faria, Lucas (primo)",
-    fr: "ex. : Bernardo Faria, Lucas (cousin)",
-    de: "z. B. Bernardo Faria, Lucas (Cousin)",
+  "ex.: Tomás Exemplo, Lucas (primo)": {
+    en: "e.g. Tomás Exemplo, Lucas (cousin)",
+    es: "ej.: Tomás Exemplo, Lucas (primo)",
+    fr: "ex. : Tomás Exemplo, Lucas (cousin)",
+    de: "z. B. Tomás Exemplo, Lucas (Cousin)",
   },
   "Escolha o quarto primeiro": {
     en: "Choose the room first",
@@ -343,11 +343,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "ex. : IPAlpha",
     de: "z. B. IPAlpha",
   },
-  "ex.: Pedro Brassioli": {
-    en: "e.g. Pedro Brassioli",
-    es: "ej.: Pedro Brassioli",
-    fr: "ex. : Pedro Brassioli",
-    de: "z. B. Pedro Brassioli",
+  "ex.: Davi Modelo": {
+    en: "e.g. Davi Modelo",
+    es: "ej.: Davi Modelo",
+    fr: "ex. : Davi Modelo",
+    de: "z. B. Davi Modelo",
   },
   "Nome do responsável": {
     en: "Guardian's name",

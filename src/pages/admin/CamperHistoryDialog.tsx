@@ -21,7 +21,7 @@ interface CamperHistoryDialogProps {
  * here; names are read live.
  */
 export default function CamperHistoryDialog({ token, open, camperId, camperName, onClose }: CamperHistoryDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [changes, setChanges] = useState<CamperChange[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const nameOf = useNames(changes?.map((c) => c.byPersonId) ?? []);
@@ -33,7 +33,7 @@ export default function CamperHistoryDialog({ token, open, camperId, camperName,
     setError(null);
     listCamperChanges(token, camperId)
       .then((c) => alive && setChanges(c))
-      .catch((e) => alive && setError(e instanceof Error ? e.message : tx("Algo deu errado.")));
+      .catch((e) => alive && setError(te(e, "Algo deu errado.")));
     return () => {
       alive = false;
     };

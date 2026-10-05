@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Camper } from "../api/campers";
 import { phoneOf } from "../api/people";
 import { loadAuth } from "../auth/store";
-import { useCamperLive, usePersonData } from "../hooks/usePersonData";
+import { useCamperResponsibles, usePersonData } from "../hooks/usePersonData";
 import { useI18n } from "../i18n";
 import { staffGreeting, whatsappLink } from "../whatsapp";
 import WhatsAppButton from "./WhatsAppButton";
@@ -15,14 +15,15 @@ interface GuardianWhatsAppProps {
 
 /**
  * Talk to a kid's family on WhatsApp. Contacts are never in the records: the
- * responsáveis and their phones are read from IPAlpha only when someone taps
- * (core's role rules decide; each read is logged for the person — LGPD).
+ * responsáveis (names only — GET /api/campers/:id/responsibles, no health) and
+ * then each one's phone are read from IPAlpha only when someone taps (core's
+ * role rules decide; each read is logged for the person — LGPD).
  */
 export default function GuardianWhatsApp({ camper: k, className = "wa-btn--sm" }: GuardianWhatsAppProps) {
   const { tx } = useI18n();
   const token = loadAuth()?.token ?? "";
   const [asked, setAsked] = useState(false);
-  const live = useCamperLive(token, asked && token ? k.id : null);
+  const live = useCamperResponsibles(token, asked && token ? k.id : null);
 
   if (!asked) {
     const label = tx("Falar com a família de {name}", { name: k.name.split(" ")[0] || tx("a criança") });
@@ -47,7 +48,7 @@ export default function GuardianWhatsApp({ camper: k, className = "wa-btn--sm" }
   return (
     <span className="person-contact">
       {responsibles.map((r) => (
-        <ResponsibleWhatsApp key={r.personId} token={token} personId={r.personId} name={r.name} about={live.data?.name || k.name} className={className} />
+        <ResponsibleWhatsApp key={r.personId} token={token} personId={r.personId} name={r.name} about={live.data?.camper.name || k.name} className={className} />
       ))}
     </span>
   );

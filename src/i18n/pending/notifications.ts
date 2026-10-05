@@ -1,11 +1,11 @@
 import type { Locale } from "../locales";
 
 export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, string>>> = {
-  "AcampaKids: João, hoje é aniversário da Ana (8 anos), do quarto 103! 🎂 Vamos fazer o dia dela especial.": {
-    en: "AcampaKids: João, today is Ana's birthday (8 years old), from room 103! 🎂 Let's make her day special.",
-    es: "AcampaKids: João, hoy es el cumpleaños de Ana (8 años), del cuarto 103! 🎂 Hagamos especial su día.",
-    fr: "AcampaKids : João, c'est l'anniversaire d'Ana (8 ans), de la chambre 103 ! 🎂 Rendons sa journée spéciale.",
-    de: "AcampaKids: João, heute hat Ana aus Zimmer 103 Geburtstag (8 Jahre)! 🎂 Lass uns ihren Tag zu etwas Besonderem machen.",
+  "AcampaKids: João, hoje é aniversário da Ana, do quarto 103! 🎂 Vamos fazer o dia dela especial.": {
+    en: "AcampaKids: João, today is Ana's birthday, from room 103! 🎂 Let's make her day special.",
+    es: "AcampaKids: João, ¡hoy es el cumpleaños de Ana, del cuarto 103! 🎂 Hagamos especial su día.",
+    fr: "AcampaKids : João, c'est l'anniversaire d'Ana, de la chambre 103 ! 🎂 Rendons sa journée spéciale.",
+    de: "AcampaKids: João, heute hat Ana aus Zimmer 103 Geburtstag! 🎂 Lass uns ihren Tag zu etwas Besonderem machen.",
   },
   "AcampaKids: Marcela, a Ana está a caminho de um fim de semana incrível para aprender sobre Jesus! Aproveite o fim de semana livre: vamos cuidar muito bem dela.": {
     en: "AcampaKids: Marcela, Ana is on her way to an amazing weekend to learn about Jesus! Enjoy your free weekend: we'll take great care of her.",
@@ -433,11 +433,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "SMS aux responsables — seulement tant que la fenêtre d'accès des parents est ouverte, quand cela a du sens.",
     de: "SMS an Bezugspersonen — nur solange der Zugangszeitraum der Eltern offen ist, wenn es sinnvoll ist.",
   },
-  "Só recebe SMS quem tem celular cadastrado. O e-mail equivalente sai só para quem tem endereço. Os pais só recebem o que está em “Para os pais” (e as fotos publicadas) — nunca avisos de quarto, função ou cadastro da equipe.": {
-    en: "Only people with a registered mobile get SMS. The matching email goes only to those with an address. Parents only get what's under “For parents” (and published photos) — never room, role, or staff roster alerts.",
-    es: "Solo recibe SMS quien tiene celular registrado. El correo equivalente sale solo para quien tiene dirección. Los padres solo reciben lo que está en “Para los padres” (y las fotos publicadas) — nunca avisos de cuarto, función o registro del equipo.",
-    fr: "Seuls ceux qui ont un portable enregistré reçoivent un SMS. L'e-mail équivalent part seulement à ceux qui ont une adresse. Les parents ne reçoivent que ce qui est dans « Pour les parents » (et les photos publiées) — jamais les alertes de chambre, de fonction ou de registre d'équipe.",
-    de: "Eine SMS bekommt nur, wer eine Handynummer hinterlegt hat. Die passende E-Mail geht nur an alle mit Adresse. Eltern bekommen nur, was unter „Für Eltern“ steht (und die veröffentlichten Fotos) — nie Benachrichtigungen zu Zimmern, Funktionen oder zum Mitarbeiterverzeichnis.",
+  "Só recebe SMS quem tem celular no IPAlpha. O e-mail equivalente sai só para quem tem endereço. Os pais só recebem o que está em “Para os pais” (e as fotos publicadas) — nunca avisos de quarto, função ou cadastro da equipe.": {
+    en: "Only people with a mobile number in IPAlpha get SMS. The matching email goes only to those with an address. Parents only get what's under “For parents” (and published photos) — never room, role, or staff roster alerts.",
+    es: "Solo recibe SMS quien tiene celular en IPAlpha. El correo equivalente sale solo para quien tiene dirección. Los padres solo reciben lo que está en “Para los padres” (y las fotos publicadas) — nunca avisos de cuarto, función o registro del equipo.",
+    fr: "Seuls ceux qui ont un portable dans IPAlpha reçoivent un SMS. L'e-mail équivalent part seulement à ceux qui ont une adresse. Les parents ne reçoivent que ce qui est dans « Pour les parents » (et les photos publiées) — jamais les alertes de chambre, de fonction ou de registre d'équipe.",
+    de: "Eine SMS bekommt nur, wer eine Handynummer im IPAlpha hat. Die passende E-Mail geht nur an alle mit Adresse. Eltern bekommen nur, was unter „Für Eltern“ steht (und die veröffentlichten Fotos) — nie Benachrichtigungen zu Zimmern, Funktionen oder zum Mitarbeiterverzeichnis.",
   },
   "Teste - Equipe": {
     en: "Test - Staff",

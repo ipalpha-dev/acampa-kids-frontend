@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { assistantLiveSession, assistantTool } from "../api/assistant";
+import { useI18n } from "../i18n";
 
 /**
  * A spoken, two-way conversation with the camp assistant (GPT-Live).
@@ -74,6 +75,7 @@ function waitForIce(pc: RTCPeerConnection): Promise<void> {
 }
 
 export function useLiveAssistant(token: string, userName = "", onNavigate?: (rawArgs: string) => string) {
+  const { te } = useI18n();
   const [status, setStatus] = useState<LiveStatus>("idle");
   const statusRef = useRef<LiveStatus>("idle");
   const [error, setError] = useState("");
@@ -341,10 +343,10 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
       const denied = (failure as Error)?.name === "NotAllowedError" || (failure as Error)?.name === "SecurityError";
       setError(denied
         ? "Preciso do microfone para conversar. Libere o acesso nas permissões do navegador."
-        : failure instanceof Error ? failure.message : "Não consegui abrir a conversa por voz.");
+        : te(failure, "Não consegui abrir a conversa por voz."));
       applyStatus("error");
     }
-  }, [applyStatus, handleEvent, listen, teardown, token]);
+  }, [applyStatus, handleEvent, listen, te, teardown, token]);
 
   const toggleMute = useCallback(() => {
     const next = !mutedRef.current;

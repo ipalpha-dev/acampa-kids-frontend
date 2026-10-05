@@ -123,24 +123,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "pessoas já receberam": { en: "people already received", es: "personas ya recibieron", fr: "personnes ont déjà reçu", de: "Personen haben sie bereits erhalten" },
   "aviso guardado": { en: "saved notice", es: "aviso guardado", fr: "avis enregistré", de: "gespeicherte Benachrichtigung" },
   "avisos guardados": { en: "saved notices", es: "avisos guardados", fr: "avis enregistrés", de: "gespeicherte Benachrichtigungen" },
-  "Organizadores dos jogos": {
-    en: "Game organizers",
-    es: "Organizadores de los juegos",
-    fr: "Organisateurs des jeux",
-    de: "Spiele-Organisatoren",
-  },
-  "Ajudantes do placar": {
-    en: "Scoreboard helpers",
-    es: "Ayudantes del marcador",
-    fr: "Aides du score",
-    de: "Punktestand-Helfer",
-  },
-  "Ajudantes do check-in": {
-    en: "Check-in helpers",
-    es: "Ayudantes del check-in",
-    fr: "Aides du check-in",
-    de: "Check-in-Helfer",
-  },
   "Ajudantes do ônibus": {
     en: "Bus helpers",
     es: "Ayudantes del autobús",

@@ -104,7 +104,11 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
     };
     w.onmessage = (e: MessageEvent<WorkerMessage>) => {
       if (e.data.type === "progress") setProgress({ best: e.data.best, attempts: e.data.attempts });
-      else if (e.data.type === "error") fail(e.data.message);
+      else if (e.data.type === "error") {
+        // the worker's text is technical (name: message): logged, never shown
+        console.warn("room distribution failed", e.data.message);
+        fail(tx("A distribuição parou no meio. Tente de novo."));
+      }
       else {
         finish();
         setPlan(e.data.best);
@@ -112,7 +116,10 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
       }
     };
     // the script itself failed to load / parse (an import that needs `window`, a bad bundle…)
-    w.onerror = (ev) => fail(ev.message || tx("A distribuição falhou ao iniciar."));
+    w.onerror = (ev) => {
+      console.warn("room distribution could not start", ev.message);
+      fail(tx("A distribuição falhou ao iniciar."));
+    };
     w.onmessageerror = () => fail(tx("Não foi possível ler a resposta da distribuição."));
     const req: WorkerRequest = {
       input: { who, kidsMode, slice: kidsMode === "ages" && slice ? (agesKnown ? slice : { ...slice, allAges: true }) : null, bedrooms, campers, staff, units, prefs: [...prefs.entries()], keepPlaced, excludeStaffIds: [...excludeStaffIds] },

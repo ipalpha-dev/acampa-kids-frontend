@@ -75,7 +75,7 @@ export default function StaffDetail({
   onOpenRole,
   onOpenEvent,
 }: StaffDetailProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // joined locally from the store — works offline and updates live (no reload needed after (un)assigning)
   const data = useStaffDetail(staffId);
   const [actionError, setError] = useState<string | null>(null);
@@ -112,7 +112,7 @@ export default function StaffDetail({
       await unassignStaff(token, eventId, staffId);
       reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

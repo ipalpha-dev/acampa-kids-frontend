@@ -58,7 +58,7 @@ interface StaffFormProps {
  * operations only — the person's data and health are kept in IPAlpha.
  */
 export default function StaffForm({ token, member, busy, onSubmit, onAddExisting, onRegister, onSexChange, leaveGuardRef }: StaffFormProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
   const editing = !!member;
@@ -123,7 +123,7 @@ export default function StaffForm({ token, member, busy, onSubmit, onAddExisting
           setFound(page.items.slice().sort(compareByName));
           setSearchError(null);
         })
-        .catch((err) => alive && setSearchError(err instanceof Error ? err.message : tx("Não foi possível buscar agora.")))
+        .catch((err) => alive && setSearchError(te(err, "Não foi possível buscar agora.")))
         .finally(() => alive && setSearching(false));
     }, 300);
     return () => {
@@ -207,7 +207,7 @@ export default function StaffForm({ token, member, busy, onSubmit, onAddExisting
         });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
       return false;
     }
   }

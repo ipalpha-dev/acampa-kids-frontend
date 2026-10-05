@@ -72,7 +72,7 @@ const sameMinute = (a: string | null, b: string | null) => (a ? Math.floor(new D
  * Each section saves on its own, so a change in one never touches the others.
  */
 export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   /** phones: the "new meeting point" button shrinks to a bare ➕ */
   const phone = useMediaQuery("(max-width: 760px)");
@@ -115,7 +115,7 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
       await updateSettings(token, patch);
       setSaved(section);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -132,7 +132,7 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
       await updateSettings(token, { busHelpers: { helpers: nextHelpers } });
     } catch (err) {
       setBus(previous);
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -199,7 +199,7 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
       await resetCheckins(token);
       setSaved("reset");
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

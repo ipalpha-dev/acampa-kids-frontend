@@ -31,7 +31,7 @@ interface MessageTemplatesPageProps {
  * in IPAlpha (projects-api) — Mordomia shows the same copy.
  */
 export default function MessageTemplatesPage({ token }: MessageTemplatesPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [templates, setTemplates] = useState<MessageTemplate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function MessageTemplatesPage({ token }: MessageTemplatesPageProp
     try {
       setTemplates(await listTemplates(token));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 
@@ -64,7 +64,7 @@ export default function MessageTemplatesPage({ token }: MessageTemplatesPageProp
       setNotice(tx("{n} modelo(s) criado(s) no IPAlpha.", { n: res.created }));
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setSeeding(false);
     }
@@ -136,7 +136,7 @@ interface TemplateEditorProps {
 
 /** One template: name, per-language subject / body with the SMS counter and the variable chips. */
 export function TemplateEditor({ token, template, onSaved }: TemplateEditorProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const confirm = useConfirm();
   const [name, setName] = useState(template.name);
   const [body, setBody] = useState<LocalizedText>(template.body);
@@ -189,7 +189,7 @@ export function TemplateEditor({ token, template, onSaved }: TemplateEditorProps
       onSaved(t);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -205,7 +205,7 @@ export function TemplateEditor({ token, template, onSaved }: TemplateEditorProps
       onSaved(await resetTemplate(token, template.slug));
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

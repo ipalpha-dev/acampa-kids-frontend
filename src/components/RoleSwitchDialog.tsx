@@ -24,7 +24,7 @@ interface RoleSwitchDialogProps {
  * dialog) — see pages/Dashboard#ProfileView and pages/parent/ParentProfile.
  */
 export default function RoleSwitchDialog({ open, onClose, user, onSwitch }: RoleSwitchDialogProps) {
-  const { tx, t } = useI18n();
+  const { tx, t, te } = useI18n();
   const [busy, setBusy] = useState<CoreRole | null>(null);
   const [error, setError] = useState<string | null>(null);
   const current = user.activeRole;
@@ -38,7 +38,7 @@ export default function RoleSwitchDialog({ open, onClose, user, onSwitch }: Role
     try {
       await onSwitch(role);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível entrar com este perfil."));
+      setError(te(err, "Não foi possível entrar com este perfil."));
       setBusy(null);
     }
   }

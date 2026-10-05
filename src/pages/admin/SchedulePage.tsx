@@ -59,7 +59,7 @@ function modeOf(segments: string[], params: URLSearchParams): { sub: SubTab; mod
 }
 
 export default function SchedulePage({ token, readOnly = false }: SchedulePageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const storedEvents = useCollection("events");
   const events = useMemo(() => (storedEvents ? sortEvents(storedEvents) : null), [storedEvents]);
   const storedRoles = useCollectionOrEmpty("roles");
@@ -106,7 +106,7 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
     try {
       await updateEvent(token, e.id, { visibleToParents: next });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 
@@ -116,7 +116,7 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
       await withBusy(() => deleteEvent(token, e.id));
       navigate("/schedule", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 
@@ -135,7 +135,7 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
       await withBusy(() => deleteRole(token, r.id));
       navigate("/schedule/roles", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

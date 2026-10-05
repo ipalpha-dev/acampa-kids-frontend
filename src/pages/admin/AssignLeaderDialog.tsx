@@ -38,7 +38,7 @@ type Group = "roomLeaders" | "roomHelpers" | "others" | "staffWing" | "otherSex"
  * the KID changes room (asked first).
  */
 export default function AssignLeaderDialog({ token, open, camper: k, onClose }: AssignLeaderDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollectionOrEmpty("staff");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const confirm = useConfirm();
@@ -141,7 +141,7 @@ export default function AssignLeaderDialog({ token, open, camper: k, onClose }: 
       else await updateCamper(token, k.id, { caretakerId: s.id });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

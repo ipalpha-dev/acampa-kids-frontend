@@ -62,11 +62,6 @@ export type UiKey =
   | "common.empty"
   | "common.retry"
   | "common.version"
-  // roles
-  | "role.parent"
-  | "role.staff"
-  | "role.health_staff"
-  | "role.admin"
   // nav / home
   | "nav.home"
   | "nav.schedule"
@@ -141,10 +136,6 @@ const pt: Catalog = {
   "common.empty": "Nada por aqui.",
   "common.retry": "Tentar de novo",
   "common.version": "Versão {version}",
-  "role.parent": "Pais",
-  "role.staff": "Equipe",
-  "role.health_staff": "Equipe médica",
-  "role.admin": "Organização",
   "nav.home": "Início",
   "nav.schedule": "Programação",
   "nav.instructions": "Instruções",
@@ -231,10 +222,6 @@ const en: Catalog = {
   "common.empty": "Nothing here.",
   "common.retry": "Try again",
   "common.version": "Version {version}",
-  "role.parent": "Parents",
-  "role.staff": "Staff",
-  "role.health_staff": "Medical team",
-  "role.admin": "Organization",
   "nav.home": "Home",
   "nav.schedule": "Schedule",
   "nav.instructions": "Instructions",
@@ -321,10 +308,6 @@ const es: Catalog = {
   "common.empty": "Nada por aquí.",
   "common.retry": "Intentar de nuevo",
   "common.version": "Versión {version}",
-  "role.parent": "Padres",
-  "role.staff": "Equipo",
-  "role.health_staff": "Equipo médico",
-  "role.admin": "Organización",
   "nav.home": "Inicio",
   "nav.schedule": "Programación",
   "nav.instructions": "Instrucciones",
@@ -411,10 +394,6 @@ const fr: Catalog = {
   "common.empty": "Rien ici.",
   "common.retry": "Réessayer",
   "common.version": "Version {version}",
-  "role.parent": "Parents",
-  "role.staff": "Équipe",
-  "role.health_staff": "Équipe médicale",
-  "role.admin": "Organisation",
   "nav.home": "Accueil",
   "nav.schedule": "Programme",
   "nav.instructions": "Instructions",
@@ -501,10 +480,6 @@ const de: Catalog = {
   "common.empty": "Hier ist noch nichts.",
   "common.retry": "Noch einmal versuchen",
   "common.version": "Version {version}",
-  "role.parent": "Eltern",
-  "role.staff": "Mitarbeitende",
-  "role.health_staff": "Gesundheitsteam",
-  "role.admin": "Organisation",
   "nav.home": "Start",
   "nav.schedule": "Programm",
   "nav.instructions": "Hinweise",

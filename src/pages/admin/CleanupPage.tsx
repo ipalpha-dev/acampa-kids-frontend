@@ -102,7 +102,7 @@ function idsOf(settings: Settings | null | undefined, group: StaffKeepGroup): st
  * cada botão pergunta antes, com a quantidade que vai sumir.
  */
 export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const confirm = useConfirm();
   const { navigate } = useRoute();
   const [busy, setBusy] = useState<CleanupGroup | "all" | null>(null);
@@ -204,7 +204,7 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
       // the camp is zero again → the setup wizard may open by itself on the next login
       if (group === "all") setWizardDismissed(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

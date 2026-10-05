@@ -101,6 +101,33 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     expect(JSON.stringify(saved)).not.toContain("Marta");
   });
 
+  it("the SMS step lives in memory only: no masked phone in localStorage, a reload asks for the phone again", async () => {
+    stubApi({
+      ...COMMON,
+      "POST /api/auth/otp/request": { status: 200, body: { success: true, challenge: "sealed-abc", codeLength: 6, expiresAt: new Date(Date.now() + 300_000).toISOString(), expireMinutes: 5, delivery: "sms" } },
+    });
+    const first = renderApp();
+    fireEvent.change(screen.getByPlaceholderText("(11) 98123-4567"), { target: { value: "11981234567" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+    await screen.findByText(/Enviamos um SMS para \(11\) •••••-4567/);
+    const stored = Object.keys(localStorage).map((k) => localStorage.getItem(k) ?? "").join("|");
+    expect(stored).not.toContain("4567");
+    expect(stored).not.toContain("sealed-abc");
+    first.unmount();
+    renderApp();
+    expect(await screen.findByPlaceholderText("(11) 98123-4567")).toBeInTheDocument();
+    expect(screen.queryByText(/Enviamos um SMS/)).toBeNull();
+  });
+
+  it("removes a pending SMS step an older build left on the device (masked phone included)", async () => {
+    stubApi(COMMON);
+    localStorage.setItem("acampa.otp", JSON.stringify({ challenge: "old", expiresAt: new Date(Date.now() + 300_000).toISOString(), codeLength: 6, phoneHint: "(11) •••••-4567" }));
+    renderApp();
+    expect(await screen.findByPlaceholderText("(11) 98123-4567")).toBeInTheDocument();
+    expect(localStorage.getItem("acampa.otp")).toBeNull();
+    expect(screen.queryByText(/•••••-4567/)).toBeNull();
+  });
+
   it("NOT_IN_PROJECT on the phone step shows the gentle note and keeps the form", async () => {
     stubApi({ ...COMMON, "POST /api/auth/otp/request": { status: 404, body: { error: { code: "NOT_IN_PROJECT", message: "x" } } } });
     renderApp();

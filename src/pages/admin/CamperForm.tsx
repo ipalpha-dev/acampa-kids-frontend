@@ -69,7 +69,7 @@ const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim
  * only; health is edited on the kid's page (written to IPAlpha).
  */
 export default function CamperForm({ token, camper, categories, busy, onSubmit, leaveGuardRef }: CamperFormProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
   const editing = !!camper;
@@ -105,7 +105,7 @@ export default function CamperForm({ token, camper, categories, busy, onSubmit, 
           setMore(!!page.nextCursor);
           setSearchError(null);
         })
-        .catch((e) => alive && setSearchError(e instanceof Error ? e.message : tx("Algo deu errado.")))
+        .catch((e) => alive && setSearchError(te(e, "Algo deu errado.")))
         .finally(() => alive && setSearching(false));
     }, SEARCH_DEBOUNCE_MS);
     return () => {
@@ -268,7 +268,7 @@ export default function CamperForm({ token, camper, categories, busy, onSubmit, 
       } else return false;
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
       return false;
     }
   }
@@ -386,7 +386,7 @@ export default function CamperForm({ token, camper, categories, busy, onSubmit, 
         <>
           <div className="cat-form__row staff-form__row">
             <CategoryRadio label={tx("Cama")} category={cat(CAMPER_CATEGORY_KEYS.bed)} value={bed} onChange={setBed} disabled={busy} />
-            {text(<><BunkIcon size={18} /> {tx("Prefere dividir quarto com")}</>, bedroomPreference, setBedroomPreference, tx("ex.: Bernardo Faria, Lucas (primo)"), undefined, "bedroomPreference")}
+            {text(<><BunkIcon size={18} /> {tx("Prefere dividir quarto com")}</>, bedroomPreference, setBedroomPreference, tx("ex.: Tomás Exemplo, Lucas (primo)"), undefined, "bedroomPreference")}
           </div>
 
           {!editing && (
@@ -417,7 +417,7 @@ export default function CamperForm({ token, camper, categories, busy, onSubmit, 
 
           <section className="form-box form-box--plain" aria-labelledby="notes-title">
             <h3 id="notes-title" className="form-box__title">{tx("📝 Observações")}</h3>
-            {text(tx("Convidado por"), invitedBy, setInvitedBy, tx("ex.: Pedro Brassioli"))}
+            {text(tx("Convidado por"), invitedBy, setInvitedBy, tx("ex.: Davi Modelo"))}
             {path === "new" ? (
               <AiNotesField
                 label={tx("📝 Observações gerais")}

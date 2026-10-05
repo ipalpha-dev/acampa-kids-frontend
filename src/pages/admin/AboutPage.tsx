@@ -129,7 +129,7 @@ function PieChart({ title, slices, total, format }: { title: string; slices: Sli
 
 /** Admin-only "Sobre": app version and how much each AI company has been used. */
 export default function AboutPage({ token }: AboutPageProps) {
-  const { tx, tag } = useI18n();
+  const { tx, tag, te } = useI18n();
   const [vendors, setVendors] = useState<AiVendorUsage[] | null>(null);
   const [kinds, setKinds] = useState<AiKindUsage[] | null>(null);
   const [sms, setSms] = useState<SmsUsage | null>(null);
@@ -149,7 +149,7 @@ export default function AboutPage({ token }: AboutPageProps) {
         setKinds(r.kinds);
         setSms(r.sms ?? null);
       })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : tx("Não foi possível carregar o uso de IA.")));
+      .catch((e) => !cancelled && setError(te(e, "Não foi possível carregar o uso de IA.")));
     return () => {
       cancelled = true;
     };

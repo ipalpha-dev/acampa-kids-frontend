@@ -77,7 +77,7 @@ const COLORS_BY_WING: Record<BedroomGroup, readonly CaretakerColor[]> = {
  * at once and texts each person concerned with one SMS.
  */
 export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const storedBedrooms = useCollection("bedrooms");
   const storedCampers = useCollectionOrEmpty("campers");
   const storedStaff = useCollectionOrEmpty("staff");
@@ -632,7 +632,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
       clearRoomsDraft();
       onBack();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       setSubmitting(false);
     }
   }

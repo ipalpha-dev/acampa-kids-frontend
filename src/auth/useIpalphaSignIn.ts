@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { isStaffAccessError } from "../components/StaffAccessDialog";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
 import {
   awaitPopupMessage,
   closePopup,
@@ -42,6 +42,7 @@ interface Options {
 /** Popup sign-in with IPAlpha (CONTRACTS_ACAMPA §5): blank popup on the gesture → start → hand-off → complete. */
 export function useIpalphaSignIn({ config, onSignedIn, onUnavailable, onNotInProject }: Options): IpalphaSignIn {
   const t = useT();
+  const { te } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -75,12 +76,12 @@ export function useIpalphaSignIn({ config, onSignedIn, onUnavailable, onNotInPro
       } else if (err instanceof ApiError && err.code === "NOT_IN_PROJECT") {
         callbacks.current.onNotInProject();
       } else if (err instanceof ApiError && (err.code === "ACCOUNT_FROZEN" || err.code === "OFFLINE")) {
-        setError(err.message);
+        setError(te(err));
       } else {
         setError(t("login.ipalphaFailed"));
       }
     },
-    [t],
+    [t, te],
   );
 
   const start = useCallback(

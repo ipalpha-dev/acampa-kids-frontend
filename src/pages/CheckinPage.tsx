@@ -40,7 +40,7 @@ type Filter = "pending" | "done" | "all";
  * parent confirm each piece of health/contact info, then "Confirmar chegada".
  */
 export default function CheckinPage({ token, adminMerged = false }: CheckinPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const campers = useCollection("campers");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const transports = useCollectionOrEmpty("transports");
@@ -92,7 +92,7 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
       setOpenId(null);
       if (fromScan.current) setScannerOpen(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -126,7 +126,7 @@ export default function CheckinPage({ token, adminMerged = false }: CheckinPageP
     try {
       await undoCheckinCamper(token, k.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

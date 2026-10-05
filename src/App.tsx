@@ -8,17 +8,15 @@ import Toast from "./components/Toast";
 import { fetchIpalphaConfig, type IpalphaConfig } from "./auth/ipalpha";
 import {
   clearAuth,
-  clearPendingOtp,
   fetchMe,
-  loadPendingOtp,
   loadStoredSession,
   logout,
   saveAuth,
-  savePendingOtp,
   switchCamp,
   switchRole,
   type AuthState,
   type LoginResult,
+  purgeStoredPendingOtp,
   type PendingOtp,
   type StoredSession,
   type SwitchResult,
@@ -33,7 +31,7 @@ import { useI18n } from "./i18n";
 import type { CoreRole } from "./roles";
 import { clearRoomsDraft } from "./roomDraft";
 import { navigate } from "./router";
-import { endOfflineSession, startOfflineSession } from "./store";
+import { endOfflineSession, extendOfflineSession, startOfflineSession } from "./store";
 import { connectRealtime, disconnectRealtime } from "./store/realtime";
 
 type Session = AuthState;
@@ -48,7 +46,10 @@ export default function App() {
   /** /me could not be reached while restoring: offline (retry) or IPAlpha in maintenance */
   const [restoreFailed, setRestoreFailed] = useState<"offline" | "maintenance" | null>(null);
   const [restoreNonce, setRestoreNonce] = useState(0);
-  const [otp, setOtp] = useState<PendingOtp | null>(() => (loadStoredSession() ? null : loadPendingOtp()));
+  /** the SMS step in progress — memory only: a reload asks for the phone again */
+  const [otp, setOtp] = useState<PendingOtp | null>(null);
+  // an older build kept the SMS step (with the masked phone) in localStorage: it leaves the device now
+  useEffect(() => purgeStoredPendingOtp(), []);
   const [phoneMasked, setPhoneMasked] = useState("");
   /** gentle note on the login screen: not in this camp's project, or the session ended */
   const [loginNote, setLoginNote] = useState<string | null>(null);
@@ -90,7 +91,6 @@ export default function App() {
     clearAuth();
     setRestoring(null);
     setRestoreFailed(null);
-    clearPendingOtp();
     // the unsaved room plan holds person ids of this session's camp: it goes with the session
     clearRoomsDraft();
     disconnectRealtime();
@@ -104,7 +104,6 @@ export default function App() {
 
   /** Same landing for every login path (SMS code or IPAlpha): save, then the role chooser when there is more than one. */
   function finishLogin({ token, tokenExpiresAt, user, camp, camps }: LoginResult) {
-    clearPendingOtp();
     setOtp(null);
     setLoginNote(null);
     const next: Session = { token, tokenExpiresAt, user, camp, camps: camps ?? [] };
@@ -196,7 +195,7 @@ export default function App() {
       const detail = (e as CustomEvent<{ code: string; message: string }>).detail;
       if (!detail) return;
       if (detail.code === "CAMP_ARCHIVED") {
-        setCampToast(detail.message || tx("Este ano está arquivado — só leitura."));
+        setCampToast(tx("Este ano está arquivado — só leitura."));
       } else if (detail.code === "CAMP_FORBIDDEN") {
         setCampToast(tx("Você não tem acesso a esse ano."));
         const activeId = session?.camps.find((c) => c.active)?.id;
@@ -222,6 +221,12 @@ export default function App() {
     void startOfflineSession(token, campId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, scopeKey]);
+
+  // the session slides (GET /me, role / camp answers): the offline copy's self-wipe follows the new expiry
+  const tokenExpiresAt = session?.tokenExpiresAt ?? null;
+  useEffect(() => {
+    extendOfflineSession(tokenExpiresAt);
+  }, [tokenExpiresAt]);
 
   // live data feed: one WebSocket per session scope (a role / camp switch reconnects with the new scope)
   useEffect(() => {
@@ -370,12 +375,8 @@ export default function App() {
         expiresAt={otp.expiresAt}
         codeLength={otp.codeLength}
         onVerified={finishLogin}
-        onBack={() => {
-          clearPendingOtp();
-          setOtp(null);
-        }}
+        onBack={() => setOtp(null)}
         onNotInProject={() => {
-          clearPendingOtp();
           setOtp(null);
           showNotInProject();
         }}
@@ -392,7 +393,6 @@ export default function App() {
         }}
         note={loginNote}
         onSent={(pending) => {
-          savePendingOtp(pending);
           setLoginNote(null);
           setOtp(pending);
         }}

@@ -130,7 +130,7 @@ function KidEmergency({ token, kid: { camper: k }, tabbed }: { token: string; ki
  * one is shown.
  */
 export default function ParentProfile({ user, token, onLogout, loggingOut, onSwitchRole }: ParentProfileProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const meta = roleMeta(user.activeRole);
   const data = useParentHome();
   const [selectedKidId, setSelectedKidId] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export default function ParentProfile({ user, token, onLogout, loggingOut, onSwi
     try {
       await onSwitchRole(role);
     } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : tx("Não foi possível trocar de perfil."));
+      setSwitchError(te(err, "Não foi possível trocar de perfil."));
       setSwitchingTo(null);
     }
   }

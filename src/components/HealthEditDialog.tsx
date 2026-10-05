@@ -213,7 +213,7 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
  * Mount it while open: it starts from the `health` it receives.
  */
 export default function HealthEditDialog({ token, open, camperId, name, health, onClose, onSaved }: HealthEditDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const before = health ?? EMPTY_HEALTH;
   const [draft, setDraft] = useState<HealthDraft>(() => healthDraftOf(health));
   const [busy, setBusy] = useState(false);
@@ -245,7 +245,7 @@ export default function HealthEditDialog({ token, open, camperId, name, health, 
       onSaved?.(answer.camper.health ?? null);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

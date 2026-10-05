@@ -48,7 +48,7 @@ interface PrepItem {
  * ⚙️ → Preparação and the per-role text in the role itself.
  */
 export default function PreparationPage({ user, token, pairedWith }: PreparationPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sections = useCollection("preparation");
   const myRoles = useMyPrepRoles(user.personId);
   const staff = useCollectionOrEmpty("staff");
@@ -112,7 +112,7 @@ export default function PreparationPage({ user, token, pairedWith }: Preparation
     try {
       await setMyPrepDone(token, item.key, !done.has(item.key));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusyKey(null);
     }

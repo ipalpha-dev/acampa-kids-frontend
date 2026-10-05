@@ -181,6 +181,47 @@ describe("encrypted offline copy (decision 35)", () => {
     expect(store.offlineCopyActive()).toBe(false);
   });
 
+  it("follows the sliding session: a later expiry from GET /me keeps the copy past the first key answer", async () => {
+    const { store, backend } = await freshStore();
+    stubKey({ key: keyB64(12), role: "equipe", healthAllowed: false, sessionExpiresAt: future(1000), campEndsAt: null });
+    await store.startOfflineSession("tok", "camp-1");
+    store.applyServerData({ campers: [KID] as never }, new Date().toISOString());
+    await vi.waitFor(() => expect(backend.peek()).not.toBeNull());
+    const slid = future(DAY);
+    store.extendOfflineSession(slid);
+    expect(store.offlineSessionExpiresAt()).toBe(slid);
+    await new Promise((r) => setTimeout(r, 1300));
+    expect(store.offlineCopyActive()).toBe(true);
+    // the stored meta carries the slid expiry (a reopening reads it)
+    await vi.waitFor(() => expect(backend.peek()?.meta.sessionExpiresAt).toBe(slid));
+    // never moves backwards
+    store.extendOfflineSession(future(1000));
+    expect(store.offlineSessionExpiresAt()).toBe(slid);
+  });
+
+  it("follows the sliding session: every accepted authenticated request pushes the expiry forward", async () => {
+    const { store } = await freshStore();
+    const client = await import("../api/client");
+    const IDLE = 10 * 60_000;
+    stubKey({ key: keyB64(13), role: "equipe", healthAllowed: false, sessionExpiresAt: future(IDLE), campEndsAt: null });
+    await store.startOfflineSession("tok", "camp-1");
+    const first = new Date(store.offlineSessionExpiresAt()!).getTime();
+    // 5 minutes later the person is still working: the server slid its expiry
+    const later = Date.now() + 5 * 60_000;
+    vi.spyOn(Date, "now").mockReturnValue(later);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })));
+    await client.api("/api/settings", { headers: { authorization: "Bearer tok" } });
+    const slid = new Date(store.offlineSessionExpiresAt()!).getTime();
+    expect(slid).toBeGreaterThan(first);
+    // safe side: never past what the server holds (request start + idle length)
+    expect(slid).toBeLessThanOrEqual(later + IDLE);
+    expect(slid).toBeGreaterThanOrEqual(later + IDLE - 2 * 60_000);
+    // anonymous calls (no bearer) say nothing about the session
+    vi.spyOn(Date, "now").mockReturnValue(later + 3 * 60_000);
+    await client.api("/api/camps/active");
+    expect(new Date(store.offlineSessionExpiresAt()!).getTime()).toBe(slid);
+  });
+
   it("without network the key can't be fetched: nothing is written, the sealed copy stays", async () => {
     const { store, backend } = await freshStore();
     const sealed = { iv: new Uint8Array(12), data: new ArrayBuffer(8), meta: { role: "equipe", campId: "camp-1", sessionExpiresAt: future(DAY), campEndsAt: null, savedAt: "" } };

@@ -27,7 +27,7 @@ interface EmergencyScanFabProps {
  */
 export default function EmergencyScanFab({ token, page = false }: EmergencyScanFabProps) {
   const { navigate } = useRoute();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [scannerOpen, setScannerOpen] = useState(page);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,8 +54,7 @@ export default function EmergencyScanFab({ token, page = false }: EmergencyScanF
         window.scrollTo({ top: 0 });
       } catch (e) {
         setScannerOpen(false);
-        if (e instanceof ApiError) setError(e.message);
-        else setError(e instanceof Error ? e.message : tx("Não foi possível ler o crachá."));
+        setError(te(e, "Não foi possível ler o crachá."));
       } finally {
         setBusy(false);
       }

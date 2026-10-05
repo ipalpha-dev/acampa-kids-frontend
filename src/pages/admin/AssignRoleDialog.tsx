@@ -44,7 +44,7 @@ export function occupationsFor(event: CampEvent, events: CampEvent[], roleById: 
 }
 
 export default function AssignRoleDialog({ token, open, entry, onClose, onAssigned }: AssignRoleDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const events = useCollection("events");
   const roles = useCollectionOrEmpty("roles");
   const staffList = useCollectionOrEmpty("staff");
@@ -99,7 +99,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
       onAssigned();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -129,7 +129,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
                 onAssigned();
                 onClose();
               })
-              .catch((err) => setError(err instanceof Error ? err.message : tx("Algo deu errado.")))
+              .catch((err) => setError(te(err, "Algo deu errado.")))
               .finally(() => setBusy(false));
           } else if (occ) setStep("confirm");
         }}

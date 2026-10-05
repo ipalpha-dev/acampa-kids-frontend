@@ -41,7 +41,7 @@ function ParentWindowNote({ window: w }: { window: { from: string | null; until:
 
 /** Admin-only list of the staff contacts shown to parents. */
 export default function ParentContactsPage({ token }: ParentContactsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollectionOrEmpty("staff");
   const settings = useCollection("settings");
   const [contacts, setContacts] = useState<ParentContact[]>([]);
@@ -78,7 +78,7 @@ export default function ParentContactsPage({ token }: ParentContactsPageProps) {
       return true;
     } catch (cause) {
       setContacts(previous);
-      setError(cause instanceof Error ? cause.message : tx("Algo deu errado."));
+      setError(te(cause, "Algo deu errado."));
       return false;
     } finally {
       setBusy(false);

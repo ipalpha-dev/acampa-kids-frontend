@@ -75,11 +75,6 @@ export function readPosition(timeoutMs = 15_000): Promise<DevicePosition> {
   });
 }
 
-export function describeGeoError(err: unknown): string {
-  if (err instanceof GeoError) return err.message;
-  return err instanceof Error ? err.message : "Algo deu errado.";
-}
-
 /** Great-circle distance in metres (haversine) — same formula as the server. */
 export function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const R = 6_371_000;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { aiCamperNotes, type AiNotesSubject, type CamperNotesFields } from "../api/ai";
+import { useI18n } from "../i18n";
 
 /** while the sorter runs, saving waits at least this long so the answer can land */
 export const AI_NOTES_MIN_WAIT_MS = 8_000;
@@ -34,6 +35,7 @@ export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, app
   const [running, setRunning] = useState(false);
   /** save stays disabled until this instant while the sorter runs */
   const [holdUntil, setHoldUntil] = useState(0);
+  const { te } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const seen = useRef(initialNotes.trim());
@@ -71,7 +73,7 @@ export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, app
     } catch (err) {
       if (ctrl.signal.aborted) return;
       seen.current = "";
-      setError(err instanceof Error ? err.message : "O assistente não respondeu.");
+      setError(te(err, "O assistente não respondeu."));
     } finally {
       if (abort.current === ctrl) {
         abort.current = null;

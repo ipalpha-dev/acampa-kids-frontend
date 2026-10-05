@@ -109,18 +109,6 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "🔒 {n} photos gardées — personne hors de la liste ne les voit.",
     de: "🔒 {n} Fotos privat — niemand außerhalb der Liste sieht sie.",
   },
-  "Quem pode enviar fotos": {
-    en: "Who can upload photos",
-    es: "Quién puede enviar fotos",
-    fr: "Qui peut envoyer des photos",
-    de: "Wer Fotos hochladen darf",
-  },
-  "Adicionar fotógrafo": {
-    en: "Add photographer",
-    es: "Añadir fotógrafo",
-    fr: "Ajouter un photographe",
-    de: "Fotograf hinzufügen",
-  },
   "Ninguém escolhido ainda.": {
     en: "No one chosen yet.",
     es: "Nadie elegido todavía.",

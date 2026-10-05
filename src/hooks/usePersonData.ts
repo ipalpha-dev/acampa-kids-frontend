@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchCamper, type Camper, type Responsible } from "../api/campers";
+import { fetchCamper, fetchCamperResponsibles, type Camper, type CamperResponsibles, type Responsible } from "../api/campers";
 import { fetchHealthLists, fetchPersonData, type HealthList, type PersonDataKind, type PersonDataMap } from "../api/people";
 import { fetchStaff, type Staff } from "../api/staff";
 import { useI18n, type Locale } from "../i18n";
@@ -47,6 +47,19 @@ export function useCamperLive(token: string, id: string | null): Live<Camper & {
     const c = await fetchCamper(token, id!);
     rememberPeople([{ personId: c.id, name: c.name, nickname: c.nickname, sex: c.sex }, ...c.responsibles.map((r) => ({ personId: r.personId, name: r.name }))]);
     return c;
+  });
+}
+
+/**
+ * A kid's responsáveis (names only), read live when someone asks to talk to the
+ * family (GET /api/campers/:id/responsibles) — never the kid's page, so no
+ * health is read for a contact button. Phones are read per responsável on tap.
+ */
+export function useCamperResponsibles(token: string, id: string | null): Live<CamperResponsibles> {
+  return useLive(id ? `responsibles:${id}` : null, async () => {
+    const res = await fetchCamperResponsibles(token, id!);
+    rememberPeople([{ personId: res.camper.id, name: res.camper.name }, ...res.responsibles.map((r) => ({ personId: r.personId, name: r.name }))]);
+    return res;
   });
 }
 

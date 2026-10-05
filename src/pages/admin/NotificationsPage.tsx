@@ -187,7 +187,7 @@ function buildGroups(tx: Tx): NotifGroup[] {
 }
 
 export default function NotificationsPage({ token }: NotificationsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const { navigate } = useRoute();
   const confirm = useConfirm();
@@ -236,7 +236,7 @@ export default function NotificationsPage({ token }: NotificationsPageProps) {
       }
       await updateSettings(token, { notifications: { [key]: value } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

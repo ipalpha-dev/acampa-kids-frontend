@@ -27,7 +27,7 @@ const KINDS: LineKind[] = ["scan", "add", "remove", "reset"];
  * kind, team, event, person or free text.
  */
 export default function ScoreHistoryPage({ token, userId, canEdit, canScan, onBack, onTeam, onEvent }: Props) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const scores = useCollectionOrEmpty("scores");
   const teams = useCollectionOrEmpty("teams");
   const events = useCollectionOrEmpty("events");
@@ -98,7 +98,7 @@ export default function ScoreHistoryPage({ token, userId, canEdit, canScan, onBa
     try {
       await deleteScore(token, e.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setDeletingId(null);
     }

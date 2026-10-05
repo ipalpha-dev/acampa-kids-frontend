@@ -28,14 +28,14 @@ export default function CategoryOptions({
   const [editingLabel, setEditingLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
 
   async function run(fn: () => Promise<void>) {
     setError(null);
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 

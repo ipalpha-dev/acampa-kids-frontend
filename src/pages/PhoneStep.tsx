@@ -7,7 +7,7 @@ import IpalphaSignInButton from "../components/ipalpha/IpalphaSignInButton";
 import LoginNote from "../components/LoginNote";
 import PhoneInput from "../components/PhoneInput";
 import StaffAccessDialog, { isStaffAccessError } from "../components/StaffAccessDialog";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
 import { isCompleteMobile, toE164 } from "../phone";
 import { campBrandLabel } from "../camps";
 
@@ -33,6 +33,7 @@ interface PhoneStepProps {
 /** Step 1 — Brazilian cell phone entry (rendered inside the green panel). */
 export default function PhoneStep({ phone, onPhoneChange, onSent, onNotInProject, note = null, onUnavailable, ipalpha }: PhoneStepProps) {
   const t = useT();
+  const { te } = useI18n();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<ApiError | null>(null);
@@ -69,9 +70,9 @@ export default function PhoneStep({ phone, onPhoneChange, onSent, onNotInProject
       } else if (isStaffAccessError(err)) {
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "ACCOUNT_FROZEN") {
-        setError(err.message);
+        setError(te(err));
       } else {
-        setError(err instanceof Error ? err.message : t("login.genericError"));
+        setError(te(err));
       }
     } finally {
       setLoading(false);

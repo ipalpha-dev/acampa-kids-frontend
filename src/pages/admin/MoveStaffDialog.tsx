@@ -31,7 +31,7 @@ const OPTIONS: { key: MoveKids; emoji?: string; icon?: string; label: string; hi
  * in particular a helper is only promoted to leader when explicitly chosen.
  */
 export default function MoveStaffDialog({ token, open, member: s, onClose }: MoveStaffDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const staff = useCollectionOrEmpty("staff");
   const campers = useCollectionOrEmpty("campers");
@@ -98,7 +98,7 @@ export default function MoveStaffDialog({ token, open, member: s, onClose }: Mov
       await moveStaff(token, s.id, { bedroom, kids: mode, ...(mode === "swap" && person ? { swapWith: person } : {}), ...(mode === "assign" && person ? { assignTo: person } : {}) });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

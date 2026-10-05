@@ -50,7 +50,8 @@ export const VEST_GRACE_DAYS = 7;
  * bedrooms outside the person's own room).
  */
 export function useCheckinHelper(activeRole: CoreRole, personId: string, enabled: boolean, campEndsAt: number | null = null): HelperAccess {
-  const staff = useCollection("staff");
+  // app-wide check (mounted by the shell): reads the records only, never names
+  const staff = useCollection("staff", { names: false });
   const lists = useCollection("settings") as Windows | null;
   const [, tick] = useState(0);
 

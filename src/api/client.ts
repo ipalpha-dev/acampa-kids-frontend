@@ -63,8 +63,27 @@ export function signalAuthFailure(status: number, code: string): void {
   if (status === 503 && code === "IPALPHA_UNAVAILABLE") window.dispatchEvent(new CustomEvent(CORE_UNAVAILABLE_EVENT));
 }
 
+/** Listeners told about every authenticated call the server accepted (see `signalAuthSuccess`). */
+const authSuccessListeners = new Set<(startedAt: number) => void>();
+
+/**
+ * Every authenticated request the server accepts slides the session's expiry
+ * (sessionIdleHours, at most once a minute — backend services/session.ts).
+ * The store listens to keep the offline copy's expiry in step with it.
+ */
+export function onAuthSuccess(listener: (startedAt: number) => void): () => void {
+  authSuccessListeners.add(listener);
+  return () => authSuccessListeners.delete(listener);
+}
+
+/** An authenticated call (JSON client or raw fetch) that started at `startedAt` answered 2xx. */
+export function signalAuthSuccess(startedAt: number): void {
+  for (const listener of authSuccessListeners) listener(startedAt);
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;
+  const startedAt = Date.now();
   // FormData bodies must keep the browser-generated multipart boundary, so we
   // only default to JSON when the caller isn't uploading a file.
   const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
@@ -112,6 +131,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     );
   }
 
+  if (hasBearer(options)) signalAuthSuccess(startedAt);
   return data as T;
 }
 

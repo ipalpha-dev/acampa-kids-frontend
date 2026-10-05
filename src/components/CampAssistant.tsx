@@ -75,7 +75,7 @@ function meaningfulHandoffSpeech(value: string): boolean {
 }
 
 export default function CampAssistant({ token, userName, availableTabs, availableSettings, avoidFab = false, onOpenChange }: CampAssistantProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [open, setOpen] = useState(false);
   const [handoff, setHandoff] = useState(false);
   const [resuming, setResuming] = useState(false);
@@ -202,7 +202,7 @@ export default function CampAssistant({ token, userName, availableTabs, availabl
       .catch((error) => {
         if (cancelled) return;
         setService({ enabled: false, voiceModel: "" });
-        setStatusError(error instanceof Error ? error.message : "Assistente indisponível.");
+        setStatusError(te(error, "Assistente indisponível."));
       });
     return () => {
       cancelled = true;

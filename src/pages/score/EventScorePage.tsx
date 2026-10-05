@@ -25,7 +25,7 @@ interface Props {
  * missing), and every scan line with who read it and when.
  */
 export default function EventScorePage({ token, eventId, userId, canEdit, canScan, onBack, onTeam }: Props) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const scores = useCollectionOrEmpty("scores");
   const teams = useCollectionOrEmpty("teams");
   const events = useCollectionOrEmpty("events");
@@ -86,7 +86,7 @@ export default function EventScorePage({ token, eventId, userId, canEdit, canSca
     try {
       await deleteScore(token, e.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setDeletingId(null);
     }

@@ -20,7 +20,8 @@ import { patchCollection, useCollection } from "../store";
  * @param during   the camp is happening right now (campPhase#useCampTiming)
  */
 export function useCampWindow(enabled: boolean, personId: string, during: boolean): void {
-  const staff = useCollection("staff");
+  // app-wide check (mounted by the shell): reads the records only, never names
+  const staff = useCollection("staff", { names: false });
   const settings = useCollection("settings");
   const me = staff?.find((s) => s.id === personId) ?? null;
   const isCaretaker = me?.roomRole === "caretaker";

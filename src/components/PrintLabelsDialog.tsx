@@ -28,7 +28,7 @@ export const BATCH_SIZE = 50;
  * moves to the next batch after each print).
  */
 export default function PrintLabelsDialog({ open, onClose, campers, allCampers, bedrooms, labelOf }: PrintLabelsDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [kind, setKind] = useState<LabelKind>("badge");
   const [scope, setScope] = useState<"filtered" | "all">("filtered");
   const [batch, setBatch] = useState(0);
@@ -72,7 +72,7 @@ export default function PrintLabelsDialog({ open, onClose, campers, allCampers, 
       setDone((d) => new Set(d).add(batch));
       if (batch < batches - 1) setBatch(batch + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Não foi possível imprimir."));
+      setError(te(e, "Não foi possível imprimir."));
     } finally {
       setBusy(false);
     }

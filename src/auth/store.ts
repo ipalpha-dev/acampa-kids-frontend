@@ -102,49 +102,33 @@ export function clearAuth(): void {
   }
 }
 
+/** Where an older build kept the pending SMS step (challenge + masked phone): never written any more. */
 const OTP_STORAGE_KEY = "acampa.otp";
 
 /**
- * The SMS code that was sent, so leaving the browser (to read the SMS) and
- * coming back keeps the real expiry. The challenge is sealed by the backend;
- * only a MASKED phone is kept, for the "enviamos para …" line.
+ * The SMS code that was sent. Memory only (App state): not even the masked
+ * phone touches the device — a reload goes back to the phone step and the
+ * person types the number again.
  */
 export interface PendingOtp {
   challenge: string;
   expiresAt: string; // ISO — when the SMS code stops being valid
   codeLength: number;
-  /** "(11) •••••-4567" — display only */
+  /** "(11) •••••-4567" — display only, in memory */
   phoneHint: string;
 }
 
-export function savePendingOtp(state: PendingOtp): void {
-  localStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(state));
-}
-
-/** Returns the pending SMS code context if it hasn't expired yet. */
-export function loadPendingOtp(): PendingOtp | null {
+/** Removes the pending SMS step an older build left in localStorage (it held the masked phone). */
+export function purgeStoredPendingOtp(): void {
   try {
-    const raw = localStorage.getItem(OTP_STORAGE_KEY);
-    if (!raw) return null;
-
-    const state = JSON.parse(raw) as PendingOtp;
-    if (!state.challenge || !state.expiresAt) {
-      localStorage.removeItem(OTP_STORAGE_KEY);
-      return null;
-    }
-    if (new Date(state.expiresAt) <= new Date()) {
-      localStorage.removeItem(OTP_STORAGE_KEY);
-      return null;
-    }
-    return state;
+    localStorage.removeItem(OTP_STORAGE_KEY);
   } catch {
-    return null;
+    // storage unavailable: nothing to remove
   }
 }
 
-export function clearPendingOtp(): void {
-  localStorage.removeItem(OTP_STORAGE_KEY);
-}
+// a stale value from an older build leaves the device as soon as the app loads
+purgeStoredPendingOtp();
 
 export function bearer(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
