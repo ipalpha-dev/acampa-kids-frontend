@@ -7,6 +7,7 @@ import HealthAlerts from "../../components/HealthAlerts";
 import KidIcon from "../../components/KidIcon";
 import LinkRequestsCard from "../../components/LinkRequestsCard";
 import ParentKidTabs from "../../components/ParentKidTabs";
+import PendingKindsCard from "../../components/PendingKindsCard";
 import PersonContact from "../../components/PersonContact";
 import PlayScene from "../../components/PlayScene";
 import HealthIcon from "../../components/HealthIcon";
@@ -237,6 +238,7 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
     return (
       <div className="admin-page">
         <h1 className="admin-title">{hello}</h1>
+        <PendingKindsCard token={token} />
         <p className="opt-empty">
           {tx("Ainda não encontramos nenhuma criança ligada a você neste acampamento.")}
           <br />
@@ -262,6 +264,9 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
       </p>
 
       <CheckinQrDialog kids={kids} active={access.checkin} />
+
+      {/* what the camp asks about THEM, not shared until they confirm (decision 87) */}
+      <PendingKindsCard token={token} />
 
       {/* another responsável the coordenação asked to include — the family decides (decision 80) */}
       <LinkRequestsCard token={token} />
