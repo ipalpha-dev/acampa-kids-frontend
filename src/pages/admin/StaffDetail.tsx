@@ -7,7 +7,7 @@ import { ICONS, kidSexOf } from "../../icons";
 import BedroomTag from "../../components/BedroomTag";
 import { useCampTiming } from "../../campPhase";
 import { unassignStaff } from "../../api/schedule";
-import { speakBirth, speakDay, speakStamp } from "../../dates";
+import { speakDay, speakStamp } from "../../dates";
 import AssignRoleDialog from "./AssignRoleDialog";
 import {
   ROOM_ROLE_META,
@@ -18,37 +18,36 @@ import {
 import MoveStaffDialog from "./MoveStaffDialog";
 import StaffFieldDialog, { type StaffQuickField } from "./StaffFieldDialog";
 import CamperCard from "../../components/CamperCard";
-import GuardianWhatsApp from "../../components/GuardianWhatsApp";
+import HealthHeart from "../../components/HealthHeart";
+import PersonContact from "../../components/PersonContact";
 import RoomRoleIcon from "../../components/RoomRoleIcon";
 import TeamTag from "../../components/TeamTag";
-import WhatsAppButton from "../../components/WhatsAppButton";
-import { loadAuth } from "../../auth/store";
 import { useLabelOf, useStaffDetail } from "../../store/derive";
+import { useNames } from "../../store/people";
+import { useHealthLabel, useStaffLive } from "../../hooks/usePersonData";
 import TransportTag from "../../components/TransportTag";
-import { formatBrazilPhoneClient } from "../../phoneFormat";
-import { staffGreeting, whatsappLink } from "../../whatsapp";
+import type { CamperCheckin } from "../../api/campers";
 import type { DetailNav } from "./DetailStack";
 import { useI18n } from "../../i18n";
-
+import { firstNameOf, shownName } from "./staffNames";
+import css from "./staffGroup.module.scss";
 
 /**
  * Who stamped it, as the sentence reads: "por Ana" (recorded by Ana),
  * "para Ana" (the vest was returned TO Ana), or "pelo próprio celular" when
- * the person did it themself (self check-in).
+ * the person did it themself (self check-in). Names are read live by id.
  */
 function stampBy(
-  c: { byName: string },
-  self: string,
+  c: Pick<CamperCheckin, "byPersonId">,
+  selfId: string,
+  nameOf: (id: string) => string,
   tx: (pt: string, vars?: Record<string, string | number>) => string,
   prep: "por" | "para" = "por",
 ): string {
-  if (!c.byName) return "";
-  const name = c.byName.split(" ")[0];
-  return c.byName === self
-    ? tx("pelo próprio celular")
-    : prep === "para"
-      ? tx("para {name}", { name })
-      : tx("por {name}", { name });
+  if (!c.byPersonId) return "";
+  if (c.byPersonId === selfId) return tx("pelo próprio celular");
+  const name = firstNameOf(nameOf(c.byPersonId));
+  return prep === "para" ? tx("para {name}", { name }) : tx("por {name}", { name });
 }
 
 interface StaffDetailProps {
@@ -76,7 +75,7 @@ export default function StaffDetail({
   onOpenRole,
   onOpenEvent,
 }: StaffDetailProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // joined locally from the store — works offline and updates live (no reload needed after (un)assigning)
   const data = useStaffDetail(staffId);
   const [actionError, setError] = useState<string | null>(null);
@@ -89,7 +88,12 @@ export default function StaffDetail({
   const [fieldOpen, setFieldOpen] = useState<StaffQuickField | null>(null);
   const [busy, setBusy] = useState(false);
   const labelOf = useLabelOf();
-  const myName = loadAuth()?.user.name ?? "";
+  // health is never in the store: read live from IPAlpha for this page (the person themself / managers)
+  const live = useStaffLive(token, staffId);
+  const healthLabel = useHealthLabel(token);
+  const healthLabelOf = (id: string | null | undefined) => (id ? healthLabel(id) || labelOf(id) : null);
+  const stampIds = data ? [data.staff.checkin?.byPersonId, data.staff.vest?.delivered?.byPersonId, data.staff.vest?.returned?.byPersonId] : [];
+  const nameOf = useNames(stampIds);
   const { endsAt } = useCampTiming();
   /** the camp is over: an unreturned vest is a problem */
   const campOver = endsAt !== null && Date.now() >= endsAt;
@@ -97,7 +101,7 @@ export default function StaffDetail({
   const reload = () => {};
   const { setTitle } = nav;
   useEffect(() => {
-    if (data) setTitle(data.staff.name.split(" ")[0]);
+    if (data) setTitle(firstNameOf(data.staff.name));
   }, [data, setTitle]);
 
   /** desvincular é um clique só — é fácil de refazer, não pede confirmação */
@@ -108,7 +112,7 @@ export default function StaffDetail({
       await unassignStaff(token, eventId, staffId);
       reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -136,7 +140,8 @@ export default function StaffDetail({
     roommates,
   } = data;
   const explicit = schedule.filter((x) => !x.implicit);
-  const firstName = s.name.split(" ")[0];
+  const firstName = firstNameOf(s.name);
+  const health = live.data?.health ?? null;
   const roommateById = new Map(roommates.map((r) => [r.id, r]));
   /** leaders (caretakers) of the OTHER kids of the room, with how many each one looks after */
   const otherLeaders = [
@@ -156,7 +161,6 @@ export default function StaffDetail({
   const vestReturned = !!s.vest?.delivered && !!s.vest.returned;
   const vestLate = campOver && !vestReturned;
   const adultIcon = staffSex(s, bedroom ? [bedroom] : []) === "M" ? "man" : "woman";
-  const reviewing = s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured";
 
   /** "Cleves (auxiliar) está no mesmo quarto: 403 (Meninos)" — the colleagues and the room are links */
   const roomSentence = bedroom && (
@@ -172,10 +176,10 @@ export default function StaffDetail({
                   className="link-btn"
                   onClick={() => onOpenStaff(r.id)}
                 >
-                  {r.name.split(" ")[0]}
+                  {firstNameOf(r.name)}
                 </button>
               ) : (
-                <strong>{r.name.split(" ")[0]}</strong>
+                <strong>{firstNameOf(r.name)}</strong>
               )}
               {bedroom.group !== "staff" && ` (${tx(ROOM_ROLE_META[r.roomRole].label).toLowerCase()})`}
             </span>
@@ -197,12 +201,8 @@ export default function StaffDetail({
       <header className="admin-head">
         <h1 className="admin-title detail-title">
           <AdultIcon sex={adultIcon} size={40} />
-          {s.name}
-          {s.admin && (
-            <span className="staff-card__inactive" title={tx("Admin do app")}>
-              admin
-            </span>
-          )}
+          {shownName(s.name)}
+          <HealthHeart show={s.hasHealth ?? live.data?.hasHealth} />
           {!s.active && <span className="staff-card__inactive">{tx("inativo")}</span>}
         </h1>
         {onEdit && (
@@ -223,35 +223,11 @@ export default function StaffDetail({
       {/* ── info ── */}
       <section className="detail-card">
         <dl className="detail-grid">
-          {/* whoever may see this person may see their phone */}
-          <dt>{tx("Celular")}</dt>
+          {/* the phone lives in IPAlpha: read only when someone taps (core's role rules decide, the read is logged) */}
+          <dt>{tx("Contato")}</dt>
           <dd>
-            {s.phone ? (
-              <>
-                {formatBrazilPhoneClient(s.phone)}
-                <WhatsAppButton
-                  className="wa-btn--sm"
-                  href={whatsappLink(
-                    s.phone,
-                    staffGreeting({ toName: s.name, fromName: myName }),
-                  )}
-                  label={tx("Falar com {name} no WhatsApp", { name: s.name.split(" ")[0] })}
-                />
-              </>
-            ) : (
-              <em className="staff-card__missing">{tx("sem celular")}</em>
-            )}
+            <PersonContact token={token} personId={s.id} name={s.name} />
           </dd>
-          {!s.redacted && (
-            <>
-              <dt>{tx("E-mail")}</dt>
-              <dd>{s.email ? <a href={`mailto:${s.email}`}>{s.email}</a> : "—"}</dd>
-              <dt>{tx("Documento")}</dt>
-              <dd>{s.document || "—"}</dd>
-              <dt>{tx("Nascimento")}</dt>
-              <dd>{speakBirth(s.birthDate) ?? "—"}</dd>
-            </>
-          )}
           <dt>{tx("Time")}</dt>
           <dd>
             {/* an admin is on the roster for the room / transport / vest only: no time, no kids */}
@@ -303,7 +279,7 @@ export default function StaffDetail({
               <dt>{tx("Check-in")}</dt>
               <dd>
                 {s.checkin
-                  ? `✅ ${speakStamp(s.checkin.at)} · ${stampBy(s.checkin, s.name, tx)}`
+                  ? `✅ ${speakStamp(s.checkin.at)} · ${stampBy(s.checkin, s.id, nameOf, tx)}`
                   : tx("Ainda não chegou")}
               </dd>
               {s.vest?.delivered && (
@@ -337,10 +313,10 @@ export default function StaffDetail({
                     </button>
                     {vestOpen && (
                       <small className="vest-details">
-                        {tx("🦺 Entregue {when} · {by}", { when: speakStamp(s.vest.delivered.at), by: stampBy(s.vest.delivered, s.name, tx) })}
+                        {tx("🦺 Entregue {when} · {by}", { when: speakStamp(s.vest.delivered.at), by: stampBy(s.vest.delivered, s.id, nameOf, tx) })}
                         {s.vest.returned && (
                           <>
-                            <br />{tx("✅ Devolvido {when} · {by}", { when: speakStamp(s.vest.returned.at), by: stampBy(s.vest.returned, s.name, tx, "para") })}
+                            <br />{tx("✅ Devolvido {when} · {by}", { when: speakStamp(s.vest.returned.at), by: stampBy(s.vest.returned, s.id, nameOf, tx, "para") })}
                           </>
                         )}
                       </small>
@@ -351,9 +327,14 @@ export default function StaffDetail({
             </>
           )}
         </dl>
-        <div className={reviewing ? "camper-ai-observation" : ""} title={reviewing ? tx("Este campo está sendo revisado pela IA") : undefined}>
-          <HealthAlerts person={s} labelOf={labelOf} boxed />
-          {reviewing && !s.healthNotes && <p className="detail-note">{tx("Observações em revisão pela IA…")}</p>}
+        <div>
+          {health && (
+            <div className={css.healthLive}>
+              <HealthAlerts person={health} labelOf={healthLabelOf} boxed />
+            </div>
+          )}
+          {live.loading && s.hasHealth && <p className="cat-hint">{tx("Carregando informações de saúde…")}</p>}
+          {live.error && s.hasHealth && <p className="cat-hint">{tx("Não foi possível ler as informações de saúde agora.")}</p>}
         </div>
       </section>
 
@@ -517,7 +498,6 @@ export default function StaffDetail({
                   labelOf={labelOf}
                   hideBedroom
                   onOpen={onOpenCamper}
-                  corner={<GuardianWhatsApp camper={k} />}
                 />
               ))}
             </ul>
@@ -548,10 +528,10 @@ export default function StaffDetail({
                           className="link-btn"
                           onClick={() => onOpenStaff(r.id)}
                         >
-                          {r.name.split(" ")[0]}
+                          {firstNameOf(r.name)}
                         </button>
                       ) : (
-                        <strong>{r.name.split(" ")[0]}</strong>
+                        <strong>{firstNameOf(r.name)}</strong>
                       )}
                       {otherLeaders.length > 1 && ` (${n})`}
                     </span>
@@ -573,7 +553,6 @@ export default function StaffDetail({
                   labelOf={labelOf}
                   hideBedroom
                   onOpen={onOpenCamper}
-                  corner={<GuardianWhatsApp camper={k} />}
                 />
               ))}
             </ul>

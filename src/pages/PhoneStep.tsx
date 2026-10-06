@@ -1,22 +1,39 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../api/client";
 import { fetchActiveCamp } from "../api/camps";
-import { requestOtp } from "../auth/store";
+import { isIpalphaUnavailable } from "../auth/ipalpha";
+import { maskPhone, requestOtp, type PendingOtp } from "../auth/store";
+import IpalphaSignInButton from "../components/ipalpha/IpalphaSignInButton";
+import LoginNote from "../components/LoginNote";
 import PhoneInput from "../components/PhoneInput";
 import StaffAccessDialog, { isStaffAccessError } from "../components/StaffAccessDialog";
-import { useT } from "../i18n";
+import { useI18n, useT } from "../i18n";
 import { isCompleteMobile, toE164 } from "../phone";
 import { campBrandLabel } from "../camps";
 
 interface PhoneStepProps {
   phone: string; // masked
   onPhoneChange: (masked: string) => void;
-  onSent: (info: { phoneE164: string; expiresAt: string; delivery: "sms" | "mock" | "redirect" }) => void;
+  onSent: (info: PendingOtp) => void;
+  /** NOT_IN_PROJECT: nobody with this phone is in this camp's project */
+  onNotInProject: () => void;
+  /** gentle note above the form (not in this camp, session ended) */
+  note?: string | null;
+  /** IPALPHA_UNAVAILABLE (the code is relayed through IPAlpha): show the maintenance scene. */
+  onUnavailable: () => void;
+  /** "Entrar com IPAlpha" below the form — absent when the backend has the feature off. */
+  ipalpha?: {
+    busy: boolean;
+    error: string | null;
+    notice: string | null;
+    onStart: () => void;
+  };
 }
 
 /** Step 1 — Brazilian cell phone entry (rendered inside the green panel). */
-export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepProps) {
+export default function PhoneStep({ phone, onPhoneChange, onSent, onNotInProject, note = null, onUnavailable, ipalpha }: PhoneStepProps) {
   const t = useT();
+  const { te } = useI18n();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accessError, setAccessError] = useState<ApiError | null>(null);
@@ -44,14 +61,18 @@ export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepPro
     setError(null);
     try {
       const res = await requestOtp(phoneE164);
-      onSent({ phoneE164, expiresAt: res.expiresAt, delivery: res.delivery });
+      onSent({ challenge: res.challenge, expiresAt: res.expiresAt, codeLength: res.codeLength || 6, phoneHint: maskPhone(phoneE164) });
     } catch (err) {
-      if (isStaffAccessError(err)) {
+      if (isIpalphaUnavailable(err)) {
+        onUnavailable();
+      } else if (err instanceof ApiError && err.code === "NOT_IN_PROJECT") {
+        onNotInProject();
+      } else if (isStaffAccessError(err)) {
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "ACCOUNT_FROZEN") {
-        setError(err.message);
+        setError(te(err));
       } else {
-        setError(err instanceof Error ? err.message : t("login.genericError"));
+        setError(te(err));
       }
     } finally {
       setLoading(false);
@@ -62,6 +83,7 @@ export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepPro
     <>
       <h1 className="camping-panel__title">{t("login.phoneTitle")}</h1>
       {campLabel && <p className="camping-panel__camp">{campLabel}</p>}
+      <LoginNote message={note} />
 
       <form className="form" onSubmit={handleSubmit}>
         <PhoneInput value={phone} onChange={onPhoneChange} disabled={loading} autoFocus />
@@ -76,6 +98,10 @@ export default function PhoneStep({ phone, onPhoneChange, onSent }: PhoneStepPro
 
         {error && <p className="message message--error">{error}</p>}
       </form>
+
+      {ipalpha && (
+        <IpalphaSignInButton busy={ipalpha.busy} disabled={loading} error={ipalpha.error} notice={ipalpha.notice} onStart={ipalpha.onStart} />
+      )}
 
       <StaffAccessDialog error={accessError} onClose={() => setAccessError(null)} />
     </>

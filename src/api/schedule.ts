@@ -139,14 +139,15 @@ export function roleDetailOf(
 
 /** Cores sugeridas para o detalhe de cada pessoa (time, base, cor). */
 export const DETAIL_COLORS = [
-  { name: "Verde", hex: "#0f9a8a" },
-  { name: "Laranja", hex: "#f2843b" },
-  { name: "Amarelo", hex: "#f4c430" },
-  { name: "Vermelho", hex: "#e8503a" },
-  { name: "Azul", hex: "#3b6ff2" },
-  { name: "Roxo", hex: "#7d3bf2" },
-  { name: "Rosa", hex: "#e0519b" },
-  { name: "Cinza", hex: "#444b52" },
+  // `key` names the swatch class (styles.scss `$detail-colors` — keep the hex values in sync)
+  { key: "verde", name: "Verde", hex: "#0f9a8a" },
+  { key: "laranja", name: "Laranja", hex: "#f2843b" },
+  { key: "amarelo", name: "Amarelo", hex: "#f4c430" },
+  { key: "vermelho", name: "Vermelho", hex: "#e8503a" },
+  { key: "azul", name: "Azul", hex: "#3b6ff2" },
+  { key: "roxo", name: "Roxo", hex: "#7d3bf2" },
+  { key: "rosa", name: "Rosa", hex: "#e0519b" },
+  { key: "cinza", name: "Cinza", hex: "#444b52" },
 ] as const;
 
 export interface CampEvent {

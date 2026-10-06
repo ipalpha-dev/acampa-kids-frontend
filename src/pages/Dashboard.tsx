@@ -5,12 +5,10 @@ import { useCampTiming, type CampPhase } from "../campPhase";
 import { useI18n } from "../i18n";
 import { useRoute, useScrollTopOnRoute } from "../router";
 import Logo from "../components/Logo";
-import { logout, type CampSummary } from "../auth/store";
+import type { CampSummary } from "../auth/store";
 import { campBrandLabel } from "../camps";
-import { roleMeta, type LoggedUser, type Role } from "../roles";
+import { roleMeta, sortRoles, type Audience, type CoreRole, type LoggedUser } from "../roles";
 import { ICONS } from "../icons";
-import { updateStaff } from "../api/staff";
-import Dialog from "../components/Dialog";
 import SyncStatus from "../components/SyncStatus";
 import EmergencyScanFab from "../components/EmergencyScanFab";
 import InstallBanner from "../components/InstallBanner";
@@ -23,8 +21,6 @@ import CheckinSettingsPage from "./admin/CheckinSettingsPage";
 import GeneralSettingsPage from "./admin/GeneralSettingsPage";
 import AboutPage from "./admin/AboutPage";
 import AdminCheckinPage from "./admin/AdminCheckinPage";
-import MedicalStaffPage from "./admin/MedicalStaffPage";
-import OrganizersPage from "./admin/OrganizersPage";
 import SchedulePage from "./admin/SchedulePage";
 import NotificationsPage from "./admin/NotificationsPage";
 import ParentContactsPage from "./admin/ParentContactsPage";
@@ -43,15 +39,13 @@ import OccurrencesPage from "./OccurrencesPage";
 import MedicationsPage from "./MedicationsPage";
 import StaffCheckinPage from "./StaffCheckinPage";
 import VestPage from "./VestPage";
-import VestHelpersPage from "./admin/VestHelpersPage";
-import PhotographersPage from "./admin/PhotographersPage";
 import TeamsPage from "./admin/TeamsPage";
 import AssignToTeamsPage from "./admin/AssignToTeamsPage";
-import GameOrganizersPage from "./admin/GameOrganizersPage";
 import TrialsPage from "./admin/TrialsPage";
 import CleanupPage from "./admin/CleanupPage";
 import SeedsPage from "./admin/SeedsPage";
 import SuperPage from "./admin/SuperPage";
+import MessageTemplatesPage from "./admin/MessageTemplatesPage";
 import Breadcrumbs from "../components/Breadcrumbs";
 import ScoreboardPage from "./ScoreboardPage";
 import GalleryPage from "./GalleryPage";
@@ -76,9 +70,10 @@ interface DashboardProps {
   camp: CampSummary;
   /** every camp this session may switch into — empty when it can't switch years */
   camps: CampSummary[];
-  onLoggedOut: () => void;
-  /** switches the session to another profile the same person holds (parent ⇄ equipe) */
-  onSwitchRole: (role: Role) => Promise<void>;
+  /** ends the session (server + this device) */
+  onLogout: () => Promise<void>;
+  /** acts as another role the same person holds (no SMS) */
+  onSwitchRole: (role: CoreRole) => Promise<void>;
   /** switches the session into another year (admin, or an organizer of the active camp) */
   onSwitchCamp: (campId: string) => Promise<void>;
 }
@@ -87,20 +82,16 @@ interface DashboardProps {
 type View = TabKey | "profile" | "badge" | "settings" | "wizard" | SettingsKey;
 
 /** Admin settings live behind the ⚙️ button; each one is its own URL (#/categories, #/settings). `superOnly`: just the deployment owner (SUPER_ADMIN_PHONE). */
-type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "organizers" | "game-organizers" | "medical" | "vests-settings" | "photographers" | "contacts" | "notifications" | "super" | "about";
+type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "contacts" | "notifications" | "templates" | "super" | "about";
 /** `adminOnly`: an ORGANIZER (Settings → Organizadores) gets every other page — these four stay with the real admin. `superOnly`: only the deployment owner. */
 const SETTINGS: readonly { key: SettingsKey; label: string; emoji?: string; icon?: string; adminOnly?: boolean; superOnly?: boolean }[] = [
   { key: "general", label: "Geral", emoji: "⚙️" },
   { key: "preparation", label: "Preparação", icon: ICONS.preparation },
   { key: "instructions-admin", label: "Instruções", emoji: "📖" },
   { key: "checkin-settings", label: "Check-in", emoji: "✅" },
-  { key: "organizers", label: "Organizadores", icon: ICONS.organizer, adminOnly: true },
-  { key: "game-organizers", label: "Jogos", emoji: "🏆" },
-  { key: "photographers", label: "Fotógrafos", icon: ICONS.camera },
-  { key: "medical", label: "Equipe médica", icon: roleMeta("health_staff").icon },
-  { key: "vests-settings", label: "Coletes", emoji: "🦺" },
   { key: "contacts", label: "Contatos importantes", emoji: "📞" },
   { key: "notifications", label: "Notificações", icon: ICONS.notifications, adminOnly: true },
+  { key: "templates", label: "Mensagens", emoji: "✉️", adminOnly: true },
   { key: "trials", label: "Testes", emoji: "🚧" },
   { key: "categories", label: "Categorias", emoji: "🗂️", adminOnly: true },
   { key: "cleanup", label: "Limpeza", icon: ICONS.cleanup, adminOnly: true },
@@ -135,7 +126,7 @@ interface Tab {
  * "Fotos" only shows up for the TEAM once the album is published (`galleryOpen`):
  * before that there is nothing to see, so the tab would just be an empty page.
  */
-function tabsFor(role: Role, phase: CampPhase, helper: HelperAccess, roomsDraft: boolean, scoreOpen: boolean, galleryOpen: boolean, during: boolean): Tab[] {
+function tabsFor(role: Audience, phase: CampPhase, helper: HelperAccess, roomsDraft: boolean, scoreOpen: boolean, galleryOpen: boolean, during: boolean): Tab[] {
   /** ordinary staff + score helpers keep Placar only while scoring is open. Managers always have one entry: Times before/after camp, Placar during it. */
   const scoreboard: Tab[] = scoreOpen ? [{ key: "scoreboard", label: "Placar", emoji: "🏆" }] : [];
   const managerTeamsTab: Tab = during ? { key: "scoreboard", label: "Placar", emoji: "🏆" } : { key: "teams", label: "Times", icon: ICONS.team };
@@ -145,7 +136,7 @@ function tabsFor(role: Role, phase: CampPhase, helper: HelperAccess, roomsDraft:
   const teamHome: Tab[] = roomsDraft ? [prep] : phase === "before" ? [prep, home] : [home, prep];
   const adminTabs: Tab[] = [
     { key: "campers", label: "Acampantes", icon: ICONS.camper },
-    { key: "staff", label: "Equipe", icon: roleMeta("staff").icon },
+    { key: "staff", label: "Equipe", icon: ICONS.staff },
     { key: "bedrooms", label: "Quartos", icon: ICONS.bed },
     // the fleet + the kid-per-líder allocation board (was Settings → Transporte)
     { key: "buses", label: "Ônibus", icon: ICONS.transport },
@@ -188,7 +179,6 @@ function tabsFor(role: Role, phase: CampPhase, helper: HelperAccess, roomsDraft:
       return adminTabs;
     // the team gets its room + a read-only programme; the KIDS' church roll call only as a helper inside the window
     case "staff":
-    case "health_staff":
       // an ORGANIZER: the admin's tabs on top of their own
       if (helper.organizer) return managerTabs;
       // the medical team has its own set: the kids and their medication, never the roll call
@@ -199,7 +189,7 @@ function tabsFor(role: Role, phase: CampPhase, helper: HelperAccess, roomsDraft:
         { key: "instructions", label: "Instruções", emoji: "📖" },
         // game organizers get Times before/after camp and Placar during it; ordinary staff and score helpers keep Placar.
         ...(helper.gameOrganizer ? [managerTeamsTab] : scoreboard),
-        ...(helper.gameOrganizer ? [{ key: "staff" as const, label: "Equipe", icon: roleMeta("staff").icon }] : []),
+        ...(helper.gameOrganizer ? [{ key: "staff" as const, label: "Equipe", icon: ICONS.staff }] : []),
         ...(helper.church ? [{ key: "checkin" as const, label: "Check-in Igreja", emoji: "⛪" }] : []),
         // a bus helper rolls-call inside the window
         ...(helper.bus ? [{ key: "bus" as const, label: "Check-in Ônibus", icon: ICONS.transport }] : []),
@@ -221,7 +211,7 @@ function tabsFor(role: Role, phase: CampPhase, helper: HelperAccess, roomsDraft:
  * Clicking the user's name opens their profile (no tab). Roles without tabs
  * land on the profile.
  */
-export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwitchRole, onSwitchCamp }: DashboardProps) {
+export default function Dashboard({ user, token, camp, camps, onLogout, onSwitchRole, onSwitchCamp }: DashboardProps) {
   const { tx } = useI18n();
   const meta = roleMeta(user.activeRole);
   /** an archived year: read-only for everyone but the super admin (checked per write, on the server) */
@@ -229,18 +219,18 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
   const activeCamp = camps.find((c) => c.active) ?? null;
   const brandLabel = campBrandLabel(camp.label, camp.year);
   const { phase, synced, during, endsAt } = useCampTiming();
-  const isTeam = user.activeRole === "staff" || user.activeRole === "health_staff";
-  const isParent = user.activeRole === "parent";
-  const helper = useCheckinHelper(user.phone, isTeam, endsAt);
+  const isTeam = user.audience === "staff";
+  const isParent = user.audience === "parent";
+  const helper = useCheckinHelper(user.activeRole, user.personId, isTeam, endsAt);
   const parentAccess = useParentWindow(isParent);
-  useCampWindow(isTeam, user.phone, during);
+  useCampWindow(isTeam && !helper.medical && !helper.organizer && !helper.scoreHelper, user.personId, during);
   const settings = useCollection("settings");
   const roomsDraft = !!settings?.kidsRoomsDraft;
   /** the scoreboard opens for everyone on the camp days; the "Placar em teste" switch opens it any day, but only for the admin, organizers, game organizers and score helpers */
-  const scoreOpen = during || (!!settings?.scoreDraft && (user.activeRole === "admin" || helper.organizer || helper.gameOrganizer || helper.scoreHelper));
+  const scoreOpen = during || (!!settings?.scoreDraft && (user.audience === "admin" || helper.organizer || helper.gameOrganizer || helper.scoreHelper));
   /** the album shows up for the team once it is published; whoever manages it (organizer / photographer) always has the tab */
   const galleryOpen = !!settings?.galleryPublished || helper.organizer || helper.photographer;
-  const tabs = tabsFor(user.activeRole, phase, helper, roomsDraft, scoreOpen, galleryOpen, during);
+  const tabs = tabsFor(user.audience, phase, helper, roomsDraft, scoreOpen, galleryOpen, during);
   /**
    * "ADM layout": eight or more visible tabs use the left navigation shell.
    * Despite the name, this is based ONLY on tab count and is never tied to the admin role.
@@ -291,7 +281,7 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
 
   // the first URL segment is the tab: #/campers/…, #/staff/…, #/profile
   /** the admin, or a team member listed as ORGANIZER: the admin's pages and the ⚙️ settings (minus the admin-only ones) */
-  const isAdmin = user.activeRole === "admin";
+  const isAdmin = user.audience === "admin";
   const settingsAllowed = isAdmin || helper.organizer;
   /** camp-admin lock from the super-admin handover: wizard takes over until they finish or leave (the deployment owner is never locked); never during a history session */
   const wizardLocked = isAdmin && !!settings?.wizardMode && !settings?.superAdmin && !isHistory;
@@ -350,8 +340,9 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
   const wizardOpen = view === "wizard";
   const hydrated = useHydrated();
   const wizardAutoEntered = useRef(false);
-  const campersList = useCollectionOrEmpty("campers");
-  const staffList = useCollectionOrEmpty("staff");
+  // the shell only counts records here: names are read by the screen being viewed, not by the shell
+  const campersList = useCollectionOrEmpty("campers", { names: false });
+  const staffList = useCollectionOrEmpty("staff", { names: false });
   const bedroomsList = useCollectionOrEmpty("bedrooms");
   const eventsList = useCollectionOrEmpty("events");
   const transportsList = useCollectionOrEmpty("transports");
@@ -376,7 +367,7 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
         transports: transportsList,
         preparation: prepList,
         instructions: instrList,
-        teamStaff: staffList.filter((s) => s.active && !s.admin),
+        teamStaff: staffList.filter((s) => s.active),
       })
     ) {
       navigate("/wizard", { replace: true });
@@ -450,9 +441,8 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
   async function handleLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
-    await logout(token);
     navigate("/", { replace: true });
-    onLoggedOut();
+    await onLogout();
   }
 
   return (
@@ -493,7 +483,7 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
           <button
             type="button"
             className={`role-chip dash-user__chip ${profileOpen ? "dash-user__chip--active" : ""}`}
-            title={tx("Você entrou como {role} — ver perfil", { role: tx(meta.personLabel) })}
+            title={tx("Você entrou como {role} — ver perfil", { role: tx(meta.label) })}
             aria-pressed={profileOpen}
             onClick={() => {
               if (profileOpen) {
@@ -504,7 +494,7 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
             }}
           >
             <img className="role-chip__icon" src={meta.icon} alt="" aria-hidden="true" />
-            {user.name.split(" ")[0]}
+            {firstName(user.name) || tx("Perfil")}
           </button>
           {settingsAllowed && !wizardLocked && (
             <button
@@ -694,7 +684,7 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
                 }}
               >
                 <img className="dash-side-nav__icon" src={meta.icon} alt="" aria-hidden="true" />
-                <span className="dash-side-nav__label">{user.name.split(" ")[0]}</span>
+                <span className="dash-side-nav__label">{firstName(user.name) || tx("Perfil")}</span>
               </button>
               <span className="dash-side-nav__version" aria-label={tx("Versão {version}", { version: __APP_VERSION__ })}>v{__APP_VERSION__}</span>
             </div>
@@ -786,17 +776,13 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
             )}
             {view === "super" && segments[1] !== "seeds" && <SuperPage token={token} user={user} camp={camp} onSwitchCamp={onSwitchCamp} />}
             {view === "checkin-settings" && <CheckinSettingsPage token={token} />}
-            {view === "organizers" && <OrganizersPage token={token} />}
-            {view === "medical" && <MedicalStaffPage token={token} />}
-            {view === "vests-settings" && <VestHelpersPage token={token} />}
-            {view === "photographers" && <PhotographersPage token={token} />}
-            {view === "game-organizers" && <GameOrganizersPage token={token} />}
             {view === "teams" && segments[1] === "assign" && <AssignToTeamsPage token={token} onBack={() => navigate("/teams")} onScoreboard={during ? () => navigate("/scoreboard") : undefined} />}
             {view === "teams" && segments[1] !== "assign" && <TeamsPage token={token} onAssign={() => navigate("/teams/assign")} onScoreboard={!during ? () => navigate("/scoreboard") : undefined} onScoreboardBack={during ? () => navigate("/scoreboard") : undefined} />}
             {view === "scoreboard" && <ScoreboardPage token={token} userId={user.id} canEdit={scoreOpen && (settingsAllowed || helper.gameOrganizer)} canScan={scoreOpen && (settingsAllowed || helper.gameOrganizer || helper.scoreHelper)} showTeamsButton={managesTeams && during} onTeams={() => navigate("/teams")} teamsParent={!during && managesTeams} />}
             {view === "gallery" && <GalleryPage token={token} canManage={settingsAllowed || helper.photographer} parentMode={isParent} />}
             {view === "contacts" && <ParentContactsPage token={token} />}
             {view === "notifications" && <NotificationsPage token={token} />}
+            {view === "templates" && <MessageTemplatesPage token={token} />}
             {view === "about" && <AboutPage token={token} />}
             {view === "checkin" && !settingsAllowed && <CheckinPage token={token} />}
             {view === "checkin" && settingsAllowed && segments.length === 1 && <AdminCheckinPage />}
@@ -809,15 +795,14 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
                 onHome={() => navigate("/checkin")}
                 onOpenStaff={(id) => navigate(`/staff/${id}`)}
                 onOpenCamper={(id) => navigate(`/campers/${id}`)}
-                myName={user.name}
                 via="bus"
               />
             )}
             {view === "checkin" && settingsAllowed && segments[1] === "bus" && segments[2] === "outbound" && <BusCheckinPage token={token} trip="outbound" basePath="/checkin/bus/outbound" checkinHomePath="/checkin" reportPath="/checkin/bus/report" />}
             {view === "checkin" && settingsAllowed && segments[1] === "bus" && segments[2] === "return" && <BusCheckinPage token={token} trip="return" basePath="/checkin/bus/return" checkinHomePath="/checkin" reportPath="/checkin/bus/report" />}
             {view === "checkin" && settingsAllowed && segments[1] === "staff" && <StaffCheckinPage token={token} checkinHomePath="/checkin" />}
-            {view === "checkin" && settingsAllowed && segments[1] === "vests" && <VestPage token={token} myName={user.name} checkinHomePath="/checkin" />}
-            {view === "vests" && <VestPage token={token} myName={user.name} />}
+            {view === "checkin" && settingsAllowed && segments[1] === "vests" && <VestPage token={token} checkinHomePath="/checkin" />}
+            {view === "vests" && <VestPage token={token} />}
             {view === "bus" && segments.length === 1 && helper.bus && (
               helper.busOutbound && helper.busReturn
                 ? <BusTripsPage outboundAvailable={helper.busOutbound} returnAvailable={helper.busReturn} />
@@ -830,10 +815,9 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
             )}
             {view === "staffcheckin" && <StaffCheckinPage token={token} />}
             {view === "profile" && (isParent
-              ? <ParentProfile user={user} onLogout={handleLogout} loggingOut={loggingOut} onSwitchRole={onSwitchRole} />
+              ? <ParentProfile token={token} user={user} onLogout={handleLogout} loggingOut={loggingOut} onSwitchRole={onSwitchRole} />
               : (
                 <ProfileView
-                  token={token}
                   user={user}
                   isAdmin={isAdmin}
                   camp={camp}
@@ -871,10 +855,12 @@ export default function Dashboard({ user, token, camp, camps, onLoggedOut, onSwi
   );
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** "Ana Maria" → "Ana" ("" while the name is not known yet) */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? "";
+}
 
 function ProfileView({
-  token,
   user,
   isAdmin,
   camp,
@@ -885,61 +871,39 @@ function ProfileView({
   onSwitchCamp,
   onOpenWizard,
 }: {
-  token: string;
   user: LoggedUser;
   isAdmin: boolean;
   camp: CampSummary;
   camps: CampSummary[];
   onLogout: () => void;
   loggingOut: boolean;
-  onSwitchRole: (role: Role) => Promise<void>;
+  onSwitchRole: (role: CoreRole) => Promise<void>;
   onSwitchCamp: (campId: string) => Promise<void>;
-  /** admin only: reopen the setup wizard */
+  /** coordenação only: reopen the setup wizard */
   onOpenWizard?: () => void;
 }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const meta = roleMeta(user.activeRole);
-  const otherRoles = user.roles.filter((r) => r !== user.activeRole);
-  const roster = useCollectionOrEmpty("staff");
-  const me = roster.find((s) => s.phone === user.phone);
-  const [switchingTo, setSwitchingTo] = useState<Role | null>(null);
+  const otherRoles = sortRoles(user.roles.filter((r) => r !== user.activeRole));
+  const [switchingTo, setSwitchingTo] = useState<CoreRole | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [switchingCampTo, setSwitchingCampTo] = useState<string | null>(null);
   const [campSwitchError, setCampSwitchError] = useState<string | null>(null);
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [emailDraft, setEmailDraft] = useState("");
-  const [emailBusy, setEmailBusy] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const emailValid = !emailDraft.trim() || EMAIL_RE.test(emailDraft.trim());
 
-  async function saveEmail() {
-    if (!me || !emailValid || emailBusy) return;
-    setEmailBusy(true);
-    setEmailError(null);
-    try {
-      await updateStaff(token, me.id, { email: emailDraft.trim() ? emailDraft.trim().toLowerCase() : null });
-      setEditingEmail(false);
-    } catch (err) {
-      setEmailError(err instanceof Error ? err.message : tx("Algo deu errado."));
-    } finally {
-      setEmailBusy(false);
-    }
-  }
-
-  /** one tap on another profile enters it — there is nothing to confirm */
-  async function enterAs(role: Role) {
+  /** one tap on another role enters it — there is nothing to confirm */
+  async function enterAs(role: CoreRole) {
     if (switchingTo) return;
     setSwitchingTo(role);
     setSwitchError(null);
     try {
       await onSwitchRole(role);
     } catch (err) {
-      setSwitchError(err instanceof Error ? err.message : tx("Não foi possível trocar de perfil."));
+      setSwitchError(te(err, "Não foi possível trocar de perfil."));
       setSwitchingTo(null);
     }
   }
 
-  /** one tap on another year enters it — no confirm, same as switching profiles */
+  /** one tap on another year enters it — no confirm, same as switching roles */
   async function enterCamp(id: string) {
     if (switchingCampTo) return;
     setSwitchingCampTo(id);
@@ -947,7 +911,7 @@ function ProfileView({
     try {
       await onSwitchCamp(id);
     } catch (err) {
-      setCampSwitchError(err instanceof Error ? err.message : tx("Não foi possível trocar de ano."));
+      setCampSwitchError(te(err, "Não foi possível trocar de ano."));
       setSwitchingCampTo(null);
     }
   }
@@ -956,36 +920,13 @@ function ProfileView({
     <div className="screen screen--narrow profile-screen">
       <div className="confetti" aria-hidden="true">🎉 🏕️ ✨ 🌲 🎈</div>
 
-      <h1 className="title title--small">{tx("Boas-vindas, {name}! 🎉", { name: user.name.split(" ")[0] })}</h1>
-      <p className="subtitle">
-        {tx("Você entrou como {role}", { role: tx(meta.personLabel) })}
-      </p>
+      <h1 className="title title--small">{firstName(user.name) ? tx("Boas-vindas, {name}! 🎉", { name: firstName(user.name) }) : tx("Boas-vindas! 🎉")}</h1>
+      <p className="subtitle">{tx("Você entrou como {role}", { role: tx(meta.label) })}</p>
 
       <div className="user-card">
         <div className="user-card__row">
           <span className="user-card__label">{tx("Nome")}</span>
-          <span className="user-card__value">{user.name}</span>
-        </div>
-        <div className="user-card__row">
-          <span className="user-card__label">{tx("Celular")}</span>
-          <span className="user-card__value">{user.phone}</span>
-        </div>
-        <div className="user-card__row">
-          <span className="user-card__label">{tx("E-mail")}</span>
-          <span className="user-card__value" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {me?.email || "—"}
-            {isAdmin && me && (
-              <button
-                type="button"
-                className="icon-btn icon-btn--bare"
-                title={tx("Trocar e-mail")}
-                aria-label={tx("Trocar e-mail")}
-                onClick={() => { setEmailDraft(me.email ?? ""); setEmailError(null); setEditingEmail(true); }}
-              >
-                <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" />
-              </button>
-            )}
-          </span>
+          <span className="user-card__value">{user.name || "—"}</span>
         </div>
         <div className="user-card__row">
           <span className="user-card__label">{tx("Perfil")}</span>
@@ -1045,30 +986,13 @@ function ProfileView({
         )}
       </div>
 
+      <p className="cat-hint profile-screen__core-note">{tx("Seus dados pessoais (celular, e-mail, saúde) ficam guardados no IPAlpha, em Meus dados.")}</p>
+
       {switchError && <p className="message message--error">{switchError}</p>}
       {campSwitchError && <p className="message message--error">{campSwitchError}</p>}
 
-      <Dialog open={editingEmail} onClose={() => !emailBusy && setEditingEmail(false)} title={tx("Trocar e-mail")} width={480} dismissible={!emailBusy} className="sheet-dialog" autofocus>
-        <div className="cat-form cat-form--plain">
-          <span className="sheet__handle" aria-hidden="true" />
-          <h2 className="cat-form__title change-room__title">
-            <img className="pencil-icon" src={ICONS.pencil} alt="" aria-hidden="true" /> {tx("Trocar e-mail")}
-          </h2>
-          <label className="cat-field cat-field--grow">
-            <span className="cat-field__label">{tx("E-mail")}</span>
-            <input className="cat-input" type="email" inputMode="email" autoComplete="email" placeholder={tx("ex.: nome@email.com")} value={emailDraft} disabled={emailBusy} onChange={(e) => setEmailDraft(e.target.value)} />
-            {!emailValid && <p className="cat-hint cat-hint--error">{tx("Informe um e-mail válido.")}</p>}
-          </label>
-          {emailError && <p className="message message--error">{emailError}</p>}
-          <div className="cat-form__actions">
-            <button type="button" className="button button--secondary" disabled={emailBusy} onClick={() => setEditingEmail(false)}>{tx("Cancelar")}</button>
-            <button type="button" className="button button--primary" disabled={emailBusy || !emailValid || !me || (emailDraft.trim().toLowerCase() || null) === (me.email || null)} onClick={() => void saveEmail()}>{emailBusy ? tx("Salvando…") : tx("Confirmar")}</button>
-          </div>
-        </div>
-      </Dialog>
-
       <div className="profile-actions">
-        {onOpenWizard && (
+        {onOpenWizard && isAdmin && (
           <button type="button" className="button button--secondary profile-wizard" onClick={onOpenWizard}>
             <img className="audience-icon" src={ICONS.wizard} alt="" aria-hidden="true" /> {tx("Assistente de configuração")}
           </button>

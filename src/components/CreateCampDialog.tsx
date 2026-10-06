@@ -21,7 +21,7 @@ interface CreateCampDialogProps {
  * previous one is archived by the server); the caller's session follows it.
  */
 export default function CreateCampDialog({ open, token, currentYear, onClose, onSwitchCamp }: CreateCampDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const nextYear = currentYear + 1;
   const [label, setLabel] = useState(`Acampa Kids ${nextYear}`);
   const [year, setYear] = useState(String(nextYear));
@@ -48,7 +48,7 @@ export default function CreateCampDialog({ open, token, currentYear, onClose, on
       setWizardDismissed(false);
       await onSwitchCamp(camp.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       setBusy(false);
     }
   }

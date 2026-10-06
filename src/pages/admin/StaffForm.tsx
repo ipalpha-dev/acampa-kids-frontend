@@ -1,35 +1,48 @@
 import RoomRoleIcon from "../../components/RoomRoleIcon";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirmChoice } from "../../components/ConfirmDialog";
-import type { Category } from "../../api/categories";
 import { bedroomGroupsForSex } from "../../api/bedrooms";
-import { BedroomSelect, CategoryChips, TeamSelect, TransportSelect } from "../../components/CategoryFields";
+import { BedroomSelect, TeamSelect, TransportSelect } from "../../components/CategoryFields";
 import { useCollectionOrEmpty } from "../../store";
-import { ROOM_ROLE_META, STAFF_CATEGORY_KEYS, type RoomRole, type Staff, type StaffInput } from "../../api/staff";
-import { blankMedication, type CamperSex, type Medication } from "../../api/campers";
-import MedicationsEditor from "../../components/MedicationsEditor";
+import { rememberPeople } from "../../store/people";
+import { ROOM_ROLE_META, type RoomRole, type Staff, type StaffInput, type StaffRegistration } from "../../api/staff";
+import type { CamperSex } from "../../api/campers";
+import { searchPeople } from "../../api/people";
+import OptionCards from "../../components/OptionCards";
 import PhoneInput from "../../components/PhoneInput";
-import NoPillIcon from "../../components/NoPillIcon";
+import SearchField from "../../components/SearchField";
 import Toggle from "../../components/Toggle";
-import AiNotesField from "../../components/AiNotesField";
-import { useAiNotesSorter } from "../../hooks/useAiNotesSorter";
-import { useFieldDedup } from "../../hooks/useFieldDedup";
-import { useGuessCamperSex } from "../../hooks/useGuessCamperSex";
-import type { DedupField } from "../../api/ai";
-import { maskBrazilPhone, toE164 } from "../../phone";
+import { toE164 } from "../../phone";
 import { useHideScanFab } from "../../scanFab";
+import { ICONS } from "../../icons";
 import { useI18n } from "../../i18n";
+import { compareByName, shownName } from "./staffNames";
+import css from "./staffGroup.module.scss";
+
+/** how the coordenação brings someone into the team */
+type AddMode = "existing" | "new";
+
+interface FoundPerson {
+  personId: string;
+  name: string;
+  nickname: string | null;
+  sex: CamperSex | null;
+}
 
 interface StaffFormProps {
-  /** session token — lets the form ask the AI to sort the health observations */
+  /** session token — searches IPAlpha for people already in the project */
   token: string;
-  /** when editing, the existing member; when creating, undefined */
+  /** when editing, the existing member (camp ops only); when creating, undefined */
   member?: Staff;
-  categories: Category[];
   busy?: boolean;
-  onSubmit: (input: StaffInput) => Promise<void>;
-  /** live man/woman guess — drives the "Novo membro" title icon */
-  onSexChange?: (sex: CamperSex | null, busy: boolean) => void;
+  /** edit: the camp-ops fields (PUT /api/staff/:id) */
+  onSubmit?: (input: StaffInput) => Promise<void>;
+  /** create, "Já está no IPAlpha": an existing person joins this camp's team */
+  onAddExisting?: (personId: string, ops: Partial<StaffInput>) => Promise<void>;
+  /** create, "Cadastrar pessoa nova": registered in IPAlpha (+ equipe membership) */
+  onRegister?: (input: StaffRegistration) => Promise<void>;
+  /** the sex shown in the "Novo membro" title icon (picked person / room wing) */
+  onSexChange?: (sex: CamperSex | null) => void;
   /**
    * Set by the form to a guard the parent calls before navigating away (breadcrumbs).
    * Resolves true when navigation may proceed, false to stay on the form.
@@ -38,67 +51,97 @@ interface StaffFormProps {
 }
 
 /**
- * Create / edit a team member. Team, room and transport are asked only on
- * CREATE; when editing they are changed from the detail page (pencil dialogs). Each health
- * topic is a switch — off = nothing to declare (field hidden, cleared on save).
+ * Add / edit a team member. People live in IPAlpha (CONTRACTS_ACAMPA §15):
+ * creating either brings someone who is ALREADY in the project's team into
+ * this camp, or registers a new person (name, phone, optional sex, home church
+ * and emergency contact travel in core's registration). Editing touches camp
+ * operations only — the person's data and health are kept in IPAlpha.
  */
-export default function StaffForm({ token, member, categories, busy, onSubmit, onSexChange, leaveGuardRef }: StaffFormProps) {
-  const { tx } = useI18n();
+export default function StaffForm({ token, member, busy, onSubmit, onAddExisting, onRegister, onSexChange, leaveGuardRef }: StaffFormProps) {
+  const { tx, te } = useI18n();
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
   const editing = !!member;
-  const byKey = (key: string) => categories.find((c) => c.key === key);
+  const [mode, setMode] = useState<AddMode | null>(null);
 
-  const [name, setName] = useState(member?.name ?? "");
-  const [phone, setPhone] = useState(member?.phone ? maskBrazilPhone(member.phone.replace(/^\+55/, "")) : "");
-  const [email, setEmail] = useState(member?.email ?? "");
-  const [documentId, setDocumentId] = useState(member?.document ?? "");
-  const [birthDate, setBirthDate] = useState(member?.birthDate ?? "");
+  // ── "Já está no IPAlpha" ──
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<FoundPerson[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<FoundPerson | null>(null);
+
+  // ── "Cadastrar pessoa nova" ──
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const [sex, setSex] = useState<CamperSex | null>(null);
+  const [homeChurch, setHomeChurch] = useState("");
+  const [hasEmergency, setHasEmergency] = useState(false);
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [emergencyRelation, setEmergencyRelation] = useState("");
+
+  // ── camp ops (both) ──
   const [active, setActive] = useState(member?.active ?? true);
   const [roomRole, setRoomRole] = useState<RoomRole>(member?.roomRole ?? "helper");
-  const bedrooms = useCollectionOrEmpty("bedrooms");
-  const roster = useCollectionOrEmpty("staff");
   const [team, setTeam] = useState<string | null>(member?.team ?? null);
   const [bedroom, setBedroom] = useState<string | null>(member?.bedroom ?? null);
+  const [transportation, setTransportation] = useState<string | null>(member?.transportation ?? null);
+  const [generalNotes, setGeneralNotes] = useState(member?.generalNotes ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  const bedrooms = useCollectionOrEmpty("bedrooms");
+  const roster = useCollectionOrEmpty("staff");
+  const onTeam = useMemo(() => new Set(roster.map((s) => s.id)), [roster]);
   const room = bedroom ? bedrooms.find((b) => b.id === bedroom) : undefined;
   const roomSex: CamperSex | null = room?.group === "girls" ? "F" : room?.group === "boys" ? "M" : null;
-  const nameChanged = editing && name.trim() !== (member?.name ?? "").trim();
-  const guessed = useGuessCamperSex({ token, name, enabled: !roomSex && (!editing || nameChanged) });
-  const sex: CamperSex | null = roomSex ?? guessed.sex ?? (editing && !nameChanged ? (member?.sex ?? null) : null);
-  const probableGender: CamperSex | null = guessed.sex ?? (editing && !nameChanged ? (member?.probableGender ?? null) : null);
-  const sexBusy = !roomSex && guessed.busy;
+  /** the person's sex as IPAlpha knows it (picked person / the form) — the room wing wins */
+  const personSex: CamperSex | null = editing ? (member?.sex ?? null) : mode === "existing" ? (picked?.sex ?? null) : sex;
+  const shownSex = roomSex ?? personSex;
   useEffect(() => {
-    onSexChange?.(sex, sexBusy);
-  }, [sex, sexBusy, onSexChange]);
-  const [transportation, setTransportation] = useState<string | null>(member?.transportation ?? null);
-  const [allergies, setAllergies] = useState<string[]>(member?.allergies ?? []);
-  const [drugAllergies, setDrugAllergies] = useState<string[]>(member?.drugAllergies ?? []);
-  const [foodRestrictions, setFoodRestrictions] = useState(member?.foodRestrictions ?? "");
-  const [healthIssues, setHealthIssues] = useState<string[]>(member?.healthIssues ?? []);
-  const [medications, setMedications] = useState<Medication[]>(member?.medications ?? []);
-  const [healthNotes, setHealthNotes] = useState(member?.healthNotes ?? "");
+    onSexChange?.(shownSex);
+  }, [shownSex, onSexChange]);
 
-  const [hasAllergies, setHasAllergies] = useState(allergies.length > 0);
-  const [hasDrugAllergies, setHasDrugAllergies] = useState(drugAllergies.length > 0);
-  const [hasHealthIssues, setHasHealthIssues] = useState(healthIssues.length > 0);
-  const [hasMedicines, setHasMedicines] = useState(medications.length > 0);
-  const [hasFoodRestrictions, setHasFoodRestrictions] = useState(!!foodRestrictions);
-  const [error, setError] = useState<string | null>(null);
-  /** don't paint the "falta o celular" warning red on a form the person just opened */
-  const [phoneTouched, setPhoneTouched] = useState(false);
+  // search IPAlpha as the coordenação types (people of the project's team not yet in this camp)
+  useEffect(() => {
+    if (editing || mode !== "existing") return;
+    const q = query.trim();
+    if (q.length < 2) {
+      setFound([]);
+      setSearching(false);
+      setSearchError(null);
+      return;
+    }
+    let alive = true;
+    setSearching(true);
+    const timer = setTimeout(() => {
+      searchPeople(token, "equipe", q)
+        .then((page) => {
+          if (!alive) return;
+          rememberPeople(page.items.map((p) => ({ personId: p.personId, name: p.name, nickname: p.nickname, sex: p.sex })));
+          setFound(page.items.slice().sort(compareByName));
+          setSearchError(null);
+        })
+        .catch((err) => alive && setSearchError(te(err, "Não foi possível buscar agora.")))
+        .finally(() => alive && setSearching(false));
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [query, mode, editing, token, tx]);
 
   // any change from the values the form opened with → ask save/discard before leaving
   const askChoice = useConfirmChoice();
   const snapshot = JSON.stringify([
-    name, phone, email, documentId, birthDate, active, roomRole, team, bedroom, transportation,
-    allergies, drugAllergies, foodRestrictions, healthIssues, medications, healthNotes,
-    hasAllergies, hasDrugAllergies, hasHealthIssues, hasMedicines, hasFoodRestrictions,
+    mode, picked?.personId, name, phone, sex, homeChurch, hasEmergency, emergencyName, emergencyPhone, emergencyRelation,
+    active, roomRole, team, bedroom, transportation, generalNotes,
   ]);
   const initialSnapshot = useRef<string | null>(null);
   if (initialSnapshot.current === null) initialSnapshot.current = snapshot;
   const dirty = initialSnapshot.current !== snapshot;
 
-  // the parent (breadcrumbs / router) calls this before navigating away
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const submitRef = useRef<() => Promise<boolean>>(async () => false);
@@ -116,183 +159,69 @@ export default function StaffForm({ token, member, categories, busy, onSubmit, o
       });
       if (r === "cancel") return false;
       if (r === "discard") return true;
-      return submitRef.current(); // save; proceed only if it succeeded
+      return submitRef.current();
     };
     return () => {
       leaveGuardRef.current = null;
     };
-  }, [leaveGuardRef, askChoice]);
+  }, [leaveGuardRef, askChoice, tx]);
 
-  // the phone IS the login: required here and never shared with another member
-  // (imports may still create someone without one — the form asks for it on the first edit)
+  // the phone is how the new person signs in (IPAlpha keeps it — never this app)
   const phoneE164 = toE164(phone);
-  const phoneTwin = phoneE164 ? roster.find((s) => s.phone === phoneE164 && s.id !== member?.id) : undefined;
-  const phoneError = !phone.trim()
-    ? tx("Informe o celular: é por ele que a pessoa entra no app.")
-    : !phoneE164
-      ? tx("Informe um celular válido com DDD.")
-      : phoneTwin
-        ? tx("Este celular já é de {name}.", { name: phoneTwin.name })
-        : null;
-  const emailError = email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? tx("Informe um e-mail válido.") : null;
-  const valid = name.trim().length > 0 && !phoneError && !emailError;
+  const phoneError = !phone.trim() ? tx("Informe o celular: é por ele que a pessoa entra no app.") : !phoneE164 ? tx("Informe um celular válido com DDD.") : null;
+  const emergencyE164 = toE164(emergencyPhone);
+  const emergencyError = hasEmergency && (!emergencyName.trim() || !emergencyE164) ? tx("Informe o nome e um celular válido com DDD.") : null;
 
-  // ✨ background "remove repeats" on individual free-text fields (fires on blur and after the sorter fills them)
-  const dedup = useFieldDedup({ token, busy });
-
-  // ✨ sort the health observations: on paste / blur the model spreads the text over the fields above
-  const ai = useAiNotesSorter({
-    token,
-    subject: "staff",
-    initialNotes: member?.healthNotes ?? "",
-    busy,
-    getCurrent: () => ({
-      allergies: hasAllergies ? allergies : [],
-      drugAllergies: hasDrugAllergies ? drugAllergies : [],
-      healthIssues: hasHealthIssues ? healthIssues : [],
-      medications: hasMedicines ? medications.filter((m) => m.name.trim()) : [],
-      foodRestrictions: hasFoodRestrictions ? foodRestrictions : "",
-    }),
-    apply: (f) => {
-      if (f.allergies.length) {
-        setAllergies(f.allergies);
-        setHasAllergies(true);
-      }
-      if (f.drugAllergies.length) {
-        setDrugAllergies(f.drugAllergies);
-        setHasDrugAllergies(true);
-      }
-      if (f.healthIssues.length) {
-        setHealthIssues(f.healthIssues);
-        setHasHealthIssues(true);
-      }
-      if (f.medications.length) {
-        setMedications(f.medications);
-        setHasMedicines(true);
-      }
-      if (f.foodRestrictions) {
-        setFoodRestrictions(f.foodRestrictions);
-        setHasFoodRestrictions(true);
-      }
-      setHealthNotes(f.healthNotes);
-      // the sorter just replaced several fields; clean repeats in all of them in parallel
-      dedup.runMany([
-        { field: "foodRestrictions", value: f.foodRestrictions, apply: setFoodRestrictions },
-        { field: "healthNotes", value: f.healthNotes, apply: setHealthNotes },
-      ]);
-    },
-  });
+  const valid = editing
+    ? true
+    : mode === "existing"
+      ? !!picked
+      : mode === "new"
+        ? name.trim().length > 0 && !phoneError && !emergencyError
+        : false;
 
   submitRef.current = handleSubmit;
 
   async function handleSubmit(e?: React.FormEvent): Promise<boolean> {
     e?.preventDefault();
-    if (!valid || ai.holding) return false;
-    // the sorter had its 8 seconds: whatever it hasn't finished is dropped and the form saves as it is
-    ai.cancel();
-    dedup.cancelAll();
+    if (!valid) return false;
     setError(null);
+    const ops: Partial<StaffInput> = {
+      active,
+      roomRole,
+      generalNotes: generalNotes.trim(),
+      // when editing, team, room and transport are changed from the detail page (pencil dialogs)
+      ...(editing ? {} : { team, bedroom, transportation }),
+    };
     try {
-      await onSubmit({
-        name: name.trim(),
-        sex,
-        probableGender,
-        phone: phoneE164 ?? null,
-        email: email.trim() ? email.trim().toLowerCase() : null,
-        document: documentId.trim(),
-        birthDate: birthDate || null,
-        active,
-        roomRole,
-        // when editing, team, room and transport are changed from the detail page (pencil dialogs), not here
-        team: editing ? (member.team ?? null) : team,
-        bedroom: editing ? (member.bedroom ?? null) : bedroom,
-        transportation: editing ? (member.transportation ?? null) : transportation,
-        allergies: hasAllergies ? allergies : [],
-        drugAllergies: hasDrugAllergies ? drugAllergies : [],
-        foodRestrictions: hasFoodRestrictions ? foodRestrictions.trim() : "",
-        healthIssues: hasHealthIssues ? healthIssues : [],
-        medications: hasMedicines ? medications.filter((m) => m.name.trim()) : [],
-        healthNotes: healthNotes.trim(),
-      });
+      if (editing) await onSubmit?.({ active, roomRole, generalNotes: generalNotes.trim(), team: member.team, bedroom: member.bedroom, transportation: member.transportation });
+      else if (mode === "existing" && picked) await onAddExisting?.(picked.personId, ops);
+      else if (mode === "new")
+        await onRegister?.({
+          ...ops,
+          name: name.trim(),
+          phone: phoneE164!,
+          ...(sex ? { sex } : {}),
+          ...(homeChurch.trim() ? { homeChurch: homeChurch.trim() } : {}),
+          ...(hasEmergency && emergencyE164 ? { emergencyContact: { name: emergencyName.trim(), phone: emergencyE164, ...(emergencyRelation.trim() ? { relation: emergencyRelation.trim() } : {}) } } : {}),
+        });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
       return false;
     }
   }
 
-  /** a labelled text field; pass `dedupAs` to run the background repeat clean-up on blur (pulses while it runs) */
-  const text = (label: string, value: string, set: (v: string) => void, placeholder = "", rows?: number, dedupAs?: DedupField) => {
-    const cls = `cat-input${rows ? " cat-input--area" : ""}${dedupAs && dedup.busy(dedupAs) ? " cat-input--busy" : ""}`;
-    const onBlur = dedupAs ? () => void dedup.run(dedupAs, value, set) : undefined;
-    return (
-      <label className="cat-field cat-field--grow">
-        <span className="cat-field__label">{label}</span>
-        {rows ? (
-          <textarea className={cls} rows={rows} value={value} placeholder={placeholder} maxLength={500} disabled={busy} onChange={(e) => set(e.target.value)} onBlur={onBlur} />
-        ) : (
-          <input className={cls} value={value} placeholder={placeholder} maxLength={120} disabled={busy} onChange={(e) => set(e.target.value)} onBlur={onBlur} />
-        )}
-      </label>
-    );
-  };
-
-  /** a switch that reveals its field only when on */
-  const optional = (label: React.ReactNode, on: boolean, setOn: (v: boolean) => void, field: React.ReactNode) => (
-    <div className="cat-field opt-field">
-      <div className="opt-field__head">
-        <Toggle checked={on} onChange={setOn} disabled={busy} label={label} />
-      </div>
-      {on && field}
-    </div>
-  );
-
-  return (
-    <form className="cat-form cat-form--plain" onSubmit={handleSubmit}>
-      <div className="cat-form__row staff-form__row">
-        <label className="cat-field cat-field--grow">
-          <span className={`cat-field__label${sexBusy ? " cat-field__label--guessing" : ""}`}>{tx("Nome")}</span>
-          <input
-            className={`cat-input${sexBusy ? " cat-input--busy" : ""}`}
-            placeholder={tx("ex.: Abimael")}
-            value={name}
-            maxLength={80}
-            autoFocus
-            disabled={busy}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <input type="hidden" name="sex" value={sex ?? ""} />
-        <div className="cat-field cat-field--grow">
-          <span className="cat-field__label">{tx("Celular")}</span>
-          <PhoneInput
-            value={phone}
-            onChange={(v) => {
-              setPhoneTouched(true);
-              setPhone(v);
-            }}
-            disabled={busy}
-          />
-          {phoneError && <p className={`cat-hint${phoneTouched || phone.trim() ? " cat-hint--error" : ""}`}>{phoneError}</p>}
-          {member?.admin && <p className="cat-hint">🔑 {tx("Login de admin é o celular da conta, não o deste cadastro.")}</p>}
+  const campOps = (
+    <>
+      {editing && (
+        <div className="cat-form__row staff-form__row">
+          <div className="cat-field">
+            <span className="cat-field__label">{tx("Status")}</span>
+            <Toggle checked={active} onChange={setActive} disabled={busy} label={active ? tx("Ativo") : tx("Inativo")} />
+          </div>
         </div>
-      </div>
-      <div className="cat-form__row staff-form__row">
-        <label className="cat-field cat-field--grow">
-          <span className="cat-field__label">{tx("E-mail")}</span>
-          <input className="cat-input" type="email" inputMode="email" autoComplete="email" placeholder={tx("ex.: nome@email.com")} value={email} maxLength={160} disabled={busy} onChange={(e) => setEmail(e.target.value)} />
-          {emailError && <p className="cat-hint cat-hint--error">{emailError}</p>}
-        </label>
-        {text(tx("Documento"), documentId, setDocumentId, tx("CPF, RG, identidade, passaporte…"))}
-        <label className="cat-field">
-          <span className="cat-field__label">{tx("Nascimento")}</span>
-          <input className="cat-input" type="date" value={birthDate} disabled={busy} onChange={(e) => setBirthDate(e.target.value)} />
-        </label>
-        <div className="cat-field">
-          <span className="cat-field__label">{tx("Status")}</span>
-          <Toggle checked={active} onChange={setActive} disabled={busy} label={active ? tx("Ativo") : tx("Inativo")} />
-        </div>
-      </div>
+      )}
 
       <fieldset className="cat-fieldset">
         <legend className="cat-field__label">{tx("Função no quarto")}</legend>
@@ -301,7 +230,7 @@ export default function StaffForm({ token, member, categories, busy, onSubmit, o
             const on = roomRole === r;
             return (
               <button key={r} type="button" className={`big-option ${on ? "big-option--on" : ""}`} aria-pressed={on} disabled={busy} onClick={() => setRoomRole(r)}>
-                <span className="big-option__emoji" aria-hidden="true"><RoomRoleIcon role={r} size={32} sex={sex ?? "M"} /></span>
+                <span className="big-option__emoji" aria-hidden="true"><RoomRoleIcon role={r} size={32} sex={shownSex ?? "M"} /></span>
                 <span className="big-option__label">{tx(ROOM_ROLE_META[r].label)}</span>
                 <span className="big-option__hint">{tx(ROOM_ROLE_META[r].hint)}</span>
               </button>
@@ -309,7 +238,6 @@ export default function StaffForm({ token, member, categories, busy, onSubmit, o
           })}
         </div>
         {editing && member?.roomRole === "caretaker" && roomRole === "helper" && <p className="cat-hint cat-hint--error">{tx("Ao virar auxiliar, as crianças sob sua responsabilidade ficam sem líder.")}</p>}
-
       </fieldset>
 
       {!editing && (
@@ -319,42 +247,152 @@ export default function StaffForm({ token, member, categories, busy, onSubmit, o
             <TeamSelect value={team} onChange={setTeam} disabled={busy} />
             <TransportSelect value={transportation} onChange={setTransportation} disabled={busy} audience="staff" />
           </div>
-          <BedroomSelect bedrooms={bedrooms} value={bedroom} onChange={setBedroom} groups={bedroomGroupsForSex(sex, probableGender)} disabled={busy} />
+          <BedroomSelect bedrooms={bedrooms} value={bedroom} onChange={setBedroom} groups={bedroomGroupsForSex(personSex)} disabled={busy} />
         </section>
       )}
 
-      <section className="form-box form-box--plain" aria-labelledby="staff-health-title">
-        <h3 id="staff-health-title" className="form-box__title">{tx("📝 Saúde e observações")}</h3>
-        {optional(tx("🤮 Alergias"), hasAllergies, setHasAllergies, <CategoryChips label={tx("Quais")} category={byKey(STAFF_CATEGORY_KEYS.allergies)} value={allergies} onChange={setAllergies} disabled={busy} />)}
-        {optional(
-          <>
-            <NoPillIcon /> {tx("Alergia a medicamentos")}
-          </>,
-          hasDrugAllergies,
-          setHasDrugAllergies,
-          <CategoryChips label={tx("Quais")} category={byKey(STAFF_CATEGORY_KEYS.drugAllergies)} value={drugAllergies} onChange={setDrugAllergies} disabled={busy} />,
-        )}
-        {optional(tx("🩺 Condição crônica"), hasHealthIssues, setHasHealthIssues, <CategoryChips label={tx("Quais")} category={byKey(STAFF_CATEGORY_KEYS.healthIssues)} value={healthIssues} onChange={setHealthIssues} disabled={busy} />)}
-        {optional(
-          tx("💊 Medicação de uso diário"),
-          hasMedicines,
-          (on) => {
-            setHasMedicines(on);
-            if (on && medications.length === 0) setMedications([blankMedication()]);
-          },
-          <MedicationsEditor value={medications} onChange={setMedications} disabled={busy} />,
-        )}
-        {optional(tx("🍽️ Alimentação / restrições"), hasFoodRestrictions, setHasFoodRestrictions, text(tx("Quais"), foodRestrictions, setFoodRestrictions, tx("ex.: vegetariano, sem lactose"), 2, "foodRestrictions"))}
-        <AiNotesField label={tx("📝 Outras observações de saúde")} value={healthNotes} onChange={setHealthNotes} placeholder={tx("ex.: cole aqui o que a pessoa escreveu na inscrição")} maxLength={500} disabled={busy} sorter={ai} />
-      </section>
+      <label className="cat-field cat-field--grow">
+        <span className="cat-field__label">{tx("📝 Observações do acampamento")}</span>
+        <textarea className="cat-input cat-input--area" rows={3} value={generalNotes} maxLength={500} disabled={busy} placeholder={tx("ex.: chega no sábado à tarde")} onChange={(e) => setGeneralNotes(e.target.value)} />
+      </label>
+      <p className="cat-hint">{tx("Contato e saúde ficam no cadastro da pessoa no IPAlpha — quem cuida da equipe vê na página dela.")}</p>
+    </>
+  );
+
+  return (
+    <form className="cat-form cat-form--plain" onSubmit={handleSubmit}>
+      {!editing && (
+        <OptionCards<AddMode>
+          label={tx("Como incluir a pessoa")}
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setError(null);
+          }}
+          disabled={busy}
+          options={[
+            { key: "existing", icon: ICONS.chooseExisting, title: tx("Já está no IPAlpha"), subtitle: tx("Busque quem já faz parte da equipe do acampamento no IPAlpha.") },
+            { key: "new", icon: ICONS.createNew, title: tx("Cadastrar pessoa nova"), subtitle: tx("Nome e celular — é por ele que a pessoa entra no app.") },
+          ]}
+        />
+      )}
+
+      {!editing && mode === "existing" && (
+        <section className={`form-box form-box--plain ${css.reveal}`} aria-labelledby="staff-find-title">
+          <h3 id="staff-find-title" className="form-box__title">{tx("🔎 Quem vai servir")}</h3>
+          {picked ? (
+            <div className={css.picked}>
+              <span className={css.pickedName}>{shownName(picked.name)}</span>
+              <button type="button" className="link-btn" disabled={busy} onClick={() => setPicked(null)}>
+                {tx("Trocar")}
+              </button>
+            </div>
+          ) : (
+            <>
+              <SearchField value={query} onChange={setQuery} placeholder={tx("Digite o nome…")} aria-label={tx("Buscar pessoa no IPAlpha")} disabled={busy} autoFocus />
+              {searchError && <p className="cat-hint cat-hint--error">{searchError}</p>}
+              {query.trim().length < 2 ? (
+                <p className="cat-hint">{tx("Digite pelo menos 2 letras do nome.")}</p>
+              ) : searching && found.length === 0 ? (
+                <p className="cat-hint">{tx("Buscando…")}</p>
+              ) : found.length === 0 && !searchError ? (
+                <p className="cat-hint">{tx("Ninguém encontrado. Se a pessoa ainda não está no IPAlpha, use “Cadastrar pessoa nova”.")}</p>
+              ) : (
+                <ul className={`picker__list ${css.results}`} role="listbox" aria-label={tx("Pessoas encontradas")}>
+                  {found.map((p) => {
+                    const already = onTeam.has(p.personId);
+                    return (
+                      <li key={p.personId}>
+                        <button type="button" role="option" aria-selected={false} className={`picker__item${already ? " picker__item--busy" : ""}`} disabled={busy || already} onClick={() => setPicked(p)}>
+                          <span className="picker__name">{shownName(p.name)}</span>
+                          {already && <span className="picker__busy">{tx("já está na equipe")}</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {!editing && mode === "new" && (
+        <section className={`form-box form-box--plain ${css.reveal}`} aria-labelledby="staff-new-title">
+          <h3 id="staff-new-title" className="form-box__title">{tx("👤 Pessoa nova no IPAlpha")}</h3>
+          <div className="cat-form__row staff-form__row">
+            <label className="cat-field cat-field--grow">
+              <span className="cat-field__label">{tx("Nome")}</span>
+              <input className="cat-input" placeholder={tx("ex.: Abimael")} value={name} maxLength={80} autoFocus disabled={busy} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <div className="cat-field cat-field--grow">
+              <span className="cat-field__label">{tx("Celular")}</span>
+              <PhoneInput
+                value={phone}
+                onChange={(v) => {
+                  setPhoneTouched(true);
+                  setPhone(v);
+                }}
+                disabled={busy}
+              />
+              {phoneError && <p className={`cat-hint${phoneTouched || phone.trim() ? " cat-hint--error" : ""}`}>{phoneError}</p>}
+            </div>
+          </div>
+          <div className="cat-field">
+            <span className="cat-field__label">{tx("Sexo (opcional)")}</span>
+            <div className="chip-group" role="radiogroup" aria-label={tx("Sexo (opcional)")}>
+              {(
+                [
+                  ["F", tx("Feminino")],
+                  ["M", tx("Masculino")],
+                ] as [CamperSex, string][]
+              ).map(([key, label]) => (
+                <button key={key} type="button" role="radio" aria-checked={sex === key} className={`chip-toggle chip-toggle--small ${sex === key ? "chip-toggle--on" : ""}`} disabled={busy} onClick={() => setSex((cur) => (cur === key ? null : key))}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="cat-field cat-field--grow">
+            <span className="cat-field__label">{tx("Igreja onde congrega (opcional)")}</span>
+            <input className="cat-input" value={homeChurch} maxLength={120} disabled={busy} placeholder={tx("ex.: IP Alphaville")} onChange={(e) => setHomeChurch(e.target.value)} />
+          </label>
+          <div className="cat-field opt-field">
+            <div className="opt-field__head">
+              <Toggle checked={hasEmergency} onChange={setHasEmergency} disabled={busy} label={tx("📞 Contato de emergência (opcional)")} />
+            </div>
+            {hasEmergency && (
+              <div className={`cat-form__row staff-form__row ${css.reveal}`}>
+                <label className="cat-field cat-field--grow">
+                  <span className="cat-field__label">{tx("Nome do contato")}</span>
+                  <input className="cat-input" value={emergencyName} maxLength={80} disabled={busy} onChange={(e) => setEmergencyName(e.target.value)} />
+                </label>
+                <div className="cat-field cat-field--grow">
+                  <span className="cat-field__label">{tx("Celular do contato")}</span>
+                  <PhoneInput value={emergencyPhone} onChange={setEmergencyPhone} disabled={busy} />
+                </div>
+                <label className="cat-field">
+                  <span className="cat-field__label">{tx("Quem é (opcional)")}</span>
+                  <input className="cat-input" value={emergencyRelation} maxLength={40} disabled={busy} placeholder={tx("ex.: irmã, amigo")} onChange={(e) => setEmergencyRelation(e.target.value)} />
+                </label>
+              </div>
+            )}
+            {emergencyError && (emergencyName.trim() || emergencyPhone.trim()) && <p className="cat-hint cat-hint--error">{emergencyError}</p>}
+          </div>
+        </section>
+      )}
+
+      {(editing || mode !== null) && campOps}
 
       {error && <p className="message message--error">{error}</p>}
 
-      <div className="cat-form__actions">
-        <button type="submit" className="button button--primary" disabled={!valid || busy || ai.holding} title={ai.holding ? tx("Aguardando a IA organizar as observações…") : undefined}>
-          {busy ? tx("Salvando…") : ai.holding ? tx("Organizando…") : editing ? tx("Salvar") : tx("Adicionar 🎉")}
-        </button>
-      </div>
+      {(editing || mode !== null) && (
+        <div className="cat-form__actions">
+          <button type="submit" className="button button--primary" disabled={!valid || busy}>
+            {busy ? tx("Salvando…") : editing ? tx("Salvar") : tx("Adicionar 🎉")}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

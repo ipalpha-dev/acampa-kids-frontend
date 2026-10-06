@@ -11,13 +11,14 @@ interface GeneralSettingsPageProps {
 
 /**
  * Admin-only "Geral":
- *   1. the ACCESS window of the ordinary team (people on no list: not
- *      organizers, check-in helpers, medical team or parent contacts) — outside
- *      it the server sends them nothing and the app shows no data;
+ *   1. the ACCESS window of the ordinary team (people serving with no helper
+ *      role in IPAlpha — organização, saúde, check-in… — nor parent contacts)
+ *      — outside it the server sends them nothing and the app shows no data;
  *   2. the ACCESS window of the parents (same idea; the welcome SMS goes out when it opens);
  *   3. the check-in reminder date (SMS to the whole team; also on Notificações);
- *   4. the "kids' rooms still a draft" switch (hides kids from caretakers, mutes room SMS) — also on Testes.
- * The scoreboard rehearsal, the check-in test tools and the SMS redirect live on Testes.
+ *   4. the "kids' rooms still a draft" switch (hides kids from caretakers, mutes room SMS) — also on Testes;
+ *   5. the foreign-lookup counters and the paused import health passes (decision 50).
+ * The scoreboard rehearsal and the check-in test tools live on Testes.
  */
 export default function GeneralSettingsPage({ token }: GeneralSettingsPageProps) {
   const { tx } = useI18n();
@@ -45,6 +46,7 @@ export default function GeneralSettingsPage({ token }: GeneralSettingsPageProps)
       <KidsRoomsDraftCard token={token} />
 
       <ForeignLookupsCard token={token} />
+
     </div>
   );
 }

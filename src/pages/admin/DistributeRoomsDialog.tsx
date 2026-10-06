@@ -11,6 +11,8 @@ import { STRATEGIES, type AgeSlice, type DistributeWho, type DistributionPlan, t
 import type { WorkerMessage, WorkerRequest } from "../../roomDistribution.worker";
 import { ICONS } from "../../icons";
 import { useI18n } from "../../i18n";
+import { firstNameOf } from "./staffNames";
+import css from "./staffGroup.module.scss";
 
 /** how long the solver keeps trying before it settles for the best plan so far */
 const DEADLINE_MS = 10_000;
@@ -50,7 +52,9 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
   const worker = useRef<Worker | null>(null);
 
   const kidRooms = useMemo(() => bedrooms.filter((b) => b.group !== "staff"), [bedrooms]);
-  const ages = useMemo(() => campers.map((k) => ageOf(k.birthDate)).filter((a): a is number => a !== null), [campers]);
+  // birth dates are not served by IPAlpha yet: with no age known, the slice is by sex only (the algorithm stays ready)
+  const ages = useMemo(() => campers.map((k) => ageOf(k.birthDate ?? null)).filter((a): a is number => a !== null), [campers]);
+  const agesKnown = ages.length > 0;
   const ageMin = ages.length ? Math.min(...ages) : 6;
   const ageMax = ages.length ? Math.max(...ages) : 12;
 
@@ -100,7 +104,11 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
     };
     w.onmessage = (e: MessageEvent<WorkerMessage>) => {
       if (e.data.type === "progress") setProgress({ best: e.data.best, attempts: e.data.attempts });
-      else if (e.data.type === "error") fail(e.data.message);
+      else if (e.data.type === "error") {
+        // the worker's text is technical (name: message): logged, never shown
+        console.warn("room distribution failed", e.data.message);
+        fail(tx("A distribuição parou no meio. Tente de novo."));
+      }
       else {
         finish();
         setPlan(e.data.best);
@@ -108,16 +116,19 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
       }
     };
     // the script itself failed to load / parse (an import that needs `window`, a bad bundle…)
-    w.onerror = (ev) => fail(ev.message || tx("A distribuição falhou ao iniciar."));
+    w.onerror = (ev) => {
+      console.warn("room distribution could not start", ev.message);
+      fail(tx("A distribuição falhou ao iniciar."));
+    };
     w.onmessageerror = () => fail(tx("Não foi possível ler a resposta da distribuição."));
     const req: WorkerRequest = {
-      input: { who, kidsMode, slice: kidsMode === "ages" ? slice : null, bedrooms, campers, staff, units, prefs: [...prefs.entries()], keepPlaced, excludeStaffIds: [...excludeStaffIds] },
+      input: { who, kidsMode, slice: kidsMode === "ages" && slice ? (agesKnown ? slice : { ...slice, allAges: true }) : null, bedrooms, campers, staff, units, prefs: [...prefs.entries()], keepPlaced, excludeStaffIds: [...excludeStaffIds] },
       deadlineMs: DEADLINE_MS,
     };
     w.postMessage(req);
   }
 
-  const camperName = (id: string) => campers.find((k) => k.id === id)?.name.split(" ")[0] ?? "?";
+  const camperName = (id: string) => firstNameOf(campers.find((k) => k.id === id)?.name);
   const roomName = (id: string | null) => (id ? bedrooms.find((b) => b.id === id)?.name ?? "?" : tx("sem quarto"));
 
   return (
@@ -162,10 +173,10 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
               onChange={pickMode}
               options={[
                 { key: "auto", icon: ICONS.organizer, title: tx("Automático") },
-                { key: "ages", icon: ICONS.ageGroups, title: tx("Por idade e sexo") },
+                agesKnown ? { key: "ages", icon: ICONS.ageGroups, title: tx("Por idade e sexo") } : { key: "ages", icon: ICONS.ageGroups, title: tx("Por sexo"), subtitle: tx("As idades virão do IPAlpha quando estiverem disponíveis.") },
               ]}
             />
-            {kidsMode === "ages" && slice && <AgeSliceEditor slice={slice} onChange={setSlice} rooms={kidRooms} campers={campers} ageMin={ageMin} ageMax={ageMax} />}
+            {kidsMode === "ages" && slice && <AgeSliceEditor slice={agesKnown ? slice : { ...slice, allAges: true }} onChange={setSlice} rooms={kidRooms} campers={campers} ageMin={ageMin} ageMax={ageMax} agesKnown={agesKnown} />}
           </>
         )}
 
@@ -234,7 +245,7 @@ export default function DistributeRoomsDialog({ open, bedrooms, campers, staff, 
 }
 
 /** One slice, top to bottom: the sex → the age range → the rooms of that wing to fill. Nobody outside the slice is touched. */
-function AgeSliceEditor({ slice, onChange, rooms, campers, ageMin, ageMax }: { slice: AgeSlice; onChange: (s: AgeSlice) => void; rooms: Bedroom[]; campers: Camper[]; ageMin: number; ageMax: number }) {
+function AgeSliceEditor({ slice, onChange, rooms, campers, ageMin, ageMax, agesKnown }: { slice: AgeSlice; onChange: (s: AgeSlice) => void; rooms: Bedroom[]; campers: Camper[]; ageMin: number; ageMax: number; agesKnown: boolean }) {
   const { tx } = useI18n();
   const wing = slice.sex === "F" ? "girls" : "boys";
   const wingRooms = rooms.filter((r) => r.group === wing);
@@ -300,9 +311,9 @@ function AgeSliceEditor({ slice, onChange, rooms, campers, ageMin, ageMax }: { s
   const agesReady = allAges || (Number.isFinite(slice.minAge) && Number.isFinite(slice.maxAge));
   const count = agesReady
     ? campers.filter((k) => {
-        if ((k.sex ?? k.probableGender) !== slice.sex) return false;
+        if (k.sex !== slice.sex) return false;
         if (allAges) return true;
-        const a = ageOf(k.birthDate);
+        const a = ageOf(k.birthDate ?? null);
         return a !== null && a >= slice.minAge && a <= slice.maxAge;
       }).length
     : 0;
@@ -320,8 +331,8 @@ function AgeSliceEditor({ slice, onChange, rooms, campers, ageMin, ageMax }: { s
         ]}
       />
       <div className="distribute__band-ages">
-        <Toggle checked={allAges} onChange={(on) => onChange({ ...slice, allAges: on })} label={tx("Todas as idades")} />
-        {!allAges && (
+        {agesKnown && <Toggle checked={allAges} onChange={(on) => onChange({ ...slice, allAges: on })} label={tx("Todas as idades")} />}
+        {agesKnown && !allAges && (
           <>
             <span>{tx("De")}</span>
             <input
@@ -354,6 +365,7 @@ function AgeSliceEditor({ slice, onChange, rooms, campers, ageMin, ageMax }: { s
         )}
         <em className="distribute__slice-count">{count} {count === 1 ? tx("criança") : tx("crianças")}</em>
       </div>
+      {!agesKnown && <p className={`cat-hint ${css.agesHint}`}>{tx("As idades ainda não vêm do IPAlpha: por enquanto a distribuição usa o sexo e as preferências de quarto. Quando estiverem disponíveis, dá para separar por idade aqui.")}</p>}
       <div ref={area} className="chip-group distribute__rooms" onPointerDown={areaPointerDown} title={tx("Arraste na área para selecionar vários quartos")}>
         {wingRooms.map((r) => {
           const on = slice.roomIds.includes(r.id);

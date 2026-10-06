@@ -7,6 +7,7 @@ import { ICONS } from "../../icons";
 import { useCollection, useCollectionOrEmpty } from "../../store";
 import StaffPicker, { type Occupation } from "./StaffPicker";
 import { useI18n } from "../../i18n";
+import { firstNameOf, shownName } from "./staffNames";
 
 type Entry = { staff: Pick<Staff, "id" | "name"> } | { eventId: string; roleId: string };
 
@@ -43,7 +44,7 @@ export function occupationsFor(event: CampEvent, events: CampEvent[], roleById: 
 }
 
 export default function AssignRoleDialog({ token, open, entry, onClose, onAssigned }: AssignRoleDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const events = useCollection("events");
   const roles = useCollectionOrEmpty("roles");
   const staffList = useCollectionOrEmpty("staff");
@@ -98,7 +99,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
       onAssigned();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -128,7 +129,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
                 onAssigned();
                 onClose();
               })
-              .catch((err) => setError(err instanceof Error ? err.message : tx("Algo deu errado.")))
+              .catch((err) => setError(te(err, "Algo deu errado.")))
               .finally(() => setBusy(false));
           } else if (occ) setStep("confirm");
         }}
@@ -137,7 +138,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
     );
   }
 
-  const first = person?.name.split(" ")[0] ?? "";
+  const first = person ? firstNameOf(person.name) : "";
   const swapping = step === "confirm" && !!occupation;
   const inThisEvent = tx("neste evento");
 
@@ -215,8 +216,8 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
           <div className="swap">
             <p className="confirm__message">
               {occupation!.where === inThisEvent
-                ? tx("{name} já tem função neste evento:", { name: person.name })
-                : tx("{name} já tem função no mesmo horário:", { name: person.name })}
+                ? tx("{name} já tem função neste evento:", { name: shownName(person.name) })
+                : tx("{name} já tem função no mesmo horário:", { name: shownName(person.name) })}
             </p>
             <div className="swap__flow" aria-label={tx("Troca de função")}>
               <div className="swap__card swap__card--from">
@@ -241,7 +242,7 @@ export default function AssignRoleDialog({ token, open, entry, onClose, onAssign
 
         {!fromPerson && !swapping && person && event && role && (
           <p className="confirm__message">
-            {tx("{person} como {role} em {event}", { person: person.name, role: `${role.emoji} ${role.name}`, event: `${event.emoji} ${event.title}` })}
+            {tx("{person} como {role} em {event}", { person: shownName(person.name), role: `${role.emoji} ${role.name}`, event: `${event.emoji} ${event.title}` })}
           </p>
         )}
 

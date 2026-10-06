@@ -1,11 +1,14 @@
 import { ROOM_ROLE_META, staffSex, type Staff } from "../api/staff";
 import { useCollectionOrEmpty } from "../store";
 import { loadAuth } from "../auth/store";
-import { staffGreeting, whatsappLink } from "../whatsapp";
+import { useI18n } from "../i18n";
+import { shownName } from "../pages/admin/staffNames";
+import css from "../pages/admin/staffGroup.module.scss";
+import HealthHeart from "./HealthHeart";
+import PersonContact from "./PersonContact";
 import RoomRoleIcon from "./RoomRoleIcon";
 import TeamTag from "./TeamTag";
 import TransportTag from "./TransportTag";
-import WhatsAppButton from "./WhatsAppButton";
 
 interface StaffMiniCardProps {
   staff: Staff;
@@ -15,18 +18,22 @@ interface StaffMiniCardProps {
   onOpen?: (staffId: string) => void;
 }
 
-/** Compact staff row (name, room role, team, WhatsApp). The body is the link. */
+/**
+ * Compact staff row (name, room role, team, contact). The body is the link.
+ * The phone is never in the record: "Ver contato" reads it from IPAlpha on tap.
+ */
 export default function StaffMiniCard({ staff: s, onOpen }: StaffMiniCardProps) {
+  const { tx } = useI18n();
   const open = onOpen ? () => onOpen(s.id) : undefined;
-  const myName = loadAuth()?.user.name ?? "";
+  const token = loadAuth()?.token ?? "";
   const bedrooms = useCollectionOrEmpty("bedrooms");
   return (
-    <li className={`staff-card staff-card--compact staff-card--cover ${open ? "staff-card--clickable" : ""} ${s.active ? "" : "staff-card--inactive"} ${s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? "Cadastro em revisão pela IA" : undefined}>
+    <li className={`staff-card staff-card--compact staff-card--cover ${open ? "staff-card--clickable" : ""} ${s.active ? "" : "staff-card--inactive"}`}>
       <div
         className="staff-card__body"
         role={open ? "link" : undefined}
         tabIndex={open ? 0 : undefined}
-        title={open ? `Ver ${s.name}` : undefined}
+        title={open ? tx("Ver {name}", { name: shownName(s.name) }) : undefined}
         onClick={open}
         onKeyDown={
           open
@@ -41,14 +48,15 @@ export default function StaffMiniCard({ staff: s, onOpen }: StaffMiniCardProps) 
       >
         <h3 className="staff-card__name staff-card__name--with-tags">
           <span className="staff-card__name-text">
-            {s.name}
-            {!s.active && <span className="staff-card__inactive">inativo</span>}
+            <span className={s.name ? undefined : css.pendingName}>{shownName(s.name)}</span>
+            <HealthHeart show={s.hasHealth} />
+            {!s.active && <span className="staff-card__inactive">{tx("inativo")}</span>}
           </span>
           {(s.bedroom || s.team || s.transportation) && (
             <span className="staff-card__tags">
               {s.bedroom && (
-                <span className="staff-tag staff-tag--soft" title={ROOM_ROLE_META[s.roomRole].hint}>
-                  <RoomRoleIcon role={s.roomRole} sex={staffSex(s, bedrooms)} /> {ROOM_ROLE_META[s.roomRole].label}
+                <span className="staff-tag staff-tag--soft" title={tx(ROOM_ROLE_META[s.roomRole].hint)}>
+                  <RoomRoleIcon role={s.roomRole} sex={staffSex(s, bedrooms)} /> {tx(ROOM_ROLE_META[s.roomRole].label)}
                 </span>
               )}
               <TeamTag teamId={s.team} />
@@ -57,12 +65,10 @@ export default function StaffMiniCard({ staff: s, onOpen }: StaffMiniCardProps) 
           )}
         </h3>
       </div>
-      {s.phone && (
-        <WhatsAppButton
-          className="wa-btn--sm staff-card__wa"
-          href={whatsappLink(s.phone, staffGreeting({ toName: s.name, fromName: myName }))}
-          label={`Falar com ${s.name.split(" ")[0]} no WhatsApp`}
-        />
+      {token && (
+        <span className={css.cardContact}>
+          <PersonContact token={token} personId={s.id} name={s.name} compact />
+        </span>
       )}
     </li>
   );

@@ -48,9 +48,9 @@ interface PrepItem {
  * ⚙️ → Preparação and the per-role text in the role itself.
  */
 export default function PreparationPage({ user, token, pairedWith }: PreparationPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sections = useCollection("preparation");
-  const myRoles = useMyPrepRoles(user.phone);
+  const myRoles = useMyPrepRoles(user.personId);
   const staff = useCollectionOrEmpty("staff");
   const timing = useCampTiming();
   /** rooms still a draft: this page is the team's home, so the departure-day self check-in lives here */
@@ -59,7 +59,7 @@ export default function PreparationPage({ user, token, pairedWith }: Preparation
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const me = staff.find((s) => s.phone === user.phone);
+  const me = staff.find((s) => s.id === user.personId);
   const done = new Set(me?.prepDone ?? []);
   const canTick = !!me;
 
@@ -112,7 +112,7 @@ export default function PreparationPage({ user, token, pairedWith }: Preparation
     try {
       await setMyPrepDone(token, item.key, !done.has(item.key));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusyKey(null);
     }

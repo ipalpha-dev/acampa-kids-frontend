@@ -5,7 +5,6 @@ import { ROOM_ROLE_META } from "../../api/staff";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import SearchField from "../../components/SearchField";
 import { ICONS } from "../../icons";
-import { formatBrazilPhoneClient } from "../../phoneFormat";
 import { setPendingToast } from "../../pendingToast";
 import { useI18n } from "../../i18n";
 
@@ -25,7 +24,7 @@ interface ImportYearPageProps {
 
 /** Acampantes / Equipe → Importar → Outro ano: pick people from another camp and copy just them into this year. */
 export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone }: ImportYearPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sorted = useMemo(() => otherCamps.slice().sort((a, b) => b.year - a.year), [otherCamps]);
   const [sourceId, setSourceId] = useState<string | null>(sorted[0]?.id ?? null);
   const [search, setSearch] = useState("");
@@ -53,7 +52,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
         setRows(r);
         setSelected((prev) => new Set([...prev].filter((id) => r.some((row) => row.id === id))));
       })
-      .catch((e) => alive && setError(e instanceof Error ? e.message : tx("Algo deu errado.")))
+      .catch((e) => alive && setError(te(e, "Algo deu errado.")))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
@@ -95,10 +94,15 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
       const result = await importFromCamp(token, sourceId, kind === "campers" ? { camperIds: ids, onMatch } : { staffIds: ids, onMatch });
       const r = result[kind];
       const n = r ? r.created + r.updated : ids.length;
-      setPendingToast(tx("✅ {n} importado(s)", { n }));
+      const waiting = r?.membershipsFailed ?? 0;
+      setPendingToast(
+        waiting > 0
+          ? tx("✅ {n} importado(s). {m} ainda precisa(m) ser incluído(s) nesta edição pelo Mordomia — com calma, ninguém se perdeu.", { n, m: waiting })
+          : tx("✅ {n} importado(s)", { n }),
+      );
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setImporting(false);
     }
@@ -131,7 +135,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
         <>
           <div className="staff-toolbar">
             <SearchField
-              placeholder={kind === "campers" ? tx("Nome, responsável ou CPF") : tx("Nome ou celular")}
+              placeholder={tx("Nome")}
               value={search}
               onChange={setSearch}
               aria-label={tx("Buscar")}
@@ -156,12 +160,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
                   <li key={row.id} className="staff-card import-year__row" onClick={() => toggle(row.id)}>
                     <input type="checkbox" className="import-year__checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} onClick={(e) => e.stopPropagation()} aria-label={tx("Selecionar {name}", { name: row.name })} />
                     <div className="staff-card__body">
-                      <h3 className="staff-card__name">{row.name}{isCamperRow(kind, row) && row.age != null && <span className="kid-card__age">{tx("{age} anos", { age: row.age })}</span>}</h3>
-                      {isCamperRow(kind, row) ? (
-                        row.guardianFirstName && <p className="staff-card__meta">{tx("Resp.:")} {row.guardianFirstName}</p>
-                      ) : (
-                        <p className="staff-card__meta">{row.phone ? formatBrazilPhoneClient(row.phone) : <em className="staff-card__missing">{tx("sem celular")}</em>}</p>
-                      )}
+                      <h3 className="staff-card__name">{row.name || tx("Nome indisponível no momento")}</h3>
                       {(row.bedroom || row.team || (!isCamperRow(kind, row) && row.roomRole)) && (
                         <div className="staff-card__tags">
                           {row.bedroom && <span className="staff-tag">{row.bedroom}</span>}

@@ -18,7 +18,7 @@ interface CheckinTestToolsProps {
  *   - reset: clears every check-in (kids church + both bus trips, team) and the log.
  */
 export default function CheckinTestTools({ token }: CheckinTestToolsProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const campers = useCollection("campers");
   const staff = useCollection("staff");
@@ -40,7 +40,7 @@ export default function CheckinTestTools({ token }: CheckinTestToolsProps) {
     try {
       await updateSettings(token, { checkinTestMode: value });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -71,7 +71,7 @@ export default function CheckinTestTools({ token }: CheckinTestToolsProps) {
         vests: r.vests,
       }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }

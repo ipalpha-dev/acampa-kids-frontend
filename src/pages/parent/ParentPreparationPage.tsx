@@ -35,7 +35,7 @@ function countdownLabel(
  * the responsible's own record (so they follow them to any phone).
  */
 export default function ParentPreparationPage({ user, token }: ParentPreparationPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sections = useCollection("preparation");
   const timing = useCampTiming();
   const first = user.name.split(" ")[0];
@@ -69,7 +69,7 @@ export default function ParentPreparationPage({ user, token }: ParentPreparation
     try {
       await setMyPrepSectionDone(token, id, !done);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusyId(null);
     }

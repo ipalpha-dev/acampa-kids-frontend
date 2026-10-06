@@ -25,7 +25,7 @@ interface RoleFormProps {
 
 export default function RoleForm({ token, role, busy, onSubmit, onCancel, embedded, hideDocs }: RoleFormProps) {
   useHideScanFab();
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const editing = !!role;
   const [name, setName] = useState(role?.name ?? "");
   const [emoji, setEmoji] = useState(role?.emoji ?? "🎯");
@@ -69,7 +69,7 @@ export default function RoleForm({ token, role, busy, onSubmit, onCancel, embedd
         detailPlaceholder: byPosition || !hasDetail || detailFromTeam ? "" : detailPlaceholder.trim(),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 
@@ -214,7 +214,7 @@ function RolePositionsPicker({ value, onChange, disabled }: { value: RoomRole[];
               onClick={() => onChange(o.roles)}
             >
               <span className="big-option__emoji" aria-hidden="true">
-                <img className="audience-icon" src={o.icon} alt="" style={{ width: 32, height: 32 }} />
+                <img className="audience-icon audience-icon--32" src={o.icon} alt="" />
               </span>
               <span className="big-option__label">{o.label}</span>
               <span className="big-option__hint">{o.hint}</span>

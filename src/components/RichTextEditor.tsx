@@ -131,7 +131,7 @@ const CalloutPreview = Extension.create({
  * (uploaded to /api/files, stored as relative urls).
  */
 export default function RichTextEditor({ value, onChange, placeholder, disabled, token, tall, aiContext, aiTitle, onAiApplied, autoOpenAi, onDone, doneBusy }: RichTextEditorProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -198,11 +198,12 @@ export default function RichTextEditor({ value, onChange, placeholder, disabled,
     if (!aiOpen) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAiOpen(false);
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // scroll lock by class (styles.scss `body.scroll-locked`); an outer lock stays when this one closes
+    const wasLocked = document.body.classList.contains("scroll-locked");
+    document.body.classList.add("scroll-locked");
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      if (!wasLocked) document.body.classList.remove("scroll-locked");
     };
   }, [aiOpen]);
 
@@ -217,7 +218,7 @@ export default function RichTextEditor({ value, onChange, placeholder, disabled,
         editor.chain().focus().setImage({ src: fileUrl(up.url), alt: up.name }).run();
       }
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Não foi possível enviar a imagem.");
+      setUploadError(te(err, "Não foi possível enviar a imagem."));
     } finally {
       setUploading(false);
     }

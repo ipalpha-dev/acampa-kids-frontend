@@ -22,7 +22,7 @@ interface StaffFieldDialogProps {
 
 /** Admin: change ONE quick field of a team member (team or transportation) from the detail page. */
 export default function StaffFieldDialog({ token, open, member: s, field, onClose }: StaffFieldDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [value, setValue] = useState<string | null>(s[field]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function StaffFieldDialog({ token, open, member: s, field, onClos
       await updateStaff(token, s.id, { [field]: value });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

@@ -16,6 +16,7 @@ import { ICONS } from "../../icons";
 import { GROUP_META, type Bedroom } from "../../api/bedrooms";
 import SearchField from "../../components/SearchField";
 import { useI18n } from "../../i18n";
+import { compareByName } from "./staffNames";
 
 interface Props { token: string; onBack: () => void; onScoreboard?: () => void }
 type GroupMode = "leader" | "preference" | "ungrouped";
@@ -27,7 +28,7 @@ interface BoardContext { prefs: PreferenceMap; preferenceUnits: KidUnit[]; bedro
 
 /** Immediate team board: every drop writes to MongoDB and the WebSocket updates all clients. */
 export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const teams = useCollection("teams");
   const campers = useCollectionOrEmpty("campers");
   const bedrooms = useCollectionOrEmpty("bedrooms");
@@ -55,7 +56,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
   const showStaff = audience !== "campers";
   const peopleByTeam = (teamId: string | null) => ({
     campers: campers.filter((camper) => camper.team === teamId && (!q || normName(camper.name).includes(q))),
-    staff: staff.filter((member) => member.team === teamId && (!q || normName(member.name).includes(q))),
+    staff: staff.filter((member) => member.team === teamId && (!q || normName(member.name).includes(q))).sort(compareByName),
   });
 
   async function move(unit: DragUnit, teamId: string | null) {
@@ -66,7 +67,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
     try {
       await assignPeopleToTeam(token, unit.kind, ids, teamId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível mudar o time."));
+      setError(te(err, "Não foi possível mudar o time."));
     } finally {
       setBusyIds((current) => { const next = new Set(current); for (const id of ids) next.delete(id); return next; });
       setDragging(null);
@@ -83,7 +84,7 @@ export default function AssignToTeamsPage({ token, onBack, onScoreboard }: Props
       await autoAssignCamperTeams(token, automaticGroups(campers, mode, context));
       setAutoOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível distribuir as crianças."));
+      setError(te(err, "Não foi possível distribuir as crianças."));
     } finally {
       setAutoBusy(false);
     }

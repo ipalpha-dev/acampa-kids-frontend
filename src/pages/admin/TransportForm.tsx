@@ -24,7 +24,7 @@ interface TransportFormProps {
 
 /** Create / edit one vehicle. A BUS carries a colour + number; a CAR does not. */
 export default function TransportForm({ transport, busy, onSubmit, onCancel }: TransportFormProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // the "Ler crachá" FAB would sit on top of Salvar / Cancelar
   useHideScanFab();
   const editing = !!transport;
@@ -54,7 +54,7 @@ export default function TransportForm({ transport, busy, onSubmit, onCancel }: T
     try {
       await onSubmit(input);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     }
   }
 
@@ -138,8 +138,7 @@ export default function TransportForm({ transport, busy, onSubmit, onCancel }: T
                 <button
                   key={c.hex}
                   type="button"
-                  className={`swatch ${color.toLowerCase() === c.hex ? "swatch--on" : ""}`}
-                  style={{ background: c.hex }}
+                  className={`swatch swatch--bus-${c.key} ${color.toLowerCase() === c.hex ? "swatch--on" : ""}`}
                   title={tx(c.name)}
                   aria-label={tx(c.name)}
                   aria-pressed={color.toLowerCase() === c.hex}

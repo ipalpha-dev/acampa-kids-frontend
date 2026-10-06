@@ -1,6 +1,7 @@
 import { api, command } from "./client";
 import { bearer } from "../auth/store";
 import { ICONS } from "../icons";
+import type { PersonLive } from "./campers";
 
 /** Category keys that feed each staff field (must match the backend). */
 export const STAFF_CATEGORY_KEYS = {
@@ -9,23 +10,16 @@ export const STAFF_CATEGORY_KEYS = {
   healthIssues: "condicao-cronica",
 } as const;
 
-export interface Staff {
+/**
+ * A team member's camp-ops record (participants, CONTRACTS_ACAMPA §15). The
+ * id IS the IPAlpha person id. No person data here: name / nickname / sex are
+ * joined live by the store; phone, e-mail and health are read per person on
+ * demand (GET /api/people/:personId/data/:kind — core's role rules decide).
+ */
+export interface StaffRecord {
+  /** the IPAlpha person id */
   id: string;
-  name: string;
-  /** "F" | "M" | null — from the room (meninas/meninos); never shown on the form */
-  sex: import("./campers").CamperSex | null;
-  /** "F" | "M" | null — Jev guess on the name; internal, never shown; icon + ordering fallback when the room has no wing */
-  probableGender: import("./campers").CamperSex | null;
-  /** E.164, or null while the person hasn't registered a phone */
-  phone: string | null;
-  /** optional — notification emails; null/empty = skip email */
-  email: string | null;
-  /** unstructured identity document (CPF, RG, identidade, CDIN, passport…) */
-  document: string;
-  /** ISO date (YYYY-MM-DD); null when unknown */
-  birthDate: string | null;
-  /** this roster row belongs to an admin login — badge only; the person can still leave Equipe */
-  admin?: boolean;
+  personId: string;
   active: boolean;
   team: string | null;
   /** Transport id (see api/transports.ts) — bus / car, not a category option */
@@ -34,18 +28,7 @@ export interface Staff {
   bedroom: string | null;
   /** CARETAKER ("líder"): looks after specific kids; HELPER ("auxiliar"): only helps out in the room */
   roomRole: RoomRole;
-  allergies: string[];
-  drugAllergies: string[];
-  foodRestrictions: string;
-  healthIssues: string[];
-  /** medicines the person takes, each with its schedule */
-  medications: import("./campers").Medication[];
-  /** free-text health/allergy remarks */
-  healthNotes: string;
-  aiReviewStatus?: "pending" | "processing" | "structured" | "reviewed" | "error" | null;
-  aiReviewError?: string;
-  aiReviewStartedAt?: string | null;
-  aiReviewFinishedAt?: string | null;
+  generalNotes: string;
   /** set when the person arrived on departure day */
   checkin: import("./campers").CamperCheckin | null;
   /** the team vest (colete): handed out, then taken back */
@@ -54,18 +37,20 @@ export interface Staff {
   prepDone: string[];
   /** distinct kids scanned via the emergency QR outside this person's scope */
   foreignLookupCount?: number;
-  /** names of those kids (newest last) — for the admin export / Geral card */
-  foreignLookupNames?: string[];
+  /** person ids of those kids */
+  foreignLookupCamperIds?: string[];
   /**
    * true when the server sent a reduced record: the viewer is a colleague in
-   * the same room (name + phone + room role + team) or a vest helper (name +
-   * phone + vest) — not an admin nor the person themself (transport, health
-   * and check-in are blank)
+   * the same room, a parent or a vest helper — not the coordenação nor the
+   * person themself (transport, check-in and notes are blank)
    */
   redacted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
+
+/** What screens read: the camp-ops record + the live person fields (name, nickname, sex, ♥). */
+export interface Staff extends StaffRecord, PersonLive {}
 
 /** Vest (colete) check-out / check-in: `returned` is never set without `delivered`. */
 export interface VestStatus {
@@ -81,40 +66,39 @@ export const ROOM_ROLE_META: Record<RoomRole, { label: string; plural: string; i
 };
 
 /** Room rosters: leaders first, then assistants; alphabetical inside each role. */
-export function compareRoomStaff(a: Pick<Staff, "name" | "roomRole">, b: Pick<Staff, "name" | "roomRole">): number {
+export function compareRoomStaff(a: { name: string; roomRole: RoomRole }, b: { name: string; roomRole: RoomRole }): number {
   const roleOrder: Record<RoomRole, number> = { caretaker: 0, helper: 1 };
   return roleOrder[a.roomRole] - roleOrder[b.roomRole] || a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
 }
 
+/** Camp-ops fields the coordenação / organização may write (PUT /api/staff/:id). */
 export interface StaffInput {
-  name: string;
-  sex: import("./campers").CamperSex | null;
-  probableGender: import("./campers").CamperSex | null;
-  phone: string | null;
-  email: string | null;
-  document: string;
-  birthDate: string | null;
   active: boolean;
   team: string | null;
   bedroom: string | null;
   roomRole: RoomRole;
   transportation: string | null;
-  allergies: string[];
-  drugAllergies: string[];
-  foodRestrictions: string;
-  healthIssues: string[];
-  medications: import("./campers").Medication[];
-  healthNotes: string;
+  generalNotes: string;
+}
+
+/** A NEW team member registered in IPAlpha by the coordenação (`POST /api/staff/register`). */
+export interface StaffRegistration extends Partial<StaffInput> {
+  name: string;
+  /** E.164 — how the person signs in */
+  phone: string;
+  sex?: import("./campers").CamperSex | null;
+  homeChurch?: string;
+  emergencyContact?: { name: string; phone: string; relation?: string };
 }
 
 /**
- * A team member's sex: girls/boys room wins, otherwise the stored sex, otherwise the probable gender.
+ * A team member's sex: girls/boys room wins, otherwise the sex from IPAlpha (shown like the name).
  */
-export function staffSex(s: Pick<Staff, "bedroom" | "sex" | "probableGender">, bedrooms: Pick<import("./bedrooms").Bedroom, "id" | "group">[]): import("./campers").CamperSex | null {
+export function staffSex(s: Pick<Staff, "bedroom" | "sex">, bedrooms: Pick<import("./bedrooms").Bedroom, "id" | "group">[]): import("./campers").CamperSex | null {
   const group = s.bedroom ? bedrooms.find((b) => b.id === s.bedroom)?.group : undefined;
   if (group === "girls") return "F";
   if (group === "boys") return "M";
-  return s.sex ?? s.probableGender ?? null;
+  return s.sex ?? null;
 }
 
 const json = (token: string) => ({ ...bearer(token), "content-type": "application/json" });
@@ -146,17 +130,25 @@ export interface StaffDetail {
   roommates: Staff[];
 }
 
-export async function createStaff(token: string, input: StaffInput): Promise<Staff> {
-  const res = await command<{ staff: Staff }>("/api/staff", {
-    method: "POST",
-    headers: json(token),
-    body: JSON.stringify(input),
-  }, ["staff", "bedrooms"]);
+/** An existing IPAlpha person joins this camp's team (`POST /api/staff {personId, …ops}`). */
+export async function addStaff(token: string, personId: string, ops: Partial<StaffInput> = {}): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>("/api/staff", { method: "POST", headers: json(token), body: JSON.stringify({ personId, ...ops }) }, ["staff", "bedrooms"]);
   return res.staff;
 }
 
-export async function updateStaff(token: string, id: string, patch: Partial<StaffInput>): Promise<Staff> {
-  const res = await command<{ staff: Staff }>(`/api/staff/${id}`, {
+/** A NEW person registered in IPAlpha + `equipe` membership + the camp-ops row (coordenação). */
+export async function registerStaff(token: string, input: StaffRegistration): Promise<{ staff: StaffRecord & { name: string }; created: boolean }> {
+  return command("/api/staff/register", { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["staff", "bedrooms"]);
+}
+
+/** One team member's page: camp ops + name + health (self / managers) — read live. */
+export async function fetchStaff(token: string, id: string): Promise<Staff> {
+  const res = await api<{ staff: Staff }>(`/api/staff/${encodeURIComponent(id)}`, { headers: bearer(token) });
+  return res.staff;
+}
+
+export async function updateStaff(token: string, id: string, patch: Partial<StaffInput>): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>(`/api/staff/${id}`, {
     method: "PUT",
     headers: json(token),
     body: JSON.stringify(patch),
@@ -175,19 +167,19 @@ export interface MoveStaffInput {
   swapWith?: string;
 }
 
-export async function moveStaff(token: string, id: string, input: MoveStaffInput): Promise<Staff> {
-  const res = await command<{ staff: Staff }>(`/api/staff/${id}/move`, { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["staff", "bedrooms", "campers"]);
+export async function moveStaff(token: string, id: string, input: MoveStaffInput): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>(`/api/staff/${id}/move`, { method: "POST", headers: json(token), body: JSON.stringify(input) }, ["staff", "bedrooms", "campers"]);
   return res.staff;
 }
 
 /** The team member arrived. */
-export async function checkinStaff(token: string, id: string): Promise<Staff> {
-  const res = await command<{ staff: Staff }>(`/api/staff/${id}/checkin`, { method: "POST", headers: bearer(token) }, ["staff"]);
+export async function checkinStaff(token: string, id: string): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>(`/api/staff/${id}/checkin`, { method: "POST", headers: bearer(token) }, ["staff"]);
   return res.staff;
 }
 
-export async function undoCheckinStaff(token: string, id: string): Promise<Staff> {
-  const res = await command<{ staff: Staff }>(`/api/staff/${id}/checkin`, { method: "DELETE", headers: bearer(token) }, ["staff"]);
+export async function undoCheckinStaff(token: string, id: string): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>(`/api/staff/${id}/checkin`, { method: "DELETE", headers: bearer(token) }, ["staff"]);
   return res.staff;
 }
 
@@ -196,10 +188,10 @@ export async function undoCheckinStaff(token: string, id: string): Promise<Staff
 export type VestAction = "deliver" | "undo-deliver" | "return" | "undo-return";
 
 /** Stamps / clears the vest delivery or return of one team member. */
-export async function setStaffVest(token: string, id: string, action: VestAction): Promise<Staff> {
+export async function setStaffVest(token: string, id: string, action: VestAction): Promise<StaffRecord> {
   const path = `/api/staff/${id}/vest/${action.endsWith("deliver") ? "delivery" : "return"}`;
   const method = action.startsWith("undo") ? "DELETE" : "POST";
-  const res = await command<{ staff: Staff }>(path, { method, headers: bearer(token) }, ["staff"]);
+  const res = await command<{ staff: StaffRecord }>(path, { method, headers: bearer(token) }, ["staff"]);
   return res.staff;
 }
 
@@ -216,7 +208,7 @@ export interface SelfCheckinStatus {
   opensAt: string | null;
   /** every meeting point — the phone shows the distance to the nearest one */
   locations: import("./settings").CheckinLocation[];
-  staff: Staff | null;
+  staff: StaffRecord | null;
 }
 
 export async function getSelfCheckinStatus(token: string): Promise<SelfCheckinStatus> {
@@ -224,8 +216,8 @@ export async function getSelfCheckinStatus(token: string): Promise<SelfCheckinSt
 }
 
 /** Sends the device position; the server decides whether it is close enough. */
-export async function selfCheckin(token: string, pos: { lat: number; lng: number; accuracyM?: number }): Promise<{ staff: Staff; distanceM: number; location: import("./settings").CheckinLocation }> {
-  const res = await command<{ staff: Staff; distanceM: number; location: import("./settings").CheckinLocation }>("/api/staff/me/checkin", {
+export async function selfCheckin(token: string, pos: { lat: number; lng: number; accuracyM?: number }): Promise<{ staff: StaffRecord; distanceM: number; location: import("./settings").CheckinLocation }> {
+  const res = await command<{ staff: StaffRecord; distanceM: number; location: import("./settings").CheckinLocation }>("/api/staff/me/checkin", {
     method: "POST",
     headers: json(token),
     body: JSON.stringify(pos),
@@ -234,11 +226,12 @@ export async function selfCheckin(token: string, pos: { lat: number; lng: number
 }
 
 /** Ticks / unticks one item of the logged-in person's Preparação checklist. */
-export async function setMyPrepDone(token: string, key: string, done: boolean): Promise<Staff> {
-  const res = await command<{ staff: Staff }>(`/api/staff/me/prep/${key}`, { method: "PUT", headers: json(token), body: JSON.stringify({ done }) }, ["staff"]);
+export async function setMyPrepDone(token: string, key: string, done: boolean): Promise<StaffRecord> {
+  const res = await command<{ staff: StaffRecord }>(`/api/staff/me/prep/${key}`, { method: "PUT", headers: json(token), body: JSON.stringify({ done }) }, ["staff"]);
   return res.staff;
 }
 
-export async function deleteStaff(token: string, id: string): Promise<void> {
-  await command(`/api/staff/${id}`, { method: "DELETE", headers: bearer(token) }, ["staff", "bedrooms", "events"]);
+/** The person leaves this camp's team (the IPAlpha membership is removed when the coordenação may). */
+export async function deleteStaff(token: string, id: string): Promise<{ membershipRemoved: boolean }> {
+  return command(`/api/staff/${id}`, { method: "DELETE", headers: bearer(token) }, ["staff", "bedrooms", "events"]);
 }

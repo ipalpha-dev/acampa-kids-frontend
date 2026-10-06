@@ -7,6 +7,8 @@ import Dialog from "../../components/Dialog";
 import { ICONS } from "../../icons";
 import { useCollectionOrEmpty } from "../../store";
 import { useI18n } from "../../i18n";
+import { shownName } from "./staffNames";
+import css from "./staffGroup.module.scss";
 
 interface MoveStaffDialogProps {
   token: string;
@@ -29,7 +31,7 @@ const OPTIONS: { key: MoveKids; emoji?: string; icon?: string; label: string; hi
  * in particular a helper is only promoted to leader when explicitly chosen.
  */
 export default function MoveStaffDialog({ token, open, member: s, onClose }: MoveStaffDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const staff = useCollectionOrEmpty("staff");
   const campers = useCollectionOrEmpty("campers");
@@ -96,7 +98,7 @@ export default function MoveStaffDialog({ token, open, member: s, onClose }: Mov
       await moveStaff(token, s.id, { bedroom, kids: mode, ...(mode === "swap" && person ? { swapWith: person } : {}), ...(mode === "assign" && person ? { assignTo: person } : {}) });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -124,7 +126,7 @@ export default function MoveStaffDialog({ token, open, member: s, onClose }: Mov
                 return (
                   <button key={o.key} type="button" className={`big-option ${on ? "big-option--on" : ""}`} aria-pressed={on} disabled={busy} onClick={() => setKids(o.key)}>
                     <span className="big-option__emoji" aria-hidden="true">
-                      {o.icon ? <img src={o.icon} alt="" width={30} height={30} style={{ display: "block" }} /> : o.emoji}
+                      {o.icon ? <img className={css.optionIcon} src={o.icon} alt="" width={30} height={30} /> : o.emoji}
                     </span>
                     <span className="big-option__label">{tx(o.label)}</span>
                     <span className="big-option__hint">{tx(o.hint)}</span>
@@ -148,7 +150,7 @@ export default function MoveStaffDialog({ token, open, member: s, onClose }: Mov
                 return (
                   <button key={x.id} type="button" className={`big-option ${on ? "big-option--on" : ""}`} aria-pressed={on} disabled={busy} onClick={() => setPerson(x.id)}>
                     <span className="big-option__emoji" aria-hidden="true"><RoomRoleIcon role={x.roomRole} size={32} sex={staffSex(x, bedrooms)} /></span>
-                    <span className="big-option__label">{x.name}</span>
+                    <span className="big-option__label">{shownName(x.name)}</span>
                     <span className="big-option__hint">
                       {tx(ROOM_ROLE_META[x.roomRole].label)}
                       {x.roomRole === "caretaker" && (n === 1 ? tx(" · {count} criança", { count: n }) : tx(" · {count} crianças", { count: n }))}

@@ -1,4 +1,4 @@
-import { applyServerData, setConnection, type Collections } from "./index";
+import { applyServerData, setConnection, type ServerCollections as Collections } from "./index";
 
 /**
  * Keeps ONE WebSocket to the backend while the user is logged in.
@@ -22,7 +22,36 @@ type ServerMessage =
   | { type: "snapshot"; at: string; data: Partial<Collections> }
   | { type: "update"; at: string; data: Partial<Collections> }
   | { type: "ping"; at: string }
+  | { type: "import-progress"; at: string; data: ImportProgressEvent }
+  | { type: "import-batch"; at: string; data: ImportBatchEvent }
   | { type: "error"; code: string; message: string };
+
+/** A people import (persons-api, CONTRACTS_ACAMPA §20/§24) moved a step — only the importer's sockets hear it. */
+export interface ImportProgressEvent {
+  importId: string;
+  step: string;
+  done: number;
+  total: number;
+  status: string;
+  batch?: number;
+}
+
+/** One batch of an import was applied (counts only — the rows are read with GET /api/imports/:id/results). */
+export interface ImportBatchEvent {
+  importId: string;
+  batch: number;
+  rows: number;
+  applied: number;
+  skipped: number;
+  unfilled: number;
+  /** import values kept aside because someone changed that field by hand (decision 78) — decided on the campers / team page */
+  conflicts: number;
+}
+
+/** Fired on `window` with `detail: ImportProgressEvent`. */
+export const IMPORT_PROGRESS_EVENT = "acampa:import-progress";
+/** Fired on `window` with `detail: ImportBatchEvent`. */
+export const IMPORT_BATCH_EVENT = "acampa:import-batch";
 
 let socket: WebSocket | null = null;
 let currentToken: string | null = null;
@@ -74,6 +103,8 @@ function open() {
       resolveCollectionWaiters(msg.data);
     }
     else if (msg.type === "ping") ws.send("pong");
+    else if (msg.type === "import-progress") window.dispatchEvent(new CustomEvent(IMPORT_PROGRESS_EVENT, { detail: msg.data }));
+    else if (msg.type === "import-batch") window.dispatchEvent(new CustomEvent(IMPORT_BATCH_EVENT, { detail: msg.data }));
     else if (msg.type === "error" && msg.code === "UNAUTHORIZED") {
       currentToken = null;
       onUnauthorized?.(/acesso da equipe/i.test(msg.message) ? "access-window-closed" : "session");

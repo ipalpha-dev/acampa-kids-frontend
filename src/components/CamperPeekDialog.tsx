@@ -1,46 +1,55 @@
 import Dialog from "./Dialog";
 import BedroomTag from "./BedroomTag";
 import GuardianWhatsApp from "./GuardianWhatsApp";
-import HealthAlerts from "./HealthAlerts";
+import HealthAlerts, { useHealthLabelOf } from "./HealthAlerts";
+import HealthHeart from "./HealthHeart";
 import KidIcon from "./KidIcon";
+import TeamTag from "./TeamTag";
 import { kidIconSex } from "../icons";
-import { ageOf } from "../api/campers";
+import { ageOf, type HealthInfo } from "../api/campers";
+import { loadAuth } from "../auth/store";
 import { navigate } from "../router";
-import { formatBrazilPhoneClient } from "../phoneFormat";
 import { useI18n } from "../i18n";
 import { useCamperDetail, useLabelOf } from "../store/derive";
+import styles from "./campers.module.scss";
 
 interface CamperPeekDialogProps {
   /** null = closed */
   camperId: string | null;
   /** shown while the record is still syncing */
   name?: string;
+  /**
+   * The kid's health, ONLY when the caller already read it for this moment
+   * (e.g. the care team's medication checklist). Without it the card shows
+   * the neutral ♥ at most — details live on the kid's page.
+   */
+  health?: HealthInfo | null;
   onClose: () => void;
 }
 
 /**
- * The kid's HEALTH card in a popup, opened from the medication checklist.
- *
- * Deliberately NOT the whole record: someone ticking a dose wants the health
- * picture (what the kid can't take, what they have, weight for the dose, the
- * convênio) and a way to reach the guardian — not school, church, documents
- * or transport. "Ver ficha completa" opens the kid's page.
+ * A quick look at a kid in a popup (name, room, team) with a tap-to-read way
+ * to reach the family. "Ver ficha completa" opens the kid's page, where the
+ * health is read live.
  */
-export default function CamperPeekDialog({ camperId, name, onClose }: CamperPeekDialogProps) {
+export default function CamperPeekDialog({ camperId, name, health, onClose }: CamperPeekDialogProps) {
   const { tx } = useI18n();
   const data = useCamperDetail(camperId ?? "");
   const labelOf = useLabelOf();
+  const healthLabelOf = useHealthLabelOf(loadAuth()?.token ?? "");
   const k = data?.camper;
-  const age = k ? ageOf(k.birthDate) : null;
-  const sex = k ? kidIconSex(data?.bedroom?.group, k.sex, k.probableGender) ?? "girl" : "girl";
+  const age = k ? ageOf(k.birthDate ?? null) : null;
+  const sex = k ? (kidIconSex(data?.bedroom?.group, k.sex) ?? "girl") : "girl";
+  const shownName = k?.name || name || "";
 
   return (
-    <Dialog open={!!camperId} onClose={onClose} title={name ?? tx("Criança")} width={520}>
+    <Dialog open={!!camperId} onClose={onClose} title={shownName || tx("Criança")} width={520}>
       <div className="cat-form cat-form--plain">
         <header className="kid-peek__head">
           <KidIcon sex={sex} size={40} />
           <h2 className="cat-form__title kid-peek__name">
-            {k?.name ?? name ?? tx("Criança")}
+            {shownName || <span className={styles.pendingName}>{tx("Carregando nome…")}</span>}
+            <HealthHeart show={k?.hasHealth} />
             {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
           </h2>
           {k && <GuardianWhatsApp camper={k} className="" />}
@@ -53,33 +62,26 @@ export default function CamperPeekDialog({ camperId, name, onClose }: CamperPeek
             <div className="staff-card__tags">
               {data?.bedroom && <BedroomTag bedroom={data.bedroom} />}
               {labelOf(k.bed) && <span className="staff-tag">{tx("Cama {bed}", { bed: labelOf(k.bed)!.toLowerCase() })}</span>}
-              {k.weightKg != null && <span className="staff-tag">{String(k.weightKg).replace(".", ",")} kg</span>}
+              <TeamTag teamId={k.team} />
+              {health?.weightKg != null && <span className="staff-tag">{tx("{weight} kg", { weight: String(health.weightKg).replace(".", ",") })}</span>}
             </div>
 
-            <HealthAlerts person={k} labelOf={labelOf} boxed />
-
-            <dl className="detail-grid kid-peek__contacts">
-              {k.guardianName && (
-                <>
-                  <dt>{tx("Responsável")}</dt>
-                  <dd>
-                    {k.guardianName}
-                    {k.guardianPhone && <> · {formatBrazilPhoneClient(k.guardianPhone)}</>}
-                  </dd>
-                </>
-              )}
-              {k.emergencyContact && (
-                <>
-                  <dt>{tx("Emergência")}</dt>
-                  <dd>{k.emergencyContact}</dd>
-                </>
-              )}
-              <dt>{tx("Convênio")}</dt>
-              <dd>
-                {k.insurance || "—"}
-                {k.insuranceCard && <span className="cat-hint">· {k.insuranceCard}</span>}
-              </dd>
-            </dl>
+            {health && (
+              <div className={styles.healthReveal}>
+                <div>
+                  <HealthAlerts person={health} labelOf={healthLabelOf} boxed />
+                  {(health.insurance || health.insuranceCard) && (
+                    <dl className="detail-grid kid-peek__contacts">
+                      <dt>{tx("Convênio")}</dt>
+                      <dd>
+                        {health.insurance || "—"}
+                        {health.insuranceCard && <span className="cat-hint">· {health.insuranceCard}</span>}
+                      </dd>
+                    </dl>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
 

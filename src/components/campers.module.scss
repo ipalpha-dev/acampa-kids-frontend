@@ -1,0 +1,167 @@
+// Shared look of the kids' screens (campers group): placeholders, the
+// responsáveis list, the creation paths and the export progress.
+
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+// a name still on its way from IPAlpha — never a blank row
+.pendingName {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 600;
+}
+
+// health details that appear in a list (tag filter / name filter ≤ 6): grow in gently
+.healthReveal {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: health-reveal .22s $ease;
+  > * { min-height: 0; }
+}
+
+@keyframes health-reveal {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+// the responsáveis of a kid (person page)
+.responsibles {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.responsible {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border: 2px solid var(--sage);
+  border-radius: 14px;
+  background: var(--paper);
+  animation: health-reveal .22s $ease;
+}
+
+.responsibleName {
+  flex: 1;
+  min-width: 140px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.addResponsible {
+  justify-self: start;
+}
+
+// creation paths (option cards) + the form under the picked one
+.pathPanel {
+  display: grid;
+  gap: 14px;
+  animation: health-reveal .24s $ease;
+}
+
+.searchResults {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.searchResult {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid var(--sage);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+
+  &:hover:not(:disabled) { border-color: var(--forest); background: #eef8f1; }
+  &:disabled { opacity: .55; cursor: wait; }
+}
+
+.searchResultOn {
+  border-color: var(--forest);
+  background: #eef8f1;
+  box-shadow: 0 0 0 3px rgba(15, 154, 138, .22);
+}
+
+.searchResultName {
+  flex: 1;
+  font-weight: 700;
+}
+
+// the export: gentle progress while the live data is read
+.exportProgress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #eef8f1;
+  color: var(--forest);
+  font-weight: 700;
+  animation: health-reveal .2s $ease;
+}
+
+.exportBar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: #d6ebe0;
+  overflow: hidden;
+}
+
+.exportBarFill {
+  height: 100%;
+  width: var(--progress, 0%);
+  border-radius: inherit;
+  background: var(--forest);
+  transition: width .25s $ease;
+}
+
+// history: which fields changed (no values)
+.historyFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyItem {
+  animation: health-reveal .2s $ease;
+}
+
+// hidden iframe the labels are printed from
+.printFrame {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border: 0;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .healthReveal,
+  .responsible,
+  .pathPanel,
+  .exportProgress,
+  .historyItem { animation: none; }
+  .searchResult,
+  .exportBarFill { transition: none; }
+}

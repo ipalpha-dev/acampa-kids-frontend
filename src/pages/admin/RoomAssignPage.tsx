@@ -23,6 +23,8 @@ import { medianAgeFloor, shortPersonName } from "../../names";
 import { useCollection, useCollectionOrEmpty } from "../../store";
 import { ICONS } from "../../icons";
 import { collatorLocale, useI18n } from "../../i18n";
+import { useNames } from "../../store/people";
+import { compareByName, firstNameOf, NAME_PENDING } from "./staffNames";
 
 interface RoomAssignPageProps {
   token: string;
@@ -42,7 +44,8 @@ interface DragUnit {
   from: string | null;
 }
 
-const firstName = (name: string) => name.split(" ")[0];
+/** names come live from IPAlpha ("…" while one is on its way) */
+const firstName = firstNameOf;
 
 /**
  * Room colours.
@@ -74,7 +77,7 @@ const COLORS_BY_WING: Record<BedroomGroup, readonly CaretakerColor[]> = {
  * at once and texts each person concerned with one SMS.
  */
 export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const storedBedrooms = useCollection("bedrooms");
   const storedCampers = useCollectionOrEmpty("campers");
   const storedStaff = useCollectionOrEmpty("staff");
@@ -111,17 +114,16 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
   /** the draft as it was right before the last Distribuir — what "Desfazer" restores (null = nothing to undo) */
   const [undoDistribution, setUndoDistribution] = useState<{ draft: RoomsDraft; summary: string } | null>(null);
 
-  /** admins + everyone on an admin list: they have another job, so Distribuir never puts them in a kids' room */
-  const excludeStaffIds = useMemo(() => {
-    const s = settings;
-    if (!s) return new Set<string>();
-    return new Set<string>([
-      ...s.organizers.staffIds, ...s.gameOrganizers.staffIds, ...s.scoreHelpers.staffIds, ...s.medicalStaff.staffIds,
-      ...s.vestHelpers.staffIds, ...s.photographers.staffIds, ...s.parentContacts.map((c) => c.staffId),
-    ]);
-  }, [settings]);
+  /**
+   * The parents' important contacts have another job, so Distribuir never puts
+   * them in a kids' room. (Helper roles live in IPAlpha now; whoever should
+   * stay out of the rooms is simply left out by hand.)
+   */
+  const excludeStaffIds = useMemo(() => new Set<string>((settings?.parentContacts ?? []).map((c) => c.personId)), [settings]);
   /** the SMS preview (who would be texted + the exact message), loaded when the dialog opens */
   const [preview, setPreview] = useState<{ messages: RoomsAppliedMessage[]; smsEnabled: boolean } | null>(null);
+  /** the people the preview would text — names read live by person id */
+  const nameOfNotified = useNames(preview?.messages.map((m) => m.staffId) ?? []);
   /** whether the example messages are expanded in the dialog */
   const [showMessages, setShowMessages] = useState(false);
   /** the per-apply avisos toggle: on = send SMS (default), off = apply silently */
@@ -152,7 +154,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
   /** the roster as the DRAFT leaves it — the board only ever shows this */
   const campers = useMemo(() => storedCampers.map((k) => applyCamperDraft(k, draft)), [storedCampers, draft]);
   const staff = useMemo(() => storedStaff.map((s) => applyStaffDraft(s, draft)), [storedStaff, draft]);
-  const kids = useMemo(() => campers.slice().sort((a, b) => a.name.localeCompare(b.name, collatorLocale())), [campers]);
+  const kids = useMemo(() => campers.slice().sort(compareByName), [campers]);
   /** who sleeps in each room as the draft leaves it (the store's counts are the server's) */
   const occupied = useMemo(() => {
     const m = new Map<string, number>();
@@ -630,7 +632,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
       clearRoomsDraft();
       onBack();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       setSubmitting(false);
     }
   }
@@ -669,7 +671,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
   const roomMatches = nq ? roomsFiltered.filter(roomHasMatch) : [];
   const roomsOnShow: Bedroom[] = roomMatches.length ? roomMatches : roomsFiltered;
 
-  const genderPoolCount = (g: CamperSex) => poolKids.filter((k) => (k.sex ?? k.probableGender) === g).length;
+  const genderPoolCount = (g: CamperSex) => poolKids.filter((k) => k.sex === g).length;
   const hoverValid = hover && dragUnit ? canDrop(dragUnit, hover) : false;
   // with the promotion on, the lone líderes take over those rooms' kids — the pending warning only counts what stays
   const promoteRooms = promoteLone ? new Set(loneStaffRooms.map(({ room }) => room.id)) : new Set<string>();
@@ -770,7 +772,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
 
           <ul className="assign-pool__list">
             {wing !== "staff" && poolUnits(units, wing).map((u) => {
-              const members = u.members.filter((k) => !k.bedroom && (wing === "all" || (k.sex ?? k.probableGender) === wing) && kidMatches(k));
+              const members = u.members.filter((k) => !k.bedroom && (wing === "all" || k.sex === wing) && kidMatches(k));
               if (!members.length) return null;
               const group = members.length > 1;
               const ids = members.map((m) => m.id);
@@ -996,8 +998,8 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
                 return (
                   <span key={id} className={`assign-chip${s ? " assign-chip--staff" : ""}`}>
                     {s && <RoomRoleIcon role={s.roomRole} size={16} sex={staffSex(s, bedrooms)} />}
-                    {k ? shortPersonName(k.name, campers) : s?.name.split(" ")[0]}
-                    {k && ageOf(k.birthDate) !== null && <span className="assign-chip__age">{ageOf(k.birthDate)}</span>}
+                    {k ? shortPersonName(k.name, campers) || NAME_PENDING : firstName(s?.name)}
+                    {k && ageOf(k.birthDate ?? null) !== null && <span className="assign-chip__age">{ageOf(k.birthDate ?? null)}</span>}
                   </span>
                 );
               })}
@@ -1084,7 +1086,7 @@ export default function RoomAssignPage({ token, onBack }: RoomAssignPageProps) {
                 <ul className="assign-notify-list">
                   {preview.messages.slice(0, 5).map((m) => (
                     <li key={m.staffId}>
-                      <span className="assign-notify-list__to">{firstName(m.name)}</span>
+                      <span className="assign-notify-list__to">{firstName(staff.find((s) => s.id === m.staffId)?.name || nameOfNotified(m.staffId))}</span>
                       <span className="assign-notify-list__msg">{m.text}</span>
                     </li>
                   ))}
@@ -1128,9 +1130,9 @@ function roomUnitIds(units: { id: string; members: Camper[] }[], kid: Camper, in
 /** pool units: groups first (biggest first), then single kids, both by name */
 function poolUnits(units: { id: string; members: Camper[] }[], wing: WingFilter) {
   return units
-    .map((u) => ({ unit: u, free: u.members.filter((k) => !k.bedroom && (wing === "all" || (k.sex ?? k.probableGender) === wing)).length }))
+    .map((u) => ({ unit: u, free: u.members.filter((k) => !k.bedroom && (wing === "all" || k.sex === wing)).length }))
     .filter((x) => x.free > 0)
-    .sort((a, b) => Number(b.free > 1) - Number(a.free > 1) || b.free - a.free || a.unit.members[0].name.localeCompare(b.unit.members[0].name, collatorLocale()))
+    .sort((a, b) => Number(b.free > 1) - Number(a.free > 1) || b.free - a.free || compareByName(a.unit.members[0], b.unit.members[0]))
     .map((x) => x.unit);
 }
 

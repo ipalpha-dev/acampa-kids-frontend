@@ -14,14 +14,16 @@ export interface ScoreEntry {
   note: string;
   /** set when the line came from scanning a kid's QR code: the kid whose team earned the points */
   camperId: string | null;
-  camperName: string;
   /** the programme event the scan belongs to — a kid counts once per event (across devices) and every scan of an event carries the same points */
   eventId: string | null;
-  by: { id: string; name: string };
+  /** who launched it (person id — name read live) */
+  byPersonId: string;
   createdAt: string;
 }
 
 export interface ScanScoreResult {
+  /** the scanned kid's FIRST name (live) */
+  camperName?: string;
   score: ScoreEntry;
   team: { id: string; name: string; color: string };
   /** the kid had no church check-in yet: the system checked them in with this scan */

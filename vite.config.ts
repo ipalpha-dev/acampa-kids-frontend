@@ -8,6 +8,10 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
+  css: {
+    // SCSS (src/styles/*.scss, components' *.module.scss) through Dart Sass' modern compiler API
+    preprocessorOptions: { scss: { api: "modern-compiler" } },
+  },
   plugins: [
     react(),
     // `npm run dev:lan` — HTTPS + LAN: the camera (QR scan) only opens in a secure
@@ -44,7 +48,8 @@ export default defineConfig({
         // the paper-cut art is a few hundred KB each — raise the default 2 MiB limit just in case
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: "/index.html",
-        // never try to cache the API / websocket
+        // never try to cache the API / websocket. The IPAlpha popup and the One Tap frame
+        // (/one-tap) live on the auth origin, so this worker never sees those navigations.
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         // images uploaded through the editor (preparation / instructions) are immutable:

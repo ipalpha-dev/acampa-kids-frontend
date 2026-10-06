@@ -31,7 +31,7 @@ const EMOJI_SUGGESTIONS = ["📌", "🎒", "👕", "🧢", "🧴", "💊", "⛪"
  *   /preparation/:id/edit   edit section
  */
 export default function PreparationAdminPage({ token }: PreparationAdminPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const sections = useCollection("preparation");
   const { segments, navigate } = useRoute();
   const confirm = useConfirm();
@@ -48,7 +48,7 @@ export default function PreparationAdminPage({ token }: PreparationAdminPageProp
     try {
       return await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
       throw err;
     } finally {
       setBusy(false);

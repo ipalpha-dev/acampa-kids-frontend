@@ -1,0 +1,156 @@
+// Decision 78 — "Valores da importação para conferir" (campers / team pages).
+// Same look as the import's own questions (pages/admin/ImportPage.module.scss).
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .28s $ease, opacity .2s ease;
+}
+
+.revealOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.revealInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 2px solid var(--sun);
+  border-radius: 18px;
+  background: #fffaf0;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--forest);
+}
+
+.badge {
+  min-width: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fdf1d3;
+  color: #7a4f17;
+  font-size: .8rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.problem {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #fdf1d3;
+  color: #7a4f17;
+  font-weight: 700;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+  animation: itemIn .28s $ease both;
+}
+
+@keyframes itemIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.itemHead {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.value {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--sand);
+
+  dt {
+    color: var(--muted);
+    font-size: .8rem;
+    font-weight: 700;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 700;
+    word-break: break-word;
+  }
+}
+
+.valueNow { background: #eef6ef; }
+
+.actions,
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bulk { justify-content: flex-end; }
+
+.choice {
+  padding: 8px 14px;
+  border: 2px solid var(--sage);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+  color: var(--pine);
+  cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+
+  &:hover:not(:disabled) { border-color: var(--pine); }
+  &:disabled { opacity: .6; cursor: default; }
+}
+
+@media (max-width: 560px) {
+  .values { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .choice { transition: none; }
+  .item { animation: none; }
+}

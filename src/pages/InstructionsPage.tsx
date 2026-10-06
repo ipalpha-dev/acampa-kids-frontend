@@ -63,9 +63,9 @@ export default function InstructionsPage({ user, pairedWith }: InstructionsPageP
   const events = useCollection("events");
   const staff = useCollectionOrEmpty("staff");
   const bedrooms = useCollectionOrEmpty("bedrooms");
-  const myRoles = useMyPrepRoles(user.phone);
+  const myRoles = useMyPrepRoles(user.personId);
   const { segments, navigate } = useRoute();
-  const me = useMemo(() => staff.find((s) => s.phone === user.phone), [staff, user.phone]);
+  const me = useMemo(() => staff.find((s) => s.id === user.personId), [staff, user.personId]);
   const myFaceSrc = me
     ? me.roomRole === "caretaker"
       ? staffSex(me, bedrooms) === "M"

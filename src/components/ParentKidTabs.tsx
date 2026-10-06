@@ -23,14 +23,14 @@ export default function ParentKidTabs({ kids, selectedId, onSelect, idPrefix, pa
   if (kids.length < 2) return null;
 
   const tabId = (id: string) => `${idPrefix}-${id}`;
-  const firstName = (name: string) => name.trim().split(/\s+/)[0];
+  /** the name comes live from IPAlpha: "…" until it arrives, never a blank tab */
+  const firstName = (name: string) => name.trim().split(/\s+/)[0] || "…";
   const surname = (name: string) => name.trim().split(/\s+/).slice(1).join(" ");
 
   return (
     <nav className="parent-kid-tabs" role="tablist" aria-label={tx("Escolha uma criança")}>
       {kids.map((kid) => {
         const active = kid.camper.id === selectedId;
-        const reviewing = kid.camper.aiReviewStatus === "pending" || kid.camper.aiReviewStatus === "processing" || kid.camper.aiReviewStatus === "structured";
         return (
           <button
             key={kid.camper.id}
@@ -40,8 +40,8 @@ export default function ParentKidTabs({ kids, selectedId, onSelect, idPrefix, pa
             aria-selected={active}
             aria-controls={panelId}
             tabIndex={active ? 0 : -1}
-            title={reviewing ? tx("{name} · cadastro em revisão pela IA", { name: kid.camper.name }) : kid.camper.name}
-            className={`parent-kid-tab ${active ? "parent-kid-tab--active" : ""} ${reviewing ? "camper-ai-review" : ""}`}
+            title={kid.camper.name || undefined}
+            className={`parent-kid-tab ${active ? "parent-kid-tab--active" : ""}`}
             onClick={() => onSelect(kid.camper.id)}
             onKeyDown={(event) => {
               const index = kids.findIndex((item) => item.camper.id === kid.camper.id);
@@ -58,7 +58,7 @@ export default function ParentKidTabs({ kids, selectedId, onSelect, idPrefix, pa
               requestAnimationFrame(() => document.getElementById(tabId(next))?.focus());
             }}
           >
-            <KidIcon sex={kidIconSex(kid.bedroom?.group, kid.camper.sex, kid.camper.probableGender)} size={28} />
+            <KidIcon sex={kidIconSex(kid.bedroom?.group, kid.camper.sex)} size={28} />
             {/* phones only have room for the first name; the surname is dropped by CSS */}
             <span>
               {firstName(kid.camper.name)}

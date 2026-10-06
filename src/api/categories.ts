@@ -1,7 +1,6 @@
 import { command } from "./client";
 import { bearer } from "../auth/store";
 import { ICONS } from "../icons";
-import { roleMeta } from "../roles";
 
 export const CATEGORY_AUDIENCES = ["camper", "staff"] as const;
 export type CategoryAudience = (typeof CATEGORY_AUDIENCES)[number];
@@ -12,7 +11,7 @@ export type CategorySelection = (typeof CATEGORY_SELECTIONS)[number];
 /** `icon` is a paper-cut image (same set as the login page). */
 export const AUDIENCE_META: Record<CategoryAudience, { label: string; icon?: string }> = {
   camper: { label: "Acampante", icon: ICONS.camper },
-  staff: { label: "Equipe", icon: roleMeta("staff").icon },
+  staff: { label: "Equipe", icon: ICONS.staff },
 };
 
 export const SELECTION_META: Record<CategorySelection, { label: string; hint: string; emoji: string }> = {

@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" width="480" height="360" role="img" aria-labelledby="t">
+  <title id="t">Acampa Kids</title>
+  <style>
+    .ink { stroke: #183d36; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .thin { stroke: #183d36; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+    .rays, .cloud, .cactus, .flag, .beacon, .glow, .bird { transform-box: fill-box; }
+    .rays { transform-origin: center; }
+    .cactus { transform-origin: 50% 100%; }
+    .flag { transform-origin: 0% 50%; }
+    @media (prefers-reduced-motion: no-preference) {
+      .rays { animation: spin 40s linear infinite; }
+      .cloud { animation: drift 7s ease-in-out infinite alternate; }
+      .cloud--small { animation-duration: 9s; animation-direction: alternate-reverse; }
+      .cactus { animation: sway 3.4s ease-in-out infinite alternate; }
+      .flag { animation: wave 1.3s ease-in-out infinite alternate; }
+      .beacon { animation: blink 1.6s ease-in-out infinite alternate; }
+      .glow { animation: blink 2.4s ease-in-out infinite alternate; }
+      .bird { animation: hop 2.6s ease-in-out infinite; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes drift { from { transform: translateX(-6px); } to { transform: translateX(10px); } }
+    @keyframes sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+    @keyframes wave { from { transform: scaleX(1) skewY(0deg); } to { transform: scaleX(.82) skewY(6deg); } }
+    @keyframes blink { from { opacity: 1; } to { opacity: .35; } }
+    @keyframes hop { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-7px); } 90% { transform: translateY(0); } }
+  </style>
+
+  <defs>
+    <clipPath id="board">
+      <rect x="318" y="198" width="74" height="34" rx="7" />
+    </clipPath>
+  </defs>
+
+  <!-- sky: the poster's paper-cut wobbly panel -->
+  <path d="M40 72 C60 30 180 18 250 22 C330 26 432 22 450 70 C470 122 462 232 452 282 C440 332 330 340 240 338 C150 336 48 338 30 290 C14 240 22 112 40 72 Z" fill="#c9e3e1" />
+
+  <!-- sun with a happy face, rays turning slowly -->
+  <g transform="translate(386 86)">
+    <g class="rays" fill="#f6d84a">
+      <rect x="-5" y="-62" width="10" height="20" rx="5" />
+      <rect x="-5" y="42" width="10" height="20" rx="5" />
+      <rect x="-62" y="-5" width="20" height="10" rx="5" />
+      <rect x="42" y="-5" width="20" height="10" rx="5" />
+      <rect x="-5" y="-62" width="10" height="20" rx="5" transform="rotate(45)" />
+      <rect x="-5" y="-62" width="10" height="20" rx="5" transform="rotate(135)" />
+      <rect x="-5" y="-62" width="10" height="20" rx="5" transform="rotate(225)" />
+      <rect x="-5" y="-62" width="10" height="20" rx="5" transform="rotate(315)" />
+    </g>
+    <path d="M-34 -4 C-34 -24 -18 -36 2 -35 C22 -34 35 -20 34 0 C33 20 20 34 -1 34 C-21 34 -34 16 -34 -4 Z" fill="#f6d84a" />
+    <path class="thin" d="M-15 -6 q5 -6 10 0 M5 -6 q5 -6 10 0" />
+    <path class="thin" d="M-12 8 q12 12 24 0" />
+    <circle cx="-20" cy="6" r="4.5" fill="#f2a46b" opacity=".7" />
+    <circle cx="20" cy="6" r="4.5" fill="#f2a46b" opacity=".7" />
+  </g>
+
+  <!-- clouds (the poster's light-blue cloud with a dark outline) -->
+  <g class="cloud">
+    <path class="ink" d="M78 104 C62 104 58 84 74 80 C72 62 96 56 104 70 C110 54 136 56 138 74 C154 72 160 94 146 102 C140 108 92 108 78 104 Z" fill="#8fd3e8" />
+  </g>
+  <g class="cloud cloud--small">
+    <path class="ink" d="M282 66 C272 66 270 54 280 52 C280 42 296 40 300 48 C306 38 322 42 322 52 C332 52 334 66 324 68 C316 70 292 70 282 66 Z" fill="#8fd3e8" />
+  </g>
+
+  <!-- ground -->
+  <path d="M30 262 C120 236 200 252 262 246 C340 240 412 234 454 250 L452 282 C440 332 330 340 240 338 C150 336 48 338 30 290 Z" fill="#12806b" />
+  <path d="M48 300 C140 286 230 296 300 290 C360 285 410 288 440 296 C428 326 330 334 240 334 C160 334 70 334 48 300 Z" fill="#0e6e5c" />
+  <!-- grass tufts + pebbles -->
+  <path class="thin" d="M60 270 l4 -10 l4 10 M372 268 l4 -9 l4 9 M300 288 l3 -8 l3 8 M150 290 l3 -8 l3 8" stroke="#a9e0a0" />
+  <ellipse cx="412" cy="292" rx="10" ry="5" fill="#f8f0c0" />
+  <ellipse cx="128" cy="300" rx="7" ry="4" fill="#f8f0c0" />
+
+  <!-- tent -->
+  <g>
+    <path class="thin" d="M152 252 L116 276 M308 252 L346 276" />
+    <path class="ink" d="M230 116 L142 264 L318 264 Z" fill="#e7a44e" />
+    <path d="M230 116 L318 264 L262 264 Z" fill="#d68a33" />
+    <path class="ink" d="M230 116 L142 264 L318 264 Z" fill="none" />
+    <!-- stripe -->
+    <path d="M168 222 L292 222 L302 238 L158 238 Z" fill="#f8f0c0" opacity=".9" />
+    <!-- dark doorway with a warm lantern inside -->
+    <path class="ink" d="M230 168 L196 264 L264 264 Z" fill="#183d36" />
+    <circle class="glow" cx="230" cy="236" r="16" fill="#f6d84a" opacity=".45" />
+    <rect x="224" y="228" width="12" height="16" rx="4" fill="#f6d84a" />
+    <path class="thin" d="M226 228 q4 -8 8 0" stroke="#f8f0c0" />
+    <!-- door flaps tied open -->
+    <path class="ink" d="M230 168 C220 200 210 232 188 264 L204 264 C214 236 224 206 230 186 Z" fill="#f8f0c0" />
+    <path class="ink" d="M230 168 C240 200 250 232 272 264 L256 264 C246 236 236 206 230 186 Z" fill="#f8f0c0" />
+    <!-- pole + waving flag -->
+    <path class="ink" d="M230 118 L230 82" fill="none" />
+    <path class="flag ink" d="M232 82 L268 92 L232 104 Z" fill="#e4572e" />
+  </g>
+
+  <!-- little construction barrier with a blinking light -->
+  <g>
+    <path class="ink" d="M330 266 L340 232 M380 266 L370 232" fill="none" />
+    <g clip-path="url(#board)">
+      <rect x="318" y="198" width="74" height="34" fill="#f8f0c0" />
+      <path d="M318 232 L340 198 L354 198 L332 232 Z M346 232 L368 198 L382 198 L360 232 Z M374 232 L396 198 L410 198 L388 232 Z" fill="#e4572e" />
+    </g>
+    <rect class="ink" x="318" y="198" width="74" height="34" rx="7" fill="none" />
+    <path class="ink" d="M355 198 L355 186" fill="none" />
+    <circle class="beacon" cx="355" cy="180" r="13" fill="#f6d84a" opacity=".5" />
+    <circle class="ink" cx="355" cy="180" r="7" fill="#f6a23a" />
+  </g>
+
+  <!-- traffic cone -->
+  <g>
+    <path class="ink" d="M418 228 L404 270 L432 270 Z" fill="#e4572e" />
+    <path d="M413 243 L423 243 L426 252 L410 252 Z" fill="#f8f0c0" />
+    <rect class="ink" x="398" y="268" width="40" height="8" rx="4" fill="#e4572e" />
+  </g>
+
+  <!-- a friendly cactus in a yellow hard hat -->
+  <g class="cactus">
+    <path d="M74 214 L54 214 L54 188" fill="none" stroke="#183d36" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M74 214 L54 214 L54 188" fill="none" stroke="#4caf6a" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M110 218 L130 218 L130 192" fill="none" stroke="#183d36" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M110 218 L130 218 L130 192" fill="none" stroke="#4caf6a" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <rect class="ink" x="70" y="150" width="44" height="120" rx="22" fill="#4caf6a" />
+    <path d="M84 168 L84 260 M100 168 L100 260" stroke="#3d9659" stroke-width="3" stroke-linecap="round" />
+    <path class="thin" d="M74 176 l-6 -3 M110 186 l6 -3 M74 238 l-6 2 M110 246 l6 2 M54 184 l-6 -3 M130 196 l6 -3" stroke-width="2.5" />
+    <!-- pink blossom on the arm, like the poster's heart cactus -->
+    <circle cx="130" cy="181" r="7" fill="#e45d86" />
+    <circle cx="130" cy="181" r="2.5" fill="#f6d84a" />
+    <!-- face -->
+    <circle cx="84" cy="196" r="4" fill="#183d36" />
+    <circle cx="100" cy="196" r="4" fill="#183d36" />
+    <circle cx="85.5" cy="194.5" r="1.3" fill="#fff" />
+    <circle cx="101.5" cy="194.5" r="1.3" fill="#fff" />
+    <path class="thin" d="M84 207 q8 9 16 0" stroke-width="3" />
+    <circle cx="77" cy="205" r="4.5" fill="#f29bb0" opacity=".8" />
+    <circle cx="107" cy="205" r="4.5" fill="#f29bb0" opacity=".8" />
+    <!-- hard hat -->
+    <path class="ink" d="M70 160 C70 134 114 134 114 160 Z" fill="#f6d84a" />
+    <rect class="ink" x="64" y="157" width="56" height="9" rx="4.5" fill="#f6d84a" />
+    <path d="M92 143 L92 156" stroke="#e7a44e" stroke-width="5" stroke-linecap="round" />
+  </g>
+
+  <!-- tiny bird hopping on the barrier -->
+  <g class="bird">
+    <path class="ink" d="M372 190 L364 186 L366 194 Z" fill="#8fd3e8" stroke-width="3" />
+    <ellipse class="ink" cx="382" cy="190" rx="11" ry="8.5" fill="#8fd3e8" stroke-width="3.5" />
+    <path d="M378 191 q4 5 9 0" fill="none" stroke="#183d36" stroke-width="2.5" stroke-linecap="round" />
+    <path d="M392 186 L400 188 L392 191 Z" fill="#f6a23a" stroke="#183d36" stroke-width="2" stroke-linejoin="round" />
+    <circle cx="387" cy="186" r="1.8" fill="#183d36" />
+  </g>
+</svg>

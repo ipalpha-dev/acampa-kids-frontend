@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import type { Transport } from "../../api/transports";
 import type { BusHelper } from "../../api/settings";
-import type { Staff } from "../../api/staff";
 import Dialog from "../../components/Dialog";
 import BusLogo from "../../components/BusLogo";
 import CarLogo from "../../components/CarLogo";
 import { useCollectionOrEmpty } from "../../store";
+import { useNames } from "../../store/people";
+import { compareByName, shownName } from "./staffNames";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
 import { ICONS } from "../../icons";
 import { useI18n } from "../../i18n";
@@ -42,16 +43,18 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
 
   const vehicles = useMemo(() => transports.slice().sort((a, b) => a.order - b.order), [transports]);
   const staffById = useMemo(() => new Map(staff.map((s) => [s.id, s])), [staff]);
-  const placed = new Set(value.map((h) => h.staffId));
+  // someone who left the team still shows (by person id, name read live) so the coordenação can remove them
+  const nameOf = useNames(value.map((h) => h.personId));
+  const placed = new Set(value.map((h) => h.personId));
 
   const shown = vehicles.filter((v) => value.some((h) => h.vehicleId === v.id));
   const target = adding?.step === "person" ? vehicles.find((v) => v.id === adding.vehicleId) ?? null : null;
 
-  function add(vehicleId: string, staffId: string) {
-    if (!placed.has(staffId)) onChange([...value, { staffId, vehicleId }]);
+  function add(vehicleId: string, personId: string) {
+    if (!placed.has(personId)) onChange([...value, { personId, vehicleId }]);
     setAdding(null);
   }
-  const remove = (staffId: string) => onChange(value.filter((h) => h.staffId !== staffId));
+  const remove = (personId: string) => onChange(value.filter((h) => h.personId !== personId));
 
   const addButton = (vehicleId?: string, label = tx("➕ Adicionar pessoa")) => (
     <button type="button" className="button button--secondary list-head__add" disabled={disabled || vehicles.length === 0} onClick={() => setAdding(vehicleId ? { step: "person", vehicleId } : { step: "vehicle" })}>
@@ -74,14 +77,17 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
       {vehicles.length === 0 ? (
         <p className="opt-empty">{tx("Nenhum transporte cadastrado. Crie os veículos em Configurações → Transporte.")}</p>
       ) : shown.length === 0 ? (
-        <p className="opt-empty">{tx("Ninguém na porta de nenhum veículo. Só o admin faz a chamada no ônibus.")}</p>
+        <p className="opt-empty">{tx("Ninguém na porta de nenhum veículo. Só a coordenação faz a chamada no ônibus.")}</p>
       ) : (
         <ul className="bus-helpers">
           {shown.map((v) => {
             const people = value
               .filter((h) => h.vehicleId === v.id)
-              .map((h) => staffById.get(h.staffId))
-              .filter((s): s is Staff => !!s);
+              .map((h) => {
+                const s = staffById.get(h.personId);
+                return { id: h.personId, name: s?.name || nameOf(h.personId), onTeam: !!s };
+              })
+              .sort(compareByName);
             return (
               <li key={v.id} className="bus-helpers__vehicle">
                 <header className="list-head">
@@ -92,9 +98,9 @@ export default function BusHelpersEditor({ value, onChange, disabled }: BusHelpe
                 </header>
                 <ul className="staff-card__tags helpers-list" aria-label={tx("Na porta: {label}", { label: v.label })}>
                   {people.map((s) => (
-                    <li key={s.id} className={`staff-tag helpers-tag ${s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? "camper-ai-review" : ""}`} title={s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured" ? tx("Cadastro em revisão pela IA") : undefined}>
-                      <span className="helpers-tag__name">{s.name}</span>
-                      <button type="button" className="helpers-tag__x" aria-label={tx("Remover {name}", { name: s.name })} title={tx("Remover")} disabled={disabled} onClick={() => remove(s.id)}>
+                    <li key={s.id} className={`staff-tag helpers-tag`}>
+                      <span className="helpers-tag__name" title={s.onTeam ? undefined : tx("Não está mais na equipe")}>{shownName(s.name)}</span>
+                      <button type="button" className="helpers-tag__x" aria-label={tx("Remover {name}", { name: shownName(s.name) })} title={tx("Remover")} disabled={disabled} onClick={() => remove(s.id)}>
                         ✕
                       </button>
                     </li>

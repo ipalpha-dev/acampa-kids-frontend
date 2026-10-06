@@ -1,0 +1,36 @@
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+// A gentle note above the login form (not in the project, session ended). The
+// wrapper animates its real height (0fr ↔ 1fr) so the form below glides.
+.wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: min(100%, 420px);
+  opacity: 0;
+  transition: grid-template-rows .28s $ease, opacity .2s ease;
+}
+
+.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.note {
+  margin: 0 0 4px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: #fdf1d3;
+  color: #7a4f17;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap { transition: none; }
+}

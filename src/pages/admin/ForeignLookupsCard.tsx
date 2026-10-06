@@ -2,6 +2,7 @@ import { useState } from "react";
 import { resetForeignLookups } from "../../api/settings";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollection } from "../../store";
+import { useNames } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 interface ForeignLookupsCardProps {
@@ -14,9 +15,10 @@ interface ForeignLookupsCardProps {
  * "Zerar contadores" unblocks anyone at ≥5 and clears the SMS-alert mark.
  */
 export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const offenders = settings?.foreignLookupOffenders ?? [];
+  const nameOf = useNames(offenders.flatMap((o) => [o.personId, ...o.camperIds]));
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +42,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
     try {
       await resetForeignLookups(token);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -57,13 +59,13 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
       <p className="cat-hint">
         {tx("Pessoas da equipe que leram")} <strong>{tx("3 ou mais")}</strong> {tx("crianças que não são do quarto delas pelo botão de busca.")}
         {" "}
-        {tx("A partir de 3 o admin recebe um SMS; a partir de 5 o acesso a crianças de fora fica bloqueado até zerar.")}
+        {tx("A partir de 3 a coordenação recebe um SMS; a partir de 5 o acesso a crianças de fora fica bloqueado até zerar.")}
       </p>
       <ul className="foreign-lookup-list">
         {offenders.map((o) => (
-          <li key={o.staffId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
+          <li key={o.personId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
             <div>
-              <strong>{o.name}</strong>
+              <strong>{nameOf(o.personId) || tx("Carregando nome…")}</strong>
               <span className="foreign-lookup-list__count">
                 {o.count === 1
                   ? tx("{n} criança", { n: o.count })
@@ -71,7 +73,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
                 {o.blocked ? tx(" · bloqueado") : ""}
               </span>
             </div>
-            {o.names.length > 0 && <p className="foreign-lookup-list__names">{o.names.join(", ")}</p>}
+            {o.camperIds.length > 0 && <p className="foreign-lookup-list__names">{o.camperIds.map((id) => nameOf(id)).filter(Boolean).join(", ")}</p>}
           </li>
         ))}
       </ul>

@@ -5,6 +5,7 @@ import Breadcrumbs from "../../components/Breadcrumbs";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollectionOrEmpty } from "../../store";
 import { canDeleteLine, fmtPoints, KIND_META, lineKind, ScoreLogList, summarizeEvents, useEventMap, useTeamMap, type KindFilter, type LineKind } from "./scoreLog";
+import { namesFor } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 interface Props {
@@ -25,7 +26,7 @@ const KINDS: LineKind[] = ["scan", "add", "remove", "reset"];
  * full timeline of its lines. Organizers may also zero the team here.
  */
 export default function TeamScorePage({ token, teamId, userId, canEdit, canScan, onBack, onEvent }: Props) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const scores = useCollectionOrEmpty("scores");
   const teams = useCollectionOrEmpty("teams");
   const events = useCollectionOrEmpty("events");
@@ -62,7 +63,8 @@ export default function TeamScorePage({ token, teamId, userId, canEdit, canScan,
   const filtered = useMemo(() => (kind === "all" ? mine : mine.filter((e) => lineKind(e) === kind)), [mine, kind]);
 
   async function remove(e: ScoreEntry) {
-    const who = e.camperName ? `${e.camperName}` : team?.name ?? tx("o time");
+    const kid = e.camperId ? (await namesFor([e.camperId]))[0] : "";
+    const who = kid || (team?.name ?? tx("o time"));
     if (
       !(await confirm({
         title: tx("Apagar este lançamento?"),
@@ -78,7 +80,7 @@ export default function TeamScorePage({ token, teamId, userId, canEdit, canScan,
     try {
       await deleteScore(token, e.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setDeletingId(null);
     }
@@ -101,7 +103,7 @@ export default function TeamScorePage({ token, teamId, userId, canEdit, canScan,
     try {
       await resetScore(token, team.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

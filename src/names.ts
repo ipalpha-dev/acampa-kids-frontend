@@ -22,7 +22,7 @@ export function shortPersonName(full: string, peers: Iterable<{ name: string }>)
 /** Floor of the median age of the kids in a room (null when nobody has a birth date). */
 export function medianAgeFloor(campers: Iterable<Pick<Camper, "birthDate">>): number | null {
   const ages = [...campers]
-    .map((c) => ageOf(c.birthDate))
+    .map((c) => ageOf(c.birthDate ?? null))
     .filter((a): a is number => a !== null)
     .sort((a, b) => a - b);
   if (ages.length === 0) return null;

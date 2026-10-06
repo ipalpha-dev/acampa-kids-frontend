@@ -1,0 +1,83 @@
+// Team (equipe) screens — people live in IPAlpha (CONTRACTS_ACAMPA §15/§16).
+
+@keyframes staff-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+// a section that appears after a choice (add mode, emergency contact, contact read)
+.reveal {
+  animation: staff-reveal .22s ease-out both;
+}
+
+// "Já está no IPAlpha": the picked person
+.picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f3f7f4;
+  animation: staff-reveal .22s ease-out both;
+}
+
+.pickedName {
+  font-weight: 800;
+}
+
+.results {
+  max-height: min(42dvh, 320px);
+}
+
+// the on-demand contact of a list card: flows with the card (never over the name)
+.cardContact {
+  flex: none;
+  align-self: center;
+
+  @media (max-width: 760px) {
+    align-self: flex-start;
+  }
+}
+
+// a name still on its way from IPAlpha
+.pendingName {
+  color: var(--muted);
+}
+
+// the person page: health read live from IPAlpha
+.healthLive {
+  animation: staff-reveal .22s ease-out both;
+}
+
+// room distribution: ages are not served yet
+.agesHint {
+  margin: 4px 0 0;
+}
+
+// MoveStaffDialog option icon
+.optionIcon {
+  display: block;
+}
+
+// BedroomForm: the narrow capacity field
+.capacityField {
+  width: 140px;
+}
+
+// StaffIcon: inline-sized paper-cut icon (beats the context rules of .audience-icon, as the old inline size did)
+:global(.audience-icon).inlineIcon {
+  &.s16 { width: 16px; height: 16px; }
+  &.s18 { width: 18px; height: 18px; }
+  &.s20 { width: 20px; height: 20px; }
+  &.s24 { width: 24px; height: 24px; }
+  &.s32 { width: 32px; height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .picked,
+  .healthLive {
+    animation: none;
+  }
+}

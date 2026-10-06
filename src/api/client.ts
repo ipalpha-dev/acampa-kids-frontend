@@ -8,12 +8,14 @@ export class ApiError extends Error {
   closesAt?: string | null;
   /** access-window errors: who the window is for */
   audience?: "staff" | "parent";
+  /** core's refusal detail (403 CORE_FORBIDDEN / 409 CORE_REJECTED), e.g. "decisionsPending" */
+  reason?: string;
 
   constructor(
     status: number,
     code: string,
     message: string,
-    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent" },
+    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent"; reason?: string },
   ) {
     super(message);
     this.status = status;
@@ -24,6 +26,7 @@ export class ApiError extends Error {
     this.opensAt = extra?.opensAt;
     this.closesAt = extra?.closesAt;
     this.audience = extra?.audience;
+    this.reason = extra?.reason;
   }
 }
 
@@ -34,8 +37,53 @@ const BASE = import.meta.env.VITE_API_URL || window.location.origin;
 /** Writes need the server; when it can't be reached this is what the user sees. */
 export const OFFLINE_MESSAGE = "Sem conexão com o servidor. Verifique o Wi-Fi do acampamento e tente novamente.";
 
+/** Fired on `window` when an authenticated call answers 401 (see App.tsx). */
+export const SESSION_ENDED_EVENT = "acampa:session-ended";
+/** Fired on `window` when an authenticated call answers 503 IPALPHA_UNAVAILABLE. */
+export const CORE_UNAVAILABLE_EVENT = "acampa:core-unavailable";
+
+function hasBearer(options?: RequestInit): boolean {
+  const headers = options?.headers;
+  if (!headers) return false;
+  if (headers instanceof Headers) return headers.has("authorization");
+  if (Array.isArray(headers)) return headers.some(([k]) => k.toLowerCase() === "authorization");
+  return Object.keys(headers).some((k) => k.toLowerCase() === "authorization");
+}
+
+/**
+ * The one place an AUTHENTICATED call's failure becomes app-wide news — the
+ * JSON client below and every raw fetch (multipart uploads, streams) call it:
+ *  - 401: core revoked / expired the role token (SESSION_ENDED) or the Acampa
+ *    session is gone — App.tsx wipes the offline copy + upload caches and
+ *    returns to the login with a gentle note;
+ *  - 503 IPALPHA_UNAVAILABLE: the camp keeps working from memory; App.tsx shows a gentle note.
+ */
+export function signalAuthFailure(status: number, code: string): void {
+  if (status === 401) window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code } }));
+  if (status === 503 && code === "IPALPHA_UNAVAILABLE") window.dispatchEvent(new CustomEvent(CORE_UNAVAILABLE_EVENT));
+}
+
+/** Listeners told about every authenticated call the server accepted (see `signalAuthSuccess`). */
+const authSuccessListeners = new Set<(startedAt: number) => void>();
+
+/**
+ * Every authenticated request the server accepts slides the session's expiry
+ * (sessionIdleHours, at most once a minute — backend services/session.ts).
+ * The store listens to keep the offline copy's expiry in step with it.
+ */
+export function onAuthSuccess(listener: (startedAt: number) => void): () => void {
+  authSuccessListeners.add(listener);
+  return () => authSuccessListeners.delete(listener);
+}
+
+/** An authenticated call (JSON client or raw fetch) that started at `startedAt` answered 2xx. */
+export function signalAuthSuccess(startedAt: number): void {
+  for (const listener of authSuccessListeners) listener(startedAt);
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   let res: Response;
+  const startedAt = Date.now();
   // FormData bodies must keep the browser-generated multipart boundary, so we
   // only default to JSON when the caller isn't uploading a file.
   const isFormData = typeof FormData !== "undefined" && options?.body instanceof FormData;
@@ -66,6 +114,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     if (code === "CAMP_ARCHIVED" || code === "CAMP_FORBIDDEN") {
       window.dispatchEvent(new CustomEvent("acampa:camp-error", { detail: { code, message } }));
     }
+    if (hasBearer(options)) signalAuthFailure(res.status, code);
     throw new ApiError(
       res.status,
       code,
@@ -77,10 +126,12 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         opensAt: err?.opensAt as string | null | undefined,
         closesAt: err?.closesAt as string | null | undefined,
         audience: err?.audience as "staff" | "parent" | undefined,
+        reason: typeof err?.reason === "string" ? err.reason : undefined,
       },
     );
   }
 
+  if (hasBearer(options)) signalAuthSuccess(startedAt);
   return data as T;
 }
 

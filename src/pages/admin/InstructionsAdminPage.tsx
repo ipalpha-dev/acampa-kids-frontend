@@ -33,7 +33,7 @@ const EMOJI_SUGGESTIONS = ["📖", "📋", "🚨", "🕐", "🍽️", "🏊", "�
  *   /instructions/:id/edit     edit it
  */
 export default function InstructionsAdminPage({ token }: InstructionsAdminPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const docs = useCollection("instructions");
   const { segments, navigate } = useRoute();
   const confirm = useConfirm();
@@ -50,7 +50,7 @@ export default function InstructionsAdminPage({ token }: InstructionsAdminPagePr
     try {
       return await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
       throw err;
     } finally {
       setBusy(false);

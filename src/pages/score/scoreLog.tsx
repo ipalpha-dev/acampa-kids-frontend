@@ -3,6 +3,7 @@ import type { ScoreEntry } from "../../api/scores";
 import type { CampEvent } from "../../api/schedule";
 import { dayKey, speakDay, speakStamp, speakTime } from "../../dates";
 import type { Team } from "../../api/teams";
+import { useNames } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 /**
@@ -118,7 +119,7 @@ export function normalize(s: string): string {
 /** Who may remove a line: organizers any line; a score helper only their OWN scans. */
 export function canDeleteLine(e: ScoreEntry, opts: { canEdit: boolean; canScan: boolean; userId: string }): boolean {
   if (opts.canEdit) return true;
-  return opts.canScan && !!e.camperId && e.by.id === opts.userId;
+  return opts.canScan && !!e.camperId && e.byPersonId === opts.userId;
 }
 
 interface ScoreLogListProps {
@@ -142,6 +143,8 @@ interface ScoreLogListProps {
 /** The ledger lines, newest first — each says what, who, why and when. */
 export function ScoreLogList({ entries, teams, events, hideTeam, hideEvent, onTeam, onEvent, canDelete, onDelete, deletingId, byDay = true, emptyText }: ScoreLogListProps) {
   const { tx } = useI18n();
+  /** the lines hold person ids only (the kid scanned, who launched it): names read live */
+  const nameOf = useNames(entries.flatMap((e) => [e.camperId, e.byPersonId]));
   const empty = emptyText ?? tx("Nenhum lançamento.");
   if (entries.length === 0) return <p className="opt-empty">{empty}</p>;
   const groups = byDay ? groupByDay(entries) : [{ key: "all", label: "", entries, total: 0 }];
@@ -159,7 +162,7 @@ export function ScoreLogList({ entries, teams, events, hideTeam, hideEvent, onTe
           )}
           <ul className="score-log">
             {g.entries.map((e) => (
-              <ScoreLogItem key={e.id} entry={e} team={teams.get(e.teamId)} event={e.eventId ? events.get(e.eventId) : undefined} hideTeam={hideTeam} hideEvent={hideEvent} onTeam={onTeam} onEvent={onEvent} deletable={!!onDelete && !!canDelete?.(e)} deleting={deletingId === e.id} onDelete={onDelete} />
+              <ScoreLogItem key={e.id} entry={e} nameOf={nameOf} team={teams.get(e.teamId)} event={e.eventId ? events.get(e.eventId) : undefined} hideTeam={hideTeam} hideEvent={hideEvent} onTeam={onTeam} onEvent={onEvent} deletable={!!onDelete && !!canDelete?.(e)} deleting={deletingId === e.id} onDelete={onDelete} />
             ))}
           </ul>
         </section>
@@ -170,6 +173,7 @@ export function ScoreLogList({ entries, teams, events, hideTeam, hideEvent, onTe
 
 interface ItemProps {
   entry: ScoreEntry;
+  nameOf: (personId: string | null | undefined) => string;
   team?: Team;
   event?: CampEvent;
   hideTeam?: boolean;
@@ -181,7 +185,7 @@ interface ItemProps {
   onDelete?: (e: ScoreEntry) => void;
 }
 
-function ScoreLogItem({ entry: e, team, event, hideTeam, hideEvent, onTeam, onEvent, deletable, deleting, onDelete }: ItemProps) {
+function ScoreLogItem({ entry: e, nameOf, team, event, hideTeam, hideEvent, onTeam, onEvent, deletable, deleting, onDelete }: ItemProps) {
   const { tx } = useI18n();
   const kind = lineKind(e);
   const meta = KIND_META[kind];
@@ -198,7 +202,7 @@ function ScoreLogItem({ entry: e, team, event, hideTeam, hideEvent, onTeam, onEv
           </span>{" "}
           {kind === "scan" ? (
             <>
-              <strong>{e.camperName || tx("Criança")}</strong>
+              <strong>{nameOf(e.camperId) || tx("Criança")}</strong>
               {!hideEvent && (
                 <>
                   {" "}
@@ -242,7 +246,7 @@ function ScoreLogItem({ entry: e, team, event, hideTeam, hideEvent, onTeam, onEv
         </span>
         {showNote && <span className="score-log__note">“{e.note}”</span>}
         <span className="score-log__meta">
-          {fmtTime(e.createdAt)} · {tx("por {name}", { name: e.by.name || "—" })}
+          {fmtTime(e.createdAt)} · {tx("por {name}", { name: nameOf(e.byPersonId) || "…" })}
         </span>
       </div>
       {deletable && (

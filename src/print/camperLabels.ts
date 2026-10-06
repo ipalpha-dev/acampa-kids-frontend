@@ -2,11 +2,16 @@ import QRCode from "qrcode";
 import { bedroomLabel, type Bedroom } from "../api/bedrooms";
 import type { Camper } from "../api/campers";
 import { bedSrc } from "../icons";
+import styles from "../components/campers.module.scss";
+import { namesFor, personInfo } from "../store/people";
 
 /**
  * Printable labels for the kids — the **badge** (crachá, 100 × 62 mm) and the
  * **access bracelet** (pulseira, 240 × 17 mm). Both carry a QR code that opens
  * the camper's detail page (`#/campers/:id`) so a staff phone can scan it.
+ *
+ * Only camp operations are printed (name, team, transport, room + QR): no
+ * health marks, no contacts — paper outlives the camp (decision 31).
  *
  * The page is rendered into a hidden iframe (no popup blockers, no extra
  * tab) with `@page { size }` matching the label, and printed from there.
@@ -20,16 +25,6 @@ export const LABEL_META: Record<LabelKind, { title: string; emoji: string; size:
 };
 
 type LabelOf = (id: string | null | undefined) => string | null;
-
-/** the *, # and + marks (allergy, health condition, daily medication) — matches the design */
-export function healthMarks(k: Camper, labelOf: LabelOf): string {
-  const real = (ids: string[] | undefined) => (ids ?? []).some((id) => (labelOf(id) ?? id).trim().toLowerCase() !== "nenhuma");
-  const marks: string[] = [];
-  if (real(k.allergies) || real(k.drugAllergies)) marks.push("*");
-  if (real(k.healthIssues)) marks.push("#");
-  if ((k.medications ?? []).length) marks.push("+");
-  return marks.join(" ");
-}
 
 /** URL the QR points to — the camper's detail page in this same app */
 export function camperUrl(id: string): string {
@@ -59,20 +54,18 @@ interface LabelData {
   bus: string;
   room: string;
   bed: string;
-  marks: string;
   qr: string;
 }
 
-async function labelData(k: Camper, roomById: Map<string, Bedroom>, labelOf: LabelOf): Promise<LabelData> {
+async function labelData(k: Pick<Camper, "id" | "name" | "team" | "transportation" | "bedroom">, roomById: Map<string, Bedroom>, labelOf: LabelOf): Promise<LabelData> {
   const room = k.bedroom ? roomById.get(k.bedroom) : null;
   const qr = await QRCode.toString(camperUrl(k.id), { type: "svg", margin: 0, errorCorrectionLevel: "M" });
   return {
-    name: k.name.trim(),
+    name: (k.name || personInfo(k.id)?.name || "").trim(),
     team: (labelOf(k.team) ?? "").toUpperCase(),
     bus: (labelOf(k.transportation) ?? "").toUpperCase(),
     room: room ? bedroomLabel(room).toUpperCase() : "",
     bed: bedSrc(room?.group),
-    marks: healthMarks(k, labelOf),
     qr,
   };
 }
@@ -98,7 +91,6 @@ const COMMON_CSS = `
   .row { display: flex; align-items: center; gap: 0.6mm; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.01em; }
   .ico { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-weight: 400; line-height: 1; }
   .ico img { width: 1.15em; height: 1.15em; object-fit: contain; display: block; }
-  .marks { position: absolute; letter-spacing: 0.15em; }
   @media screen { body { background: #ccc; padding: 10mm; } .card { margin: 0 auto 6mm; box-shadow: 0 2px 8px rgba(0,0,0,.3); } }
 `;
 
@@ -114,7 +106,6 @@ const BADGE_CSS = `
   .row--team { top: 21.8mm; }
   .row--bus { top: 32.9mm; }
   .row--room { top: 44mm; font-size: 10.8pt; }
-  .marks { left: 4mm; top: 50.5mm; font-size: 12pt; color: #b42318; }
 `;
 
 function badgeHtml(d: LabelData): string {
@@ -128,7 +119,6 @@ function badgeHtml(d: LabelData): string {
     ${d.team ? `<div class="row row--team"><span class="ico">🏷️</span><span>${esc(d.team)}</span></div>` : ""}
     ${d.bus ? `<div class="row row--bus"><span class="ico">🚌</span><span>${esc(d.bus)}</span></div>` : ""}
     ${d.room ? `<div class="row row--room"><span class="ico"><img src="${esc(d.bed)}" alt=""></span><span>${esc(d.room)}</span></div>` : ""}
-    ${d.marks ? `<div class="marks">${esc(d.marks)}</div>` : ""}
   </div>`;
 }
 
@@ -146,7 +136,6 @@ const BRACELET_CSS = `
   .row--room { width: 36.6mm; }
   .row--bus { width: 46.2mm; }
   .row--team { font-size: 7.3pt; }
-  .marks { left: 187.5mm; top: 3.2mm; font-size: 11.6pt; color: #000; }
 `;
 
 function braceletHtml(d: LabelData): string {
@@ -162,7 +151,6 @@ function braceletHtml(d: LabelData): string {
       <div class="row row--bus">${d.bus ? `<span class="ico">🚌</span><span>${esc(d.bus)}</span>` : ""}</div>
       <div class="row row--team">${d.team ? `<span class="ico">🏷️</span><span>${esc(d.team)}</span>` : ""}</div>
     </div>
-    ${d.marks ? `<div class="marks">${esc(d.marks)}</div>` : ""}
   </div>`;
 }
 
@@ -170,6 +158,9 @@ function braceletHtml(d: LabelData): string {
 
 export async function buildLabelsHtml(kind: LabelKind, campers: Camper[], bedrooms: Bedroom[], labelOf: LabelOf): Promise<string> {
   const roomById = new Map(bedrooms.map((b) => [b.id, b]));
+  // names arrive in the background: make sure every label has one before printing
+  const unnamed = campers.filter((k) => !k.name).map((k) => k.id);
+  if (unnamed.length) await namesFor(unnamed);
   const data = await Promise.all(campers.map((k) => labelData(k, roomById, labelOf)));
   const render = kind === "badge" ? badgeHtml : braceletHtml;
   const css = COMMON_CSS + (kind === "badge" ? BADGE_CSS : BRACELET_CSS);
@@ -183,7 +174,7 @@ export async function printLabels(kind: LabelKind, campers: Camper[], bedrooms: 
 
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  frame.className = styles.printFrame;
   document.body.appendChild(frame);
 
   await new Promise<void>((resolve) => {

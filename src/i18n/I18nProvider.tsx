@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { errorText } from "./errors";
 import { LITERALS } from "./literals";
 import { DEFAULT_LOCALE, LOCALE_TAG, deviceLocale, format, resolveLocale, type Locale } from "./locales";
 import { t as translate, type UiKey } from "./ui";
@@ -8,6 +9,8 @@ interface I18nValue {
   setLocale: (locale: Locale | string | null | undefined) => void;
   t: (key: UiKey, vars?: Record<string, string | number>) => string;
   tx: (pt: string, vars?: Record<string, string | number>) => string;
+  /** an error (ApiError, server refusal, app Error) as text in the person's language — `fallbackPt` when nothing better is known (see ./errors.ts) */
+  te: (err: unknown, fallbackPt?: string) => string;
   tag: string;
 }
 
@@ -33,6 +36,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       setLocale: (next) => setLocaleState(resolveLocale(next ?? DEFAULT_LOCALE)),
       t: (key, vars) => translate(locale, key, vars),
       tx: (pt, vars) => format(locale === "pt" ? pt : (LITERALS[pt]?.[locale] ?? pt), vars ?? {}),
+      te: (err, fallbackPt) => errorText(locale, err, fallbackPt),
       tag: LOCALE_TAG[locale],
     }),
     [locale],

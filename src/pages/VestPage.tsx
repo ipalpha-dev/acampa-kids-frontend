@@ -4,17 +4,14 @@ import SearchField from "../components/SearchField";
 import { setStaffVest, staffSex, type Staff, type VestAction } from "../api/staff";
 import Breadcrumbs from "../components/Breadcrumbs";
 import { ICONS, vestSrc } from "../icons";
-import { formatBrazilPhoneClient } from "../phoneFormat";
+import PersonContact from "../components/PersonContact";
 import { useRoute } from "../router";
 import { useCollection, useCollectionOrEmpty } from "../store";
-import { staffGreeting, whatsappLink } from "../whatsapp";
 import { speakStamp } from "../dates";
 import { collatorLocale, useI18n } from "../i18n";
 
 interface VestPageProps {
   token: string;
-  /** the logged-in person's name (for the WhatsApp greeting) */
-  myName: string;
   /** merged admin Check-in landing page */
   checkinHomePath?: string;
 }
@@ -80,10 +77,10 @@ function StepIcon({ step, sex, className = "" }: { step: Step; sex?: "F" | "M" |
  * out and the list closes the gap. Searching there also lists everyone
  * else who matches below a divider, in the "Todos" layout.
  * Once the check-in window is over, a vest still out is late → yellow row.
- * For the admin and the vest helpers (Settings → Coletes); the helper sees only name + phone.
+ * For the coordenação and the `coletes` role; the helper sees only the name (the phone is read on tap).
  */
-export default function VestPage({ token, myName, checkinHomePath }: VestPageProps) {
-  const { tx } = useI18n();
+export default function VestPage({ token, checkinHomePath }: VestPageProps) {
+  const { tx, te } = useI18n();
   const staff = useCollection("staff");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const settings = useCollection("settings");
@@ -170,7 +167,7 @@ export default function VestPage({ token, myName, checkinHomePath }: VestPagePro
       await setStaffVest(token, s.id, action);
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
       return false;
     } finally {
       setPending((p) => {
@@ -238,25 +235,14 @@ export default function VestPage({ token, myName, checkinHomePath }: VestPagePro
   const total = active.length;
   const pct = total ? Math.round((counts.back / total) * 100) : 0;
 
-  function phoneOf(s: Staff) {
-    if (!s.phone) return <em className="staff-card__missing">{tx("sem celular")}</em>;
-    return (
-      <a
-        className="link-btn vest-row__phone"
-        href={whatsappLink(s.phone, staffGreeting({ toName: s.name, fromName: myName }))}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={tx("Falar com {name} no WhatsApp", { name: s.name.split(" ")[0] })}
-      >
-        {formatBrazilPhoneClient(s.phone)}
-      </a>
-    );
+  /** the phone is never in the record: read from IPAlpha only when the helper taps it */
+  function contactOf(s: Staff) {
+    return <PersonContact token={token} personId={s.id} name={s.name} compact />;
   }
 
   function rowClass(s: Staff, step: Step, extra = "") {
     const late = step === "out" && windowOver;
-    const reviewing = s.aiReviewStatus === "pending" || s.aiReviewStatus === "processing" || s.aiReviewStatus === "structured";
-    return `bus-row vest-row vest-row--${step} ${late ? "vest-row--late" : ""} ${reviewing ? "camper-ai-review" : ""} ${extra}`;
+    return `bus-row vest-row vest-row--${step} ${late ? "vest-row--late" : ""} ${extra}`;
   }
 
   /** "Todos" layout: status icon · name + phone · action buttons */
@@ -268,10 +254,10 @@ export default function VestPage({ token, myName, checkinHomePath }: VestPagePro
         <StepIcon step={step} sex={staffSex(s, bedrooms)} />
         <span className="bus-row__body">
           <span className="bus-row__name">
-            <span className={`strike ${step === "back" ? "strike--on" : ""}`}>{s.name}</span>
+            <span className={`strike ${step === "back" ? "strike--on" : ""}`}>{s.name || "…"}</span>
           </span>
           <span className="bus-row__meta">
-            {phoneOf(s)}
+            {contactOf(s)}
             {step === "out" && s.vest.delivered && <>{tx(" · entregue {when}", { when: speakStamp(s.vest.delivered.at) })}</>}
             {step === "back" && s.vest.returned && <>{tx(" · devolvido {when}", { when: speakStamp(s.vest.returned.at) })}</>}
           </span>
@@ -305,7 +291,7 @@ export default function VestPage({ token, myName, checkinHomePath }: VestPagePro
   /** step-tab layout: tick box · name + phone · status icon (already showing the next state while ticked) */
   function tickRow(s: Staff, tabKey: Exclude<Tab, "all">) {
     const step = TAB_STEP[tabKey];
-    const first = s.name.split(" ")[0];
+    const first = s.name.split(" ")[0] || "…";
     const on = armed.has(s.id) || leaving.has(s.id);
     const going = leaving.has(s.id);
     const action: VestAction = tabKey === "deliver" ? "deliver" : "return";
@@ -325,9 +311,9 @@ export default function VestPage({ token, myName, checkinHomePath }: VestPagePro
         </button>
         <span className="bus-row__body">
           <span className="bus-row__name">
-            <span className={`strike ${on ? "strike--on" : ""}`}>{s.name}</span>
+            <span className={`strike ${on ? "strike--on" : ""}`}>{s.name || "…"}</span>
           </span>
-          <span className="bus-row__meta">{phoneOf(s)}</span>
+          <span className="bus-row__meta">{contactOf(s)}</span>
         </span>
         <span className={`vest-row__swap ${on ? "vest-row__swap--next" : ""}`}>
           <StepIcon step={step} sex={staffSex(s, bedrooms)} className="vest-row__swap-now" />

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { confirmCampDelete, fetchCamps, requestCampDelete, updateCamp, type CampRow } from "../../api/camps";
 import { ApiError } from "../../api/client";
-import { fetchImportCacheCount, wipeImportCache } from "../../api/super";
 import type { CampSummary } from "../../auth/store";
 import AdminsEditor from "../../components/AdminsEditor";
 import { useConfirm } from "../../components/ConfirmDialog";
@@ -24,10 +23,10 @@ interface SuperPageProps {
 /**
  * ⚙️ → Superusuário (Acampamentos, for a plain admin): the camp registry for
  * everyone who reaches this page, plus — deployment owner only — the admin
- * list, the import cache and a link to the assistant's seed templates.
+ * list and a link to the assistant's seed templates.
  */
 export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const { navigate } = useRoute();
   const confirm = useConfirm();
   const settings = useCollection("settings");
@@ -70,7 +69,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
       await updateCamp(token, c.id, { active: true });
       await onSwitchCamp(c.id);
     } catch (e) {
-      setRowError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setRowError(te(e, "Algo deu errado."));
       setRowBusy(null);
     }
   }
@@ -91,7 +90,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
       await updateCamp(token, c.id, { archived: true });
       setReload((r) => r + 1);
     } catch (e) {
-      setRowError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setRowError(te(e, "Algo deu errado."));
     } finally {
       setRowBusy(null);
     }
@@ -101,54 +100,6 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
     setDeleteTarget(null);
     setRowDone(tx("Acampamento apagado: {n} registro(s) removido(s).", { n: removed }));
     setReload((r) => r + 1);
-  }
-
-  const [importCache, setImportCache] = useState<{ count: number; staff: number; campers: number } | null>(null);
-  const [cacheBusy, setCacheBusy] = useState(false);
-  const [cacheError, setCacheError] = useState<string | null>(null);
-  const [cacheDone, setCacheDone] = useState<string | null>(null);
-  const [cacheReload, setCacheReload] = useState(0);
-
-  useEffect(() => {
-    if (!isSuper) return;
-    let alive = true;
-    fetchImportCacheCount(token)
-      .then((r) => alive && setImportCache(r))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [token, isSuper, cacheReload]);
-
-  async function cleanCache() {
-    if (cacheBusy) return;
-    const n = importCache?.count ?? 0;
-    const ok = await confirm({
-      emoji: "🧹",
-      title: tx("Limpar o cache de importação?"),
-      message: (
-        <>
-          {tx("Apaga as {n} correspondências que a importação de equipe e de acampantes guardou (coluna da planilha → valor do app).", { n })}
-          <br />
-          {tx("A próxima importação vai remontar o mapeamento do zero. Não apaga nenhum cadastro.")}
-        </>
-      ),
-      confirmLabel: tx("Limpar cache"),
-      danger: true,
-    });
-    if (!ok) return;
-    setCacheBusy(true);
-    setCacheError(null);
-    setCacheDone(null);
-    try {
-      const { removed } = await wipeImportCache(token);
-      setCacheReload((r) => r + 1);
-      setCacheDone(tx("{n} correspondência(s) do cache apagada(s).", { n: removed }));
-    } catch (e) {
-      setCacheError(e instanceof Error ? e.message : tx("Algo deu errado."));
-    } finally {
-      setCacheBusy(false);
-    }
   }
 
   return (
@@ -223,29 +174,6 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
 
       {isSuper && (
         <section className="cat-form">
-          <h2 className="cat-form__title">
-            <img className="admin-title__icon" src={ICONS.importCampers} alt="" aria-hidden="true" /> {tx("Cache de importação")}
-          </h2>
-          <p className="cat-hint">
-            {tx("As correspondências que a importação de equipe e de acampantes guarda (coluna da planilha → valor do app). Limpar não apaga nenhum cadastro.")}
-          </p>
-          {cacheError && <p className="message message--error">{cacheError}</p>}
-          {cacheDone && <p className="message message--ok">✅ {cacheDone}</p>}
-          <p className="cat-form__title" style={{ fontSize: "1.4rem" }}>
-            {importCache == null
-              ? "…"
-              : tx("{n} {unit}", { n: importCache.count, unit: tx(importCache.count === 1 ? "correspondência" : "correspondências") })}
-          </p>
-          <div className="cat-form__actions">
-            <button type="button" className="button button--danger" disabled={cacheBusy || importCache?.count === 0} onClick={() => void cleanCache()}>
-              {cacheBusy ? tx("Limpando…") : importCache?.count === 0 ? tx("Já está limpo") : tx("🧹 Limpar cache")}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {isSuper && (
-        <section className="cat-form">
           <h2 className="cat-form__title">🌱 {tx("Sementes")}</h2>
           <button type="button" className="link-btn" onClick={() => navigate("/super/seeds")}>
             {tx("Modelos do assistente ›")}
@@ -269,7 +197,7 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
 }
 
 function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | null; token: string; onClose: () => void; onSaved: (c: CampRow) => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [label, setLabel] = useState("");
   const [year, setYear] = useState("");
   const [busy, setBusy] = useState(false);
@@ -293,7 +221,7 @@ function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | n
       const updated = await updateCamp(token, camp.id, { label: label.trim(), year: yearNumber });
       onSaved({ ...camp, label: updated.label, year: updated.year });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -337,17 +265,17 @@ function RenameCampDialog({ camp, token, onClose, onSaved }: { camp: CampRow | n
 type DeleteStep = "confirm" | "code";
 
 function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow | null; token: string; onClose: () => void; onDeleted: (removed: number) => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [step, setStep] = useState<DeleteStep>("confirm");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [phone, setPhone] = useState("");
-  const [delivery, setDelivery] = useState<"sms" | "mock">("sms");
   const [code, setCode] = useState("");
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!camp) return;
+    setExpiresAt(null);
     setStep("confirm");
     setError(null);
     setCode("");
@@ -360,11 +288,10 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
     setError(null);
     try {
       const res = await requestCampDelete(token, camp.id);
-      setPhone(res.phone);
-      setDelivery(res.delivery);
+      setExpiresAt(res.expiresAt);
       setStep("code");
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -386,7 +313,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           setCode("");
         }
       }
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -399,7 +326,7 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           <span className="sheet__handle" aria-hidden="true" />
           <h2 className="cat-form__title">{tx('Apagar "{label}"?', { label: camp.label })}</h2>
           <p className="cat-hint">
-            {tx("Isso apaga para sempre {campers} acampante(s), {staff} pessoa(s) da equipe e {photos} foto(s) de {label}. Não pode ser desfeito.", {
+            {tx("Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins) e {photos} foto(s). Os cadastros das pessoas continuam no IPAlpha. Não pode ser desfeito.", {
               campers: camp.counts.campers,
               staff: camp.counts.staff,
               photos: camp.counts.photos,
@@ -423,7 +350,9 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           <span className="sheet__handle" aria-hidden="true" />
           <h2 className="cat-form__title">{tx("Confirme o código")}</h2>
           <p className="cat-hint">
-            {delivery === "mock" ? tx(" (modo dev: o código aparece no console do servidor)") : tx("Mandamos um código por SMS para {phone}", { phone })}
+            {expiresAt
+              ? tx("Mandamos um código por SMS para o seu celular cadastrado no IPAlpha. Ele vale até {time}.", { time: new Date(expiresAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) })
+              : tx("Mandamos um código por SMS para o seu celular cadastrado no IPAlpha.")}
           </p>
           <OtpInput value={code} onChange={setCode} onComplete={(v) => void confirmDelete(v)} disabled={busy} autoFocus invalid={!!error} />
           {error && (

@@ -95,7 +95,7 @@ function beep(kind: "ok" | "error") {
  * flash + buzz with the reason on failure.
  */
 export default function ScanPointsDialog({ token, onClose, initialEventId, initialPoints, onChange }: ScanPointsDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const events = useCollection("events");
   const campers = useCollectionOrEmpty("campers");
   const scores = useCollectionOrEmpty("scores");
@@ -179,13 +179,13 @@ export default function ScanPointsDialog({ token, onClose, initialEventId, initi
       const id = camperIdFromQr(raw);
       if (!id) throw new Error(t("Este QR code não é de uma pulseira ou crachá do Acampa Kids."));
       const known = campers.find((x) => x.id === id);
-      if (scannedIds.has(id)) throw new Error(t("{name} já foi lido(a) neste evento.", { name: known ? known.name.split(" ")[0] : t("Esta criança") }));
-      if (known && !known.team) throw new Error(t("{name} não está em nenhum time.", { name: known.name.split(" ")[0] }));
+      if (scannedIds.has(id)) throw new Error(t("{name} já foi lido(a) neste evento.", { name: known?.name.split(" ")[0] || t("Esta criança") }));
+      if (known && !known.team) throw new Error(t("{name} não está em nenhum time.", { name: known.name.split(" ")[0] || t("Esta criança") }));
       const res = await scanScore(token, { camperId: id, eventId, points });
       const checkin = res.checkedIn ? t(" · ✅ check-in feito") : "";
-      showFlash({ kind: "ok", text: t("{name} · +{n} para {team}{checkin}", { name: res.score.camperName.split(" ")[0], n: points, team: res.team.name, checkin }), color: res.team.color });
+      showFlash({ kind: "ok", text: t("{name} · +{n} para {team}{checkin}", { name: (res.camperName || known?.name || "").split(" ")[0] || t("A criança"), n: points, team: res.team.name, checkin }), color: res.team.color });
     } catch (e) {
-      showFlash({ kind: "error", text: e instanceof Error ? e.message : t("Não foi possível ler este QR code.") });
+      showFlash({ kind: "error", text: te(e, "Não foi possível ler este QR code.") });
     } finally {
       busyRef.current = false;
     }
@@ -252,7 +252,7 @@ export default function ScanPointsDialog({ token, onClose, initialEventId, initi
     try {
       await repointEventScans(token, eventId, points);
     } catch (e) {
-      setRepointError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setRepointError(te(e, "Algo deu errado."));
     } finally {
       setRepointing(false);
     }

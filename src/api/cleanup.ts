@@ -9,7 +9,8 @@ export type CleanupGroup = "campers" | "staff" | "bedrooms" | "transports" | "te
  * The admin lists whose people may be SPARED when the Equipe block is wiped
  * (the toggles on the card). A kept list also stays as it is.
  */
-export type StaffKeepGroup = "organizers" | "gameOrganizers" | "scoreHelpers" | "medicalStaff" | "checkinHelpers" | "busHelpers" | "vestHelpers" | "photographers" | "parentContacts";
+/** camp-ops lists the Equipe cleanup may spare (helper roles live in IPAlpha) */
+export type StaffKeepGroup = "busHelpers" | "parentContacts";
 
 /** Which realtime collections the server republishes for each block — the write waits for them. */
 const TOUCHES: Record<CleanupGroup | "all", CollectionName[]> = {

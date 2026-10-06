@@ -6,10 +6,21 @@
  *   ⚠️ chronic conditions   🤮 allergies   🚫💊 drug allergies (must NOT take)
  *   💊 medication (per medicine, with times)   🍽️ food restrictions   🩺 extra medical notes
  */
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { medicationLine, type Medication } from "../api/campers";
+import { useHealthLabel } from "../hooks/usePersonData";
 import { useI18n } from "../i18n";
 import NoPillIcon from "./NoPillIcon";
+
+/**
+ * `labelOf` for `<HealthAlerts>` over the church health lists (+ Acampa's old
+ * import categories): option id → label, null when unknown (the line is
+ * skipped rather than showing a raw id).
+ */
+export function useHealthLabelOf(token: string): (id: string | null | undefined) => string | null {
+  const label = useHealthLabel(token);
+  return useMemo(() => (id: string | null | undefined) => (id ? label(id) || null : null), [label]);
+}
 
 export interface HealthLike {
   allergies: string[];
@@ -41,7 +52,7 @@ export function healthLines(p: HealthLike, labelOf: HealthAlertsProps["labelOf"]
   const drugs = p.drugAllergies.map(labelOf).filter(Boolean) as string[];
   const lines: { icon: ReactNode; title: string; text: string; soft?: boolean }[] = [];
   if (health.length) lines.push({ icon: "⚠️", title: "Condição de saúde", text: health.join(", ") });
-  if (p.neurodivergent) lines.push({ icon: "🧩", title: "Neurodivergente", text: "Neurodivergente" });
+  if (p.neurodivergent) lines.push({ icon: "🧩", title: "Neurodivergência", text: "Neurodivergência" });
   if (allergies.length) lines.push({ icon: "🤮", title: "Alergias", text: allergies.join(", ") });
   if (drugs.length) lines.push({ icon: <NoPillIcon />, title: "Não pode tomar", text: drugs.join(", ") });
   const meds = medicinesText(p);
@@ -87,7 +98,7 @@ export default function HealthAlerts({ person, labelOf, boxed }: HealthAlertsPro
         <span className="staff-card__alert-icon" role="img" aria-label={tx(l.title)}>
           {l.icon}
         </span>{" "}
-        {l.title === "Neurodivergente" ? tx(l.text) : l.text}
+        {l.title === "Neurodivergência" ? tx(l.text) : l.text}
       </p>
     ),
   );

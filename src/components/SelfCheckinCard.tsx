@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { getSelfCheckinStatus, selfCheckin, type SelfCheckinStatus } from "../api/staff";
 import { ApiError } from "../api/client";
-import { describeGeoError, distanceMeters, formatDistance, readPosition, type DevicePosition } from "../geo";
+import { distanceMeters, GeoError, formatDistance, readPosition, type DevicePosition } from "../geo";
 import type { LoggedUser } from "../roles";
 import { speakTime } from "../dates";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import { useI18n } from "../i18n";
+import { usePersonName } from "../store/people";
 import Dialog from "./Dialog";
 
 interface SelfCheckinCardProps {
   token: string;
-  /** the logged-in person — their staff record is found by phone */
+  /** the logged-in person — their staff record is the one whose id is their person id */
   user: LoggedUser;
 }
 
@@ -62,11 +63,13 @@ function remember(date: string) {
  * still check in later. Once checked in, the green "done" card shows inline.
  */
 export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const staff = useCollection("staff");
   const events = useCollectionOrEmpty("events");
   const settings = useCollection("settings");
-  const me = useMemo(() => staff?.find((s) => s.phone === user.phone) ?? null, [staff, user.phone]);
+  const me = useMemo(() => staff?.find((s) => s.id === user.personId) ?? null, [staff, user.personId]);
+  /** who stamped the arrival when it was not the person themself (name read live) */
+  const stampedBy = usePersonName(me?.checkin && me.checkin.byPersonId !== user.personId ? me.checkin.byPersonId : null);
   /** first event of the programme = departure (events come sorted by date/time, but sort defensively) */
   const first = useMemo(() => [...events].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0] ?? null, [events]);
   const departure = first?.date ?? null;
@@ -134,7 +137,8 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
       p = await readPosition();
       setPos(p);
     } catch (err) {
-      setError(describeGeoError(err));
+      // GeoError already speaks the device language (geo.ts); anything else goes through the error texts
+      setError(err instanceof GeoError ? err.message : te(err));
       setPhase("idle");
       return;
     }
@@ -147,7 +151,7 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
         // someone from the admin table beat us to it — the store update will flip the card
         setError(null);
       } else {
-        setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+        setError(te(err, "Algo deu errado."));
       }
     } finally {
       setPhase("idle");
@@ -157,11 +161,11 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
   // ── already there ──
   if (checkedIn) {
     const when = speakTime(me.checkin!.at);
-    const self = me.checkin!.byUserId === user.id;
+    const self = me.checkin!.byPersonId === user.personId;
     const distanceNote = justDone !== null && justDone > 0 ? tx(" (a {distance} do ponto de encontro)", { distance: formatDistance(justDone) }) : "";
     const arrival = self
       ? tx("Você confirmou sua chegada às {when}", { when })
-      : tx("{name} confirmou sua chegada às {when}", { name: me.checkin!.byName.split(" ")[0], when });
+      : tx("{name} confirmou sua chegada às {when}", { name: stampedBy.split(" ")[0] || tx("A equipe"), when });
     const card = (
       <section className={`selfcheck selfcheck--done${popup ? " selfcheck--popup" : ""}`} aria-live="polite">
         <span className="selfcheck__badge" aria-hidden="true">✅</span>
@@ -221,7 +225,7 @@ export default function SelfCheckinCard({ token, user }: SelfCheckinCardProps) {
           {tx("Ao chegar em {place}, confirme sua presença aqui", { place: placeLabel })}
         </p>
 
-        {blocked && <p className="message message--error">{blocked.message}</p>}
+        {blocked && <p className="message message--error">{te(blocked)}</p>}
         {error && <p className="message message--error">{error}</p>}
         {distance !== null && !error && (
           <p className="cat-hint">

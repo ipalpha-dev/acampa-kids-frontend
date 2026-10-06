@@ -5,7 +5,8 @@ import { createEvent, createRole } from "../api/schedule";
 import { createInstruction } from "../api/instructions";
 import { createPrepSection } from "../api/preparation";
 import { fetchSeeds, type SeedBus, type SeedDocs, type Seeds } from "../api/seeds";
-import { loadSampleCamp, type SampleLoad } from "../api/wizard";
+import { fetchSampleEnabled, loadSampleCamp, type SampleLoad } from "../api/wizard";
+import { ApiError } from "../api/client";
 import { applySampleSchedule } from "./sampleSchedule";
 import { sampleSchedulePlan } from "./sampleScheduleDates";
 import { mapsLink, updateSettings, type NotificationSettings } from "../api/settings";
@@ -18,9 +19,7 @@ import CheckinSettingsPage from "../pages/admin/CheckinSettingsPage";
 import RoomAssignPage from "../pages/admin/RoomAssignPage";
 import BedroomsPage from "../pages/admin/BedroomsPage";
 import CamperImportPage from "../pages/admin/CamperImportPage";
-import SmsRedirectCard from "../pages/admin/SmsRedirectCard";
 import StaffImportPage from "../pages/admin/StaffImportPage";
-import StaffListEditor from "../pages/admin/StaffListEditor";
 import { useRoute } from "../router";
 import { useCollection, useCollectionOrEmpty, useHydrated } from "../store";
 import { ICONS } from "../icons";
@@ -226,8 +225,17 @@ export default function WizardPage({ token, user, camp, camps, onExit }: WizardP
 
 // ── intro ───────────────────────────────────────────────────────────────────
 
-function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => void; onSkip: () => void }) {
-  const { tx } = useI18n();
+export function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => void; onSkip: () => void }) {
+  const { tx, te } = useI18n();
+  /** the fictional sample exists only in preview / dev (GET /api/wizard/sample → {enabled}) */
+  const [sampleEnabled, setSampleEnabled] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void fetchSampleEnabled(token).then((on) => alive && setSampleEnabled(on));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<(SampleLoad & { events: number }) | null>(null);
@@ -243,7 +251,9 @@ function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => voi
       const applied = await applySampleSchedule(token, sampleSchedulePlan(), { roles, events });
       setLoaded({ ...r, events: applied.events });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      // the server says the sample is off here after all: the option simply goes away
+      if (e instanceof ApiError && e.code === "SAMPLE_DISABLED") setSampleEnabled(false);
+      else setError(te(e, "Algo deu errado."));
     } finally {
       setTesting(false);
     }
@@ -277,11 +287,13 @@ function IntroStep({ token, onNext, onSkip }: { token: string; onNext: () => voi
       <h2 className="wizard-card__title">{tx("Vamos montar o acampamento! 🏕️")}</h2>
       {error && <p className="message message--error">{error}</p>}
       <div className="wizard-choice">
-        <button type="button" className="wizard-choice__card" disabled={testing} onClick={() => void loadSample()}>
-          <img className="wizard-choice__art" src={ICONS.wizardSample} alt="" aria-hidden="true" />
-          <span className="wizard-choice__title">{testing ? tx("Carregando… 🧪") : tx("Ver funcionando")}</span>
-          <span className="wizard-choice__hint">{tx("Um acampamento de exemplo, fictício")}</span>
-        </button>
+        {sampleEnabled && (
+          <button type="button" className="wizard-choice__card" disabled={testing} onClick={() => void loadSample()}>
+            <img className="wizard-choice__art" src={ICONS.wizardSample} alt="" aria-hidden="true" />
+            <span className="wizard-choice__title">{testing ? tx("Carregando… 🧪") : tx("Ver funcionando")}</span>
+            <span className="wizard-choice__hint">{tx("Um acampamento de exemplo, fictício")}</span>
+          </button>
+        )}
         <button type="button" className="wizard-choice__card" disabled={testing} onClick={onNext}>
           <img className="wizard-choice__art" src={ICONS.wizard} alt="" aria-hidden="true" />
           <span className="wizard-choice__title">{tx("Montar do zero")}</span>
@@ -303,7 +315,7 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
     <section className="wizard-card">
       <h2 className="wizard-card__title">{tx("🔑 Administradores")}</h2>
       <p className="admin-intro">
-        {tx("Quem administra o app convida quem mais vai cuidar da configuração. A pessoa entra com o")} <strong>{tx("próprio celular")}</strong> {tx("(código por SMS) — mande o link para ela.")}
+        {tx("Quem serve na coordenação recebe esse papel no IPAlpha (Mordomia). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.")}
       </p>
       <AdminsEditor token={token} user={user} />
     </section>
@@ -315,7 +327,7 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
 const spotDraft = (v: string) => v.replace(",", ".");
 
 function VenueStep({ token, places, onNext }: { token: string; places: KnownPlace[]; onNext: () => void }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const recalled = useRef(recalledWizardPlace()).current;
@@ -369,7 +381,7 @@ function VenueStep({ token, places, onNext }: { token: string; places: KnownPlac
       rememberWizardPlace({ id: placeId, name: name.trim() || "Acampamento", address: address.trim() });
       setApplied(created);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -461,7 +473,7 @@ function addDays(iso: string, days: number): string {
 }
 
 function ScheduleStep({ token, roles, events }: { token: string; roles: TemplateRole[]; events: TemplateEvent[] }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const existingEvents = useCollectionOrEmpty("events");
   const existingRoles = useCollectionOrEmpty("roles");
   const [firstDay, setFirstDay] = useState(nextFriday);
@@ -535,7 +547,7 @@ function ScheduleStep({ token, roles, events }: { token: string; roles: Template
       }
       setApplied(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -611,7 +623,7 @@ function ScheduleStep({ token, roles, events }: { token: string; roles: Template
 const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const instructions = useCollectionOrEmpty("instructions");
   const preparation = useCollectionOrEmpty("preparation");
   const settings = useCollection("settings");
@@ -637,7 +649,7 @@ function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
       await createInstruction(token, { title: docs.addressTitle, emoji: docs.addressEmoji, audience: "all", content });
       setCreatedAddress(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -651,7 +663,7 @@ function DocsStep({ token, docs }: { token: string; docs: SeedDocs }) {
       await createPrepSection(token, { title: docs.prepTitle, emoji: docs.prepEmoji, audiences: ["parent", "caretaker", "helper"], content: docs.prepContent });
       setCreatedPrep(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(null);
     }
@@ -718,12 +730,10 @@ const ALL_NOTIFICATION_KEYS: (keyof NotificationSettings)[] = [
 ];
 
 function NotificationsGateCard({ token }: { token: string }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const redirect = settings?.smsRedirect;
-  const hasTestPhone = !!(redirect?.staffPhone || redirect?.parentPhone);
   const onCount = settings ? ALL_NOTIFICATION_KEYS.filter((k) => settings.notifications[k]).length : 0;
 
   async function setAll(value: boolean) {
@@ -733,7 +743,7 @@ function NotificationsGateCard({ token }: { token: string }) {
     try {
       await updateSettings(token, { notifications: Object.fromEntries(ALL_NOTIFICATION_KEYS.map((k) => [k, value])) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -747,22 +757,14 @@ function NotificationsGateCard({ token }: { token: string }) {
         </h2>
         <Toggle
           checked={onCount === ALL_NOTIFICATION_KEYS.length}
-          disabled={!settings || busy || (!hasTestPhone && onCount === 0)}
+          disabled={!settings || busy}
           label={onCount === ALL_NOTIFICATION_KEYS.length ? tx("Todas ligadas") : onCount > 0 ? tx("{n} ligadas", { n: onCount }) : tx("Todas desligadas")}
           onChange={(v) => void setAll(v)}
         />
       </div>
-      <p className="cat-hint">
-        {tx("As notificações só podem ficar ligadas quando o")} <strong>{tx("redirecionamento de SMS")}</strong> {tx("tem celular de teste preenchido — enquanto não tiver, tudo continua desligado (ninguém recebe SMS de mentira). Ligue-as aqui ou uma a uma em Notificações.")}
-      </p>
-      {hasTestPhone ? (
-        onCount > 0 && onCount < ALL_NOTIFICATION_KEYS.length ? (
-          <p className="message message--warn">{tx("{on} de {total} notificações ligadas.", { on: onCount, total: ALL_NOTIFICATION_KEYS.length })}</p>
-        ) : null
-      ) : (
-        <p className="message message--warn">
-          {tx("Sem celular de teste: preencha o “Redirecionar SMS” acima para poder ligar as notificações com segurança.")}
-        </p>
+      <p className="cat-hint">{tx("Os avisos saem por SMS e e-mail pelo IPAlpha, com os modelos de Configurações → Mensagens. Ligue-os aqui ou um a um em Notificações.")}</p>
+      {onCount > 0 && onCount < ALL_NOTIFICATION_KEYS.length && (
+        <p className="message message--warn">{tx("{on} de {total} notificações ligadas.", { on: onCount, total: ALL_NOTIFICATION_KEYS.length })}</p>
       )}
       {error && <p className="message message--error">{error}</p>}
     </section>
@@ -772,36 +774,14 @@ function NotificationsGateCard({ token }: { token: string }) {
 function ConfigStep({ token }: { token: string }) {
   const { tx } = useI18n();
   const settings = useCollection("settings");
-  const [organizerIds, setOrganizerIds] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (settings) setOrganizerIds(settings.organizers.staffIds);
-  }, [settings]);
-
-  async function saveOrganizers(nextIds: string[]) {
-    if (busy) return;
-    const previous = organizerIds;
-    setOrganizerIds(nextIds);
-    setBusy(true);
-    setError(null);
-    try {
-      await updateSettings(token, { organizers: { staffIds: nextIds } });
-    } catch (err) {
-      setOrganizerIds(previous);
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const [error] = useState<string | null>(null);
 
   return (
     <div className="wizard-config">
       <section className="wizard-card">
         <h2 className="wizard-card__title">{tx("⚙️ Configurações importantes")}</h2>
         <p className="admin-intro">
-          {tx("As janelas de acesso e de check-in, quem organiza, e o redirecionamento de SMS para os testes. Cada card salva por si — nada precisa ser preenchido de uma vez.")}
+          {tx("As janelas de acesso e de check-in e os avisos. Quem serve em cada papel (organização, saúde, check-in…) é definido no IPAlpha. Cada card salva por si — nada precisa ser preenchido de uma vez.")}
         </p>
         {error && <p className="message message--error">{error}</p>}
       </section>
@@ -814,19 +794,6 @@ function ConfigStep({ token }: { token: string }) {
         <CheckinSettingsPage token={token} />
       </div>
 
-      <section className="cat-form">
-        <StaffListEditor
-          title={<span><img className="audience-icon" src={ICONS.organizer} alt="" aria-hidden="true" /> {tx("Organizadores")}</span>}
-          hint={<>{tx("Acesso de administração (acampantes, equipe, quartos, programação…) sem ser admin")}</>}
-          value={organizerIds}
-          onChange={(ids) => void saveOrganizers(ids)}
-          disabled={busy}
-          pickerTitle={tx("Adicionar organizador")}
-          empty={tx("Ninguém escolhido ainda. Só o admin administra o app.")}
-        />
-      </section>
-
-      <SmsRedirectCard token={token} />
       <NotificationsGateCard token={token} />
     </div>
   );
@@ -867,7 +834,7 @@ function RoomsStep({ token }: { token: string }) {
 // ── buses (prefilled from the seeds) ───────────────────────────────────────
 
 function BusesStep({ token, fleet }: { token: string; fleet: SeedBus[] }) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const transports = useCollectionOrEmpty("transports");
   const hydrated = useHydrated();
   const [seeding, setSeeding] = useState(false);
@@ -891,7 +858,7 @@ function BusesStep({ token, fleet }: { token: string; fleet: SeedBus[] }) {
           await createTransport(token, input);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+        setError(te(e, "Algo deu errado."));
       } finally {
         setSeeding(false);
       }
@@ -926,7 +893,7 @@ function DoneStep({ onExit }: { onExit: () => void }) {
   const transports = useCollectionOrEmpty("transports");
   const settings = useCollection("settings");
 
-  const team = staff.filter((s) => s.active && !s.admin).length;
+  const team = staff.filter((s) => s.active).length;
   const placed = campers.filter((k) => k.transportation).length;
   const rows: { label: string; value: string; ok: boolean }[] = [
     { label: tx("Equipe importada"), value: tx("{n} pessoa(s)", { n: team }), ok: team > 0 },
@@ -936,7 +903,7 @@ function DoneStep({ onExit }: { onExit: () => void }) {
     { label: tx("Documentos"), value: tx("{prep} preparação(ões) · {instr} instrução(ões)", { prep: preparation.length, instr: instructions.length }), ok: preparation.length > 0 && instructions.length > 0 },
     {
       label: tx("Janelas e listas"),
-      value: tx("{checkin} · {n} organizador(es)", { checkin: settings?.checkinWindow.from ? tx("check-in ✓") : tx("check-in —"), n: settings?.organizers.staffIds.length ?? 0 }),
+      value: settings?.checkinWindow.from ? tx("check-in ✓") : tx("check-in —"),
       ok: !!settings?.checkinWindow.from,
     },
     { label: tx("Ônibus"), value: tx("{vehicles} veículo(s) · {placed}/{total} crianças alocadas", { vehicles: transports.length, placed, total: campers.length }), ok: transports.length > 0 },

@@ -11,6 +11,7 @@ import { ICONS } from "../../icons";
 import AssignRoleDialog from "./AssignRoleDialog";
 import type { DetailNav } from "./DetailStack";
 import { useI18n } from "../../i18n";
+import { shownName } from "./staffNames";
 
 interface RoleDetailProps {
   token: string;
@@ -153,13 +154,13 @@ export default function RoleDetail({ token, roleId, nav, onEdit, onOpenStaff, on
                           )}
                           {picked.map((p) =>
                             onOpenStaff ? (
-                              <button key={p.staffId} type="button" className="staff-tag staff-tag--soft staff-tag--link" title={tx("{name} foi escalado(a) à mão — ver", { name: p.name })} onClick={() => onOpenStaff(p.staffId)}>
-                                {p.name}
+                              <button key={p.staffId} type="button" className="staff-tag staff-tag--soft staff-tag--link" title={tx("{name} foi escalado(a) à mão — ver", { name: shownName(p.name) })} onClick={() => onOpenStaff(p.staffId)}>
+                                {shownName(p.name)}
                                 {p.detail && <span className="staff-tag__n">{p.detail}</span>}
                               </button>
                             ) : (
-                              <span key={p.staffId} className="staff-tag staff-tag--soft" title={tx("{name} foi escalado(a) à mão", { name: p.name })}>
-                                {p.name}
+                              <span key={p.staffId} className="staff-tag staff-tag--soft" title={tx("{name} foi escalado(a) à mão", { name: shownName(p.name) })}>
+                                {shownName(p.name)}
                                 {p.detail && <span className="staff-tag__n">{p.detail}</span>}
                               </span>
                             ),

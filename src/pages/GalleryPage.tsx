@@ -14,6 +14,7 @@ import PageFooter from "../components/PageFooter";
 import Toggle from "../components/Toggle";
 import { useConfirm } from "../components/ConfirmDialog";
 import { ICONS } from "../icons";
+import { personInfo, requestNames, usePeopleVersion } from "../store/people";
 import { collatorLocale, useI18n } from "../i18n";
 
 interface GalleryPageProps {
@@ -95,7 +96,7 @@ async function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
  * be general photos of the camp.
  */
 export default function GalleryPage({ token, canManage, parentMode = false }: GalleryPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const storePhotos = useCollectionOrEmpty("gallery");
   /** parent face-search: null = the whole album; a Set = only those ids */
   const [matchedIds, setMatchedIds] = useState<Set<string> | null>(null);
@@ -267,7 +268,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
       setLightbox(null);
       setFilter("all");
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível procurar as fotos."));
+      setError(te(err, "Não foi possível procurar as fotos."));
     } finally {
       setFaceSearching(false);
       if (referenceInput.current) referenceInput.current.value = "";
@@ -396,7 +397,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
         if (inside.length === 0) failures.push({ name: f.name, state: "error", error: tx("nenhuma foto dentro do zip") });
         else list.push(...inside);
       } catch (err) {
-        failures.push({ name: f.name, state: "error", error: err instanceof Error ? err.message : tx("não consegui abrir o zip") });
+        failures.push({ name: f.name, state: "error", error: te(err, "não consegui abrir o zip") });
       }
     }
     setJobs([...list.map((f) => ({ name: f.name, state: "sending" as const })), ...failures]);
@@ -407,7 +408,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
         await uploadGalleryPhoto(token, { file: list[i], caption: "", eventId: presetEvent });
         setJobs((prev) => prev?.map((j, k) => (k === i ? { ...j, state: "done" } : j)) ?? null);
       } catch (err) {
-        setJobs((prev) => prev?.map((j, k) => (k === i ? { ...j, state: "error", error: err instanceof Error ? err.message : tx("Falhou.") } : j)) ?? null);
+        setJobs((prev) => prev?.map((j, k) => (k === i ? { ...j, state: "error", error: te(err, "Falhou.") } : j)) ?? null);
       }
     }
     if (fileInput.current) fileInput.current.value = "";
@@ -495,7 +496,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
       setDl((prev) => (prev ? { ...prev, zipping: false, state: "done" } : prev));
     } catch (err) {
       if (isAbort(err)) setDl((prev) => (prev ? { ...prev, zipping: false, state: "stopped" } : prev));
-      else setDl((prev) => (prev ? { ...prev, zipping: false, state: "error", error: err instanceof Error ? err.message : tx("Algo deu errado.") } : prev));
+      else setDl((prev) => (prev ? { ...prev, zipping: false, state: "error", error: te(err, "Algo deu errado.") } : prev));
     } finally {
       dlAbort.current = null;
     }
@@ -577,7 +578,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
     try {
       await setAlbumPublished(token, next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setAlbumBusy(false);
     }
@@ -667,7 +668,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
       setMoveOpen(false);
       setSelected(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBulkBusy(false);
     }
@@ -710,7 +711,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
       await playVanish(ids);
       await deleteGalleryPhotos(token, ids);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       endVanish(ids);
       setBulkBusy(false);
@@ -771,7 +772,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
       if (nextOrder.length > 1) await reorderGalleryPhotos(token, nextOrder.map((p) => p.id));
       setSelected(new Set());
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBulkBusy(false);
     }
@@ -978,6 +979,10 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
   );
 
   const current = lightbox ? lightbox.list[lightbox.index] ?? null : null;
+  usePeopleVersion();
+  useEffect(() => {
+    if (current?.byPersonId) requestNames([current.byPersonId]);
+  }, [current?.byPersonId]);
   const currentEvent = current?.eventId ? eventById.get(current.eventId) : undefined;
 
   return (
@@ -1347,7 +1352,7 @@ export default function GalleryPage({ token, canManage, parentMode = false }: Ga
             {current.caption && <p className="lightbox__caption">{current.caption}</p>}
             <p className="lightbox__meta">
               {currentEvent ? `${currentEvent.emoji || "📅"} ${currentEvent.title} · ` : ""}
-              {tx("por {name}", { name: current.byName })} · {speakDay(dayKey(current.createdAt), "month")}
+              {tx("por {name}", { name: personInfo(current.byPersonId)?.name || "—" })} · {speakDay(dayKey(current.createdAt), "month")}
             </p>
 
             {/* carousel: every photo of the set, the open one highlighted */}

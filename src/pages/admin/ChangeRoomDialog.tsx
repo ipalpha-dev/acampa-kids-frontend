@@ -7,7 +7,8 @@ import { BedroomSelect } from "../../components/CategoryFields";
 import Dialog from "../../components/Dialog";
 import { ICONS } from "../../icons";
 import { useCollectionOrEmpty } from "../../store";
-import { collatorLocale, useI18n } from "../../i18n";
+import { useI18n } from "../../i18n";
+import { compareByName, firstNameOf, shownName } from "./staffNames";
 
 interface ChangeRoomDialogProps {
   token: string;
@@ -24,7 +25,7 @@ interface ChangeRoomDialogProps {
  * Works on the current room too: to hand the kid to another caretaker.
  */
 export default function ChangeRoomDialog({ token, open, camper: k, onClose }: ChangeRoomDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const staff = useCollectionOrEmpty("staff");
   const [bedroom, setBedroom] = useState<string | null>(k.bedroom);
@@ -43,7 +44,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
   const room = bedroom ? bedrooms.find((b) => b.id === bedroom) : null;
   const caretakers = useMemo(
     // an admin sleeping in the room is not a líder: their roster record is only for the room / transport / vest
-    () => (bedroom ? staff.filter((s) => s.bedroom === bedroom && s.roomRole === "caretaker").sort((a, b) => a.name.localeCompare(b.name, collatorLocale())) : []),
+    () => (bedroom ? staff.filter((s) => s.bedroom === bedroom && s.roomRole === "caretaker").sort(compareByName) : []),
     [staff, bedroom],
   );
   const helpers = useMemo(() => (bedroom ? staff.filter((s) => s.bedroom === bedroom && s.roomRole === "helper") : []), [staff, bedroom]);
@@ -55,9 +56,9 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
   }, [caretakers, caretakerId]);
 
   const changed = bedroom !== k.bedroom || caretakerId !== k.caretakerId;
-  const sex = (room?.group === "girls" ? "F" : room?.group === "boys" ? "M" : null) ?? k.sex ?? k.probableGender;
+  const sex = (room?.group === "girls" ? "F" : room?.group === "boys" ? "M" : null) ?? k.sex;
   const needsPick = caretakers.length > 1 && !caretakerId;
-  const first = k.name.split(" ")[0];
+  const first = firstNameOf(k.name);
   const whoCares =
     sex === "F"
       ? tx("Quem vai cuidar da {name}?", { name: first })
@@ -72,7 +73,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
       await moveCamper(token, k.id, bedroom, caretakerId);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -87,7 +88,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
           <img className="admin-title__icon" src={ICONS.swap} alt="" aria-hidden="true" /> {tx("Trocar de quarto")}
         </h2>
 
-        <BedroomSelect bedrooms={bedrooms} value={bedroom} onChange={setBedroom} current={k.bedroom} groups={bedroomGroupsForSex(k.sex, k.probableGender)} disabled={busy} />
+        <BedroomSelect bedrooms={bedrooms} value={bedroom} onChange={setBedroom} current={k.bedroom} groups={bedroomGroupsForSex(k.sex)} disabled={busy} />
 
         {bedroom && (
           <fieldset className="cat-fieldset change-room__caretaker">
@@ -99,7 +100,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
             {caretakers.length === 0 && (
               <p className="message message--warn">
                 {helpers.length
-                  ? <>{tx("⚠️ Nenhum líder neste quarto (só auxiliares: {names}). A criança ficará", { names: helpers.map((h) => h.name.split(" ")[0]).join(", ") })} <strong>{tx("sem líder")}</strong>.</>
+                  ? <>{tx("⚠️ Nenhum líder neste quarto (só auxiliares: {names}). A criança ficará", { names: helpers.map((h) => firstNameOf(h.name)).join(", ") })} <strong>{tx("sem líder")}</strong>.</>
                   : <>{tx("⚠️ Nenhum líder neste quarto. A criança ficará")} <strong>{tx("sem líder")}</strong>.</>}
               </p>
             )}
@@ -110,7 +111,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
                   : sex === "M"
                     ? tx("Quem vai cuidar do {name} agora vai ser o", { name: first })
                     : tx("Quem vai cuidar do(a) {name} agora vai ser o", { name: first })}{" "}
-                <strong>{caretakers[0].name}</strong>.
+                <strong>{shownName(caretakers[0].name)}</strong>.
               </p>
             )}
             {caretakers.length > 1 && (
@@ -122,7 +123,7 @@ export default function ChangeRoomDialog({ token, open, camper: k, onClose }: Ch
                       <span className="big-option__emoji" aria-hidden="true">
                         <RoomRoleIcon role="caretaker" size={32} sex={staffSex(s, bedrooms)} />
                       </span>
-                      <span className="big-option__label">{s.name}</span>
+                      <span className="big-option__label">{shownName(s.name)}</span>
                     </button>
                   );
                 })}

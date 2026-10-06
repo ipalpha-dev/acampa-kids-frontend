@@ -16,7 +16,7 @@ interface RoleDocEditorProps {
 }
 
 export default function RoleDocEditor({ token, role, field, context, onClose }: RoleDocEditorProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const meta: Record<RoleDocField, { label: ReactNode; placeholder: string; aiContext: "role_instructions" | "role_preparation" }> = {
     instructions: {
       label: tx("📝 Instruções para a equipe"),
@@ -42,11 +42,12 @@ export default function RoleDocEditor({ token, role, field, context, onClose }: 
       cancel();
     };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // scroll lock by class (styles.scss `body.scroll-locked`); an outer lock stays when this one closes
+    const wasLocked = document.body.classList.contains("scroll-locked");
+    document.body.classList.add("scroll-locked");
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      if (!wasLocked) document.body.classList.remove("scroll-locked");
     };
   });
 
@@ -65,7 +66,7 @@ export default function RoleDocEditor({ token, role, field, context, onClose }: 
       await updateRole(token, role.id, { [field]: html });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível salvar."));
+      setError(te(err, "Não foi possível salvar."));
       setSaving(false);
     }
   }

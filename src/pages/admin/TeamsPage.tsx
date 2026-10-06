@@ -21,7 +21,7 @@ interface TeamsPageProps {
  * linked to a team on their forms; the scoreboard (Placar) ranks these teams.
  */
 export default function TeamsPage({ token, onAssign, onScoreboard, onScoreboardBack }: TeamsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const teams = useCollection("teams");
   const staff = useCollectionOrEmpty("staff");
   const campers = useCollectionOrEmpty("campers");
@@ -50,7 +50,7 @@ export default function TeamsPage({ token, onAssign, onScoreboard, onScoreboardB
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Algo deu errado."));
+      setError(te(err, "Algo deu errado."));
     } finally {
       setBusy(false);
     }
@@ -158,18 +158,19 @@ export default function TeamsPage({ token, onAssign, onScoreboard, onScoreboardB
 }
 
 /** High-saturation colours kids can shout by name without mixing them up. */
-const PRESETS: { name: string; hex: string }[] = [
-  { name: "Vermelho", hex: "#e30613" },
-  { name: "Laranja", hex: "#ff6600" },
-  { name: "Amarelo", hex: "#ffcc00" },
-  { name: "Lima", hex: "#a8e10c" },
-  { name: "Verde", hex: "#00a651" },
-  { name: "Ciano", hex: "#00c2e0" },
-  { name: "Azul", hex: "#0057b8" },
-  { name: "Roxo", hex: "#6b2d8b" },
-  { name: "Rosa", hex: "#ff1493" },
-  { name: "Marrom", hex: "#8b4513" },
-  { name: "Preto", hex: "#1a1a1a" },
+/** `key` names the swatch class (styles.scss `$team-presets` — keep the hex values in sync). */
+const PRESETS: { key: string; name: string; hex: string }[] = [
+  { key: "vermelho", name: "Vermelho", hex: "#e30613" },
+  { key: "laranja", name: "Laranja", hex: "#ff6600" },
+  { key: "amarelo", name: "Amarelo", hex: "#ffcc00" },
+  { key: "lima", name: "Lima", hex: "#a8e10c" },
+  { key: "verde", name: "Verde", hex: "#00a651" },
+  { key: "ciano", name: "Ciano", hex: "#00c2e0" },
+  { key: "azul", name: "Azul", hex: "#0057b8" },
+  { key: "roxo", name: "Roxo", hex: "#6b2d8b" },
+  { key: "rosa", name: "Rosa", hex: "#ff1493" },
+  { key: "marrom", name: "Marrom", hex: "#8b4513" },
+  { key: "preto", name: "Preto", hex: "#1a1a1a" },
 ];
 
 function TeamDialog({ team, busy, onSave, onClose }: { team?: Team; busy: boolean; onSave: (input: TeamInput) => Promise<void>; onClose: () => void }) {
@@ -210,8 +211,7 @@ function TeamDialog({ team, busy, onSave, onClose }: { team?: Team; busy: boolea
                   type="button"
                   role="radio"
                   aria-checked={c.hex === color.toLowerCase()}
-                  className={`color-picker__swatch ${c.hex === color.toLowerCase() ? "color-picker__swatch--on" : ""}`}
-                  style={{ background: c.hex }}
+                  className={`color-picker__swatch color-picker__swatch--${c.key} ${c.hex === color.toLowerCase() ? "color-picker__swatch--on" : ""}`}
                   title={tx(c.name)}
                   disabled={busy}
                   onClick={() => setColor(c.hex)}

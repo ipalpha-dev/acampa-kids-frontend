@@ -15,7 +15,7 @@ interface KidsRoomsDraftCardProps {
  * moving rooms, or the person's own room changing).
  */
 export default function KidsRoomsDraftCard({ token }: KidsRoomsDraftCardProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const settings = useCollection("settings");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function KidsRoomsDraftCard({ token }: KidsRoomsDraftCardProps) {
     try {
       await updateSettings(token, { kidsRoomsDraft: value });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     } finally {
       setBusy(false);
     }

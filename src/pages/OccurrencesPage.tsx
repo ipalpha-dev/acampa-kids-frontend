@@ -8,6 +8,7 @@ import SearchField from "../components/SearchField";
 import RichHtml from "../components/RichHtml";
 import RichTextEditor from "../components/RichTextEditor";
 import { useCollection } from "../store";
+import { useNames } from "../store/people";
 import { speakDateTime } from "../dates";
 import PageFooter from "../components/PageFooter";
 import { ICONS, kidFaceSrc } from "../icons";
@@ -31,7 +32,7 @@ const normalize = (value: string) =>
 
 
 export default function OccurrencesPage({ token, audience }: OccurrencesPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const occurrences = useCollection("occurrences");
   const campers = useCollection("campers");
   const staff = useCollection("staff");
@@ -72,7 +73,7 @@ export default function OccurrencesPage({ token, audience }: OccurrencesPageProp
       setCreating(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tx("Não foi possível registrar a ocorrência."));
+      setError(te(err, "Não foi possível registrar a ocorrência."));
     } finally {
       setBusy(false);
     }
@@ -192,8 +193,8 @@ function PeopleField({ title, hint, people, onAdd, onRemove, disabled }: {
         <ul className="occurrence-chips">
           {people.map((person) => (
             <li key={person.id} className="staff-tag helpers-tag">
-              <span>{person.name}</span>
-              <button type="button" className="helpers-tag__x" disabled={disabled} aria-label={tx("Remover {name}", { name: person.name })} onClick={() => onRemove(person.id)}>✕</button>
+              <span>{person.name || "…"}</span>
+              <button type="button" className="helpers-tag__x" disabled={disabled} aria-label={tx("Remover {name}", { name: person.name || "…" })} onClick={() => onRemove(person.id)}>✕</button>
             </li>
           ))}
         </ul>
@@ -226,7 +227,7 @@ function PersonPicker({ open, kind, campers, staff, selectedIds, onPick, onClose
             {filtered.map((person) => (
               <li key={person.id}>
                 <button type="button" className="picker__item" onClick={() => { onPick(person.id); setQuery(""); onClose(); }}>
-                  <span className="picker__name">{person.name}</span><span aria-hidden="true">+</span>
+                  <span className="picker__name">{person.name || "…"}</span><span aria-hidden="true">+</span>
                 </button>
               </li>
             ))}
@@ -240,33 +241,36 @@ function PersonPicker({ open, kind, campers, staff, selectedIds, onPick, onClose
 function OccurrenceCard({ occurrence, campers, staff, bedrooms }: { occurrence: Occurrence; campers: Map<string, Camper>; staff: Map<string, Staff>; bedrooms: Bedroom[] }) {
   const { tx } = useI18n();
   const [open, setOpen] = useState(false);
-  const names = occurrence.campers.map((person) => person.name);
+  /** the occurrence holds person ids only: names are read live from IPAlpha */
+  const nameOf = useNames([...occurrence.campers, ...occurrence.staff, occurrence.createdBy.personId]);
+  const shown = (id: string) => nameOf(id) || "…";
+  const names = occurrence.campers.map(shown);
   return (
     <article className="detail-card occurrence-card">
       <button type="button" className="occurrence-card__head" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <span className="occurrence-card__date">{speakDateTime(occurrence.createdAt)}</span>
         <span className="occurrence-card__summary">
           <strong>{names.length > 0 ? names.join(", ") : tx("Sem acampante relacionado")}</strong>
-          <small>{tx("Registrado por {name}", { name: occurrence.createdBy.name })}</small>
+          <small>{tx("Registrado por {name}", { name: shown(occurrence.createdBy.personId) })}</small>
         </span>
         <span className="occurrence-card__chevron" aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       <div className="occurrence-card__people">
-        {occurrence.campers.map((person) => {
-          const kid = campers.get(person.id);
+        {occurrence.campers.map((id) => {
+          const kid = campers.get(id);
           return (
-            <span key={`c-${person.id}`} className="occurrence-badge occurrence-badge--camper">
-              <img className="occurrence-badge__face" src={kidFaceSrc(kid?.sex ?? kid?.probableGender, person.id)} alt="" aria-hidden="true" /> {person.name}
+            <span key={`c-${id}`} className="occurrence-badge occurrence-badge--camper">
+              <img className="occurrence-badge__face" src={kidFaceSrc(kid?.sex, id)} alt="" aria-hidden="true" /> {shown(id)}
             </span>
           );
         })}
-        {occurrence.staff.map((person) => {
-          const member = staff.get(person.id);
+        {occurrence.staff.map((id) => {
+          const member = staff.get(id);
           const sex = member ? staffSex(member, bedrooms) : null;
           const face = sex === "M" ? ICONS.leaderFace : ICONS.leaderFaceWoman;
           return (
-            <span key={`s-${person.id}`} className="occurrence-badge">
-              <img className="occurrence-badge__face" src={face} alt="" aria-hidden="true" /> {person.name}
+            <span key={`s-${id}`} className="occurrence-badge">
+              <img className="occurrence-badge__face" src={face} alt="" aria-hidden="true" /> {shown(id)}
             </span>
           );
         })}

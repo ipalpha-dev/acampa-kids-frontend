@@ -28,6 +28,7 @@ import { DownloadGlyph } from "../../components/Glyph";
 import { ICONS, kidSexOf } from "../../icons";
 import { collatorLocale, useI18n } from "../../i18n";
 import { shortPersonName } from "../../names";
+import { compareByName, NAME_PENDING, shownName } from "./staffNames";
 
 interface BedroomsPageProps {
   token: string;
@@ -50,7 +51,7 @@ function modeOf(segments: string[], params: URLSearchParams): Mode {
 
 /** Admin: bedrooms grouped by wing, each with its bed layout and occupancy; read-only for the medical team. */
 export default function BedroomsPage({ token, readOnly = false }: BedroomsPageProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   // from the local store (localStorage + live WebSocket feed) — occupancy is kept fresh by the server push
   const stored = useCollection("bedrooms");
   const bedrooms = useMemo(() => (stored ? sortRooms(stored) : null), [stored]);
@@ -102,7 +103,7 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
       await withBusy(() => deleteBedroom(token, b.id));
       navigate("/bedrooms", { replace: true });
     } catch (e) {
-      setError(e instanceof Error ? e.message : tx("Algo deu errado."));
+      setError(te(e, "Algo deu errado."));
     }
   }
 
@@ -312,9 +313,9 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
                               {team.length > 0 && (
                                 <span className="room-card__people-row">
                                   {team.map((s) => (
-                                    <span key={s.id} className="room-card__person" title={s.name}>
+                                    <span key={s.id} className="room-card__person" title={shownName(s.name)}>
                                       <RoomRoleIcon role={s.roomRole} size={16} sex={staffSex(s, bedrooms)} />
-                                      {shortPersonName(s.name, team)}
+                                      {shortPersonName(s.name, team) || NAME_PENDING}
                                     </span>
                                   ))}
                                 </span>
@@ -322,8 +323,8 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
                               {kids.length > 0 && (
                                 <span className="room-card__people-row">
                                   <KidIcon sex={kidSexOf(b.group)} group={kids.length > 1} size={16} />
-                                  <span className="room-card__names" title={kids.map((k) => k.name).join(", ")}>
-                                    {kids.map((k) => shortPersonName(k.name, kids)).join(", ")}
+                                  <span className="room-card__names" title={kids.map((k) => shownName(k.name)).join(", ")}>
+                                    {kids.map((k) => shortPersonName(k.name, kids) || NAME_PENDING).join(", ")}
                                   </span>
                                 </span>
                               )}
@@ -379,7 +380,7 @@ function occupantsByRoom(campers: Camper[], staff: Staff[]): Map<string, { kids:
   for (const k of campers) if (k.bedroom) bucket(k.bedroom).kids.push(k);
   for (const s of staff) if (s.bedroom) bucket(s.bedroom).staff.push(s);
   for (const cur of map.values()) {
-    cur.kids.sort((a, b) => a.name.localeCompare(b.name, collatorLocale(), { sensitivity: "base" }));
+    cur.kids.sort(compareByName);
     cur.staff.sort(compareRoomStaff);
   }
   return map;

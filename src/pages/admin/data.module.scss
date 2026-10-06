@@ -1,0 +1,29 @@
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+// ── Sobre: pie / legend tones (palette in SCSS, not in the component) ──────
+
+.slice { stroke: var(--tone, var(--muted)); }
+.dot { background: var(--tone, var(--muted)); }
+
+.tone-muted { --tone: var(--muted); }
+
+.vendor-anthropic { --tone: var(--sun); }
+.vendor-openai { --tone: var(--panel); }
+.vendor-openai_api { --tone: var(--forest-dark); }
+.vendor-xai { --tone: var(--red); }
+.vendor-meta { --tone: var(--pine); }
+.vendor-zhipu { --tone: var(--sage); }
+.vendor-google { --tone: var(--sky); }
+.vendor-alibaba { --tone: var(--orange, #e08a1e); }
+.vendor-typesafe { --tone: var(--teal, #0f9a8a); }
+
+.kind-edit { --tone: var(--sun); }
+.kind-suggest { --tone: var(--panel); }
+.kind-image { --tone: var(--red); }
+.kind-camper_notes { --tone: var(--pine); }
+.kind-structure_health { --tone: var(--teal, #0f9a8a); }
+.kind-normalize_observations { --tone: var(--orange, #e08a1e); }
+.kind-dedup_field { --tone: var(--sage); }
+.kind-guess_sex { --tone: var(--sky); }
+.kind-assistant_chat { --tone: var(--forest); }
+.kind-assistant_voice { --tone: var(--forest-dark); }

@@ -13,7 +13,7 @@ export function normName(s: string): string {
 
 /** one name of the preference field, with whatever the parents added in parentheses kept aside */
 export interface PrefName {
-  /** the name used for matching ("Helena Cima") */
+  /** the name used for matching ("Ana Exemplo") */
   name: string;
   /** the remark in parentheses, if any ("irmã", "não sabe o sobrenome, sala Lídia") — never matched, always shown */
   note: string;
@@ -22,7 +22,7 @@ export interface PrefName {
 /**
  * The names of a kid's "prefere dividir quarto com" field. Parents write the
  * list however they like: "Ana, Bruno e Carla" / "Ana; Bruno" / "Ana e Bruno".
- * Anything in parentheses is a remark, not a name ("Helena Cima (irmã)",
+ * Anything in parentheses is a remark, not a name ("Ana Exemplo (irmã)",
  * "Eloah (não sabe o sobrenome, sala Lídia)"): it is lifted out before the
  * split — so a comma inside it never cuts a name in two — and handed back as
  * the entry's `note`. A " · " tail is the bed note the import appends
@@ -183,8 +183,8 @@ export interface GroupingOptions {
 
 /** "meninas 5 · meninos 12" — what the limit works out to for each wing (for the Limite label) */
 export function blobLimitHint(bedrooms: readonly Bedroom[]): string {
-  const girls = blobLimitOf({ sex: "F", probableGender: null } as Camper, bedrooms);
-  const boys = blobLimitOf({ sex: "M", probableGender: null } as Camper, bedrooms);
+  const girls = blobLimitOf({ sex: "F" }, bedrooms);
+  const boys = blobLimitOf({ sex: "M" }, bedrooms);
   return girls === boys ? String(girls) : `meninas ${girls} · meninos ${boys}`;
 }
 
@@ -203,8 +203,8 @@ const BIG_ROOM_SHARE = 0.2;
  * wing split in two corridors (4×7 + 6×14) rightly answers 14 → 12, where a
  * median or percentile would say 7 → 5.
  */
-export function blobLimitOf(kid: Camper, bedrooms: readonly Bedroom[]): number {
-  const sex = kid.sex ?? kid.probableGender;
+export function blobLimitOf(kid: Pick<Camper, "sex">, bedrooms: readonly Bedroom[]): number {
+  const sex = kid.sex;
   const wing = sex === "F" ? "girls" : sex === "M" ? "boys" : null;
   const caps = bedrooms.filter((b) => wing ? b.group === wing : b.group !== "staff").map((b) => b.capacity).sort((a, b) => b - a);
   if (!caps.length) return DEFAULT_BLOB_LIMIT;

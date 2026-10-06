@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { listCamperChanges, medicationLine, PARENT_FIELD_LABEL, type CamperChange, type Medication } from "../../api/campers";
+import { listCamperChanges, PARENT_FIELD_LABEL, type CamperChange } from "../../api/campers";
 import Dialog from "../../components/Dialog";
-import { useLabelOf } from "../../store/derive";
 import { speakDateTime } from "../../dates";
 import { useI18n } from "../../i18n";
+import { roleMeta } from "../../roles";
+import { useNames } from "../../store/people";
+import styles from "../../components/campers.module.scss";
 
 interface CamperHistoryDialogProps {
   token: string;
@@ -13,62 +15,63 @@ interface CamperHistoryDialogProps {
   onClose: () => void;
 }
 
-/** Every edit the kid's parent made to the "Informações de saúde" block, newest first — read by the admin. */
+/**
+ * Which fields of the kid's health / notes were changed, by whom and when,
+ * newest first. The values themselves live in IPAlpha and are not repeated
+ * here; names are read live.
+ */
 export default function CamperHistoryDialog({ token, open, camperId, camperName, onClose }: CamperHistoryDialogProps) {
-  const { tx } = useI18n();
+  const { tx, te } = useI18n();
   const [changes, setChanges] = useState<CamperChange[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const labelOf = useLabelOf();
+  const nameOf = useNames(changes?.map((c) => c.byPersonId) ?? []);
 
   useEffect(() => {
     if (!open) return;
+    let alive = true;
     setChanges(null);
     setError(null);
     listCamperChanges(token, camperId)
-      .then(setChanges)
-      .catch((e) => setError(e instanceof Error ? e.message : tx("Algo deu errado.")));
+      .then((c) => alive && setChanges(c))
+      .catch((e) => alive && setError(te(e, "Algo deu errado.")));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, token, camperId]);
 
-  /** a stored value → readable text (option ids become labels) */
-  const show = (v: unknown): string => {
-    if (v === null || v === undefined || v === "") return "—";
-    if (Array.isArray(v)) {
-      if (!v.length) return "—";
-      // medications are objects; every other list is option ids
-      if (typeof v[0] === "object" && v[0] !== null) return (v as Medication[]).map(medicationLine).join("; ");
-      return v.map((id) => labelOf(String(id)) ?? String(id)).join(", ");
-    }
-    if (typeof v === "number") return String(v).replace(".", ",");
-    return String(v);
-  };
+  const first = camperName.split(" ")[0] || tx("a criança");
 
   return (
     <Dialog open={open} onClose={onClose} title={tx("Histórico de alterações")} width={640}>
       <div className="cat-form">
-        <h2 className="cat-form__title">{tx("🕓 Alterações feitas pelos pais · {name}", { name: camperName.split(" ")[0] })}</h2>
+        <h2 className="cat-form__title">{tx("🕓 Alterações · {name}", { name: first })}</h2>
+        <p className="cat-hint">{tx("Mostra quais campos mudaram, quem mudou e quando. Os dados ficam guardados no IPAlpha.")}</p>
         {error && <p className="message message--error">{error}</p>}
         {!error && changes === null && <p className="opt-empty">{tx("Carregando…")}</p>}
-        {changes && changes.length === 0 && <p className="opt-empty">{tx("Os pais ainda não alteraram nada.")}</p>}
+        {changes && changes.length === 0 && <p className="opt-empty">{tx("Nada foi alterado ainda.")}</p>}
         {changes && changes.length > 0 && (
           <ol className="history-list">
-            {changes.map((c) => (
-              <li key={c.id} className={`history-item ${c.medical ? "history-item--medical" : ""}`}>
-                <p className="history-item__head">
-                  <strong>{c.byName}</strong> · {speakDateTime(c.at)}
-                  <span className={`staff-tag ${c.medical ? "staff-tag--late" : "staff-tag--soft"}`}>{c.medical ? tx("🩺 dados médicos") : tx("📝 observações")}</span>
-                </p>
-                <ul className="history-item__changes">
-                  {c.changes.map((x) => (
-                    <li key={x.field}>
-                      <span className="history-item__field">{tx(PARENT_FIELD_LABEL[x.field] ?? x.field)}</span>
-                      <span className="history-item__before">{show(x.before)}</span>
-                      <span aria-hidden="true">→</span>
-                      <span className="history-item__after">{show(x.after)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
+            {changes.map((c) => {
+              const who = nameOf(c.byPersonId);
+              return (
+                <li key={c.id} className={`history-item ${styles.historyItem} ${c.medical ? "history-item--medical" : ""}`}>
+                  <p className="history-item__head">
+                    <strong className={who ? undefined : styles.pendingName}>{who || tx("Carregando nome…")}</strong>
+                    {" · "}
+                    {tx(roleMeta(c.byRole).label)} · {speakDateTime(c.at)}
+                    <span className={`staff-tag ${c.medical ? "staff-tag--late" : "staff-tag--soft"}`}>{c.medical ? tx("🩺 saúde") : tx("📝 observações")}</span>
+                  </p>
+                  <ul className={styles.historyFields} aria-label={tx("Campos alterados")}>
+                    {c.fields.map((f) => (
+                      <li key={f} className="staff-tag">
+                        {tx(PARENT_FIELD_LABEL[f] ?? f)}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              );
+            })}
           </ol>
         )}
         <div className="cat-form__actions">

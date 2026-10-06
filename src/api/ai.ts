@@ -1,4 +1,4 @@
-import { ApiError, OFFLINE_MESSAGE, api } from "./client";
+import { ApiError, OFFLINE_MESSAGE, api, signalAuthFailure } from "./client";
 import { bearer } from "../auth/store";
 
 const BASE = import.meta.env.VITE_API_URL || window.location.origin;
@@ -33,6 +33,7 @@ export async function aiTranscribe(token: string, audio: Blob, signal?: AbortSig
     throw new ApiError(0, "OFFLINE", OFFLINE_MESSAGE);
   }
   const data = (await res.json().catch(() => null)) as { text?: string; error?: { code?: string; message?: string } } | null;
+  if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
   if (!res.ok) throw new ApiError(res.status, data?.error?.code ?? "AI_FAILED", data?.error?.message ?? "Não foi possível transcrever o áudio.");
   return data?.text ?? "";
 }
@@ -151,6 +152,7 @@ export async function aiEdit(token: string, req: AiEditRequest, onChunk: (progre
   }
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+    signalAuthFailure(res.status, data?.error?.code ?? "");
     throw new ApiError(res.status, data?.error?.code ?? "AI_FAILED", data?.error?.message ?? "O assistente não respondeu.");
   }
   if (!res.body) return { reply: "", doc: null, docPending: false, lookups: [], thought: [] };
@@ -270,13 +272,6 @@ export async function aiDedupField(token: string, field: DedupField, value: stri
   return api("/api/ai/dedup-field", { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ field, value }), signal });
 }
 
-/**
- * Hidden sex field for a new camper: Jev 1.13 guesses F/M from the
- * (Brazilian) first name. Best-effort — `sex: null` on any failure.
- */
-export async function aiGuessSex(token: string, name: string, signal?: AbortSignal): Promise<{ sex: "F" | "M" | null }> {
-  return api("/api/ai/guess-sex", { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ name }), signal });
-}
 
 /** Models sometimes wrap the answer in ```html fences even when told not to. */
 export function stripCodeFences(text: string): string {
