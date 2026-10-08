@@ -1,7 +1,7 @@
 import { api } from "./client";
 import { bearer } from "../auth/store";
 
-/** One person holding `coordenacao` (names read live; the role itself is granted in Mordomia). */
+/** One person holding `coordenacao` (names read live; the role itself is granted in Oikos). */
 export interface AdminAccount {
   personId: string;
   name: string;
@@ -15,7 +15,7 @@ export interface AdminsInfo {
   appUrl: string;
 }
 
-/** Everyone who coordinates the camp + the app link. Read-only: roles are granted in Mordomia (IPAlpha). */
+/** Everyone who coordinates the camp + the app link. Read-only: roles are granted in Oikos (IPAlpha). */
 export async function listAdmins(token: string): Promise<AdminsInfo> {
   return api<AdminsInfo>("/api/admins", { headers: bearer(token) });
 }

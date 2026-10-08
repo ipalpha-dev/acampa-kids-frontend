@@ -5,7 +5,7 @@ import { bearer } from "../auth/store";
  * The project's message templates (CONTRACTS_ACAMPA §11/§15, decisions 34/45):
  * every SMS / e-mail Acampa sends is a template of the IPAlpha project, sent
  * by notifications-api to a person id. The coordenação edits the copy here
- * (also editable in Mordomia / the Developers portal); the variables are
+ * (also editable in Oikos / the Developers portal); the variables are
  * fixed by Acampa's code.
  */
 

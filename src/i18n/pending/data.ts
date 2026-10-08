@@ -91,11 +91,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Les personnes sans téléphone ne font pas partie de cet import : vous pouvez les enregistrer dans IPAlpha et importer à nouveau.",
     de: "Wer ohne Handynummer bleibt, ist bei diesem Import nicht dabei: Du kannst die Person in IPAlpha erfassen und noch einmal importieren.",
   },
-  "✅ {n} importado(s). {m} ainda precisa(m) ser incluído(s) nesta edição pelo Mordomia — com calma, ninguém se perdeu.": {
-    en: "✅ {n} imported. {m} still need(s) to be added to this edition in Mordomia — no rush, nobody got lost.",
-    es: "✅ {n} importado(s). {m} aún necesita(n) ser incluido(s) en esta edición desde Mordomia — con calma, nadie se perdió.",
-    fr: "✅ {n} importé(s). {m} doi(ven)t encore être ajouté(s) à cette édition dans Mordomia — sans hâte, personne n'est perdu.",
-    de: "✅ {n} importiert. {m} muss/müssen noch in Mordomia zu dieser Ausgabe hinzugefügt werden — in Ruhe, niemand ist verloren.",
+  "✅ {n} importado(s). {m} ainda precisa(m) ser incluído(s) nesta edição pelo Oikos — com calma, ninguém se perdeu.": {
+    en: "✅ {n} imported. {m} still need(s) to be added to this edition in Oikos — no rush, nobody got lost.",
+    es: "✅ {n} importado(s). {m} aún necesita(n) ser incluido(s) en esta edición desde Oikos — con calma, nadie se perdió.",
+    fr: "✅ {n} importé(s). {m} doi(ven)t encore être ajouté(s) à cette édition dans Oikos — sans hâte, personne n'est perdu.",
+    de: "✅ {n} importiert. {m} muss/müssen noch in Oikos zu dieser Ausgabe hinzugefügt werden — in Ruhe, niemand ist verloren.",
   },
 
   // ── Geral: import health card ──
@@ -218,16 +218,16 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Reprenez ce qui existe déjà d'un autre camp : catégories, équipes, chambres, bus, équipe, campeurs, programme, documents et paramètres. Chaque bloc devient un NOUVEL enregistrement de cette année (les personnes sont les mêmes dans IPAlpha) — rien ici ne modifie l'année d'origine.",
     de: "Übernimm, was es schon aus einem anderen Camp gibt: Kategorien, Teams, Zimmer, Busse, Team, Kinder, Programm, Dokumente und Einstellungen. Jeder Bereich wird zu einem NEUEN Eintrag dieses Jahres (die Personen sind dieselben in IPAlpha) — am Ursprungsjahr ändert sich nichts.",
   },
-  "{n} pessoa(s) ainda precisa(m) ser incluída(s) nesta edição pelo Mordomia": {
-    en: "{n} person(s) still need(s) to be added to this edition in Mordomia",
-    es: "{n} persona(s) aún necesita(n) ser incluida(s) en esta edición desde Mordomia",
-    fr: "{n} personne(s) doi(ven)t encore être ajoutée(s) à cette édition dans Mordomia",
-    de: "{n} Person(en) muss/müssen noch in Mordomia zu dieser Ausgabe hinzugefügt werden",
+  "{n} pessoa(s) ainda precisa(m) ser incluída(s) nesta edição pelo Oikos": {
+    en: "{n} person(s) still need(s) to be added to this edition in Oikos",
+    es: "{n} persona(s) aún necesita(n) ser incluida(s) en esta edición desde Oikos",
+    fr: "{n} personne(s) doi(ven)t encore être ajoutée(s) à cette édition dans Oikos",
+    de: "{n} Person(en) muss/müssen noch in Oikos zu dieser Ausgabe hinzugefügt werden",
   },
-  "Quem serve na coordenação recebe esse papel no IPAlpha (Mordomia). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.": {
-    en: "Whoever serves in coordination gets that role in IPAlpha (Mordomia). Then just send the link: the person signs in with their own phone, with a code by SMS.",
-    es: "Quien sirve en la coordinación recibe ese rol en IPAlpha (Mordomia). Después solo envía el enlace: la persona entra con su propio celular, con un código por SMS.",
-    fr: "La personne qui sert à la coordination reçoit ce rôle dans IPAlpha (Mordomia). Ensuite, envoyez simplement le lien : elle se connecte avec son propre téléphone, avec un code par SMS.",
-    de: "Wer in der Koordination dient, bekommt diese Aufgabe in IPAlpha (Mordomia). Danach einfach den Link schicken: Die Person meldet sich mit dem eigenen Handy und einem SMS-Code an.",
+  "Quem serve na coordenação recebe esse papel no IPAlpha (Oikos). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.": {
+    en: "Whoever serves in coordination gets that role in IPAlpha (Oikos). Then just send the link: the person signs in with their own phone, with a code by SMS.",
+    es: "Quien sirve en la coordinación recibe ese rol en IPAlpha (Oikos). Después solo envía el enlace: la persona entra con su propio celular, con un código por SMS.",
+    fr: "La personne qui sert à la coordination reçoit ce rôle dans IPAlpha (Oikos). Ensuite, envoyez simplement le lien : elle se connecte avec son propre téléphone, avec un code par SMS.",
+    de: "Wer in der Koordination dient, bekommt diese Aufgabe in IPAlpha (Oikos). Danach einfach den Link schicken: Die Person meldet sich mit dem eigenen Handy und einem SMS-Code an.",
   },
 };

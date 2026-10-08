@@ -97,7 +97,7 @@ export default function ImportYearPage({ kind, token, otherCamps, onBack, onDone
       const waiting = r?.membershipsFailed ?? 0;
       setPendingToast(
         waiting > 0
-          ? tx("✅ {n} importado(s). {m} ainda precisa(m) ser incluído(s) nesta edição pelo Mordomia — com calma, ninguém se perdeu.", { n, m: waiting })
+          ? tx("✅ {n} importado(s). {m} ainda precisa(m) ser incluído(s) nesta edição pelo Oikos — com calma, ninguém se perdeu.", { n, m: waiting })
           : tx("✅ {n} importado(s)", { n }),
       );
       onDone();

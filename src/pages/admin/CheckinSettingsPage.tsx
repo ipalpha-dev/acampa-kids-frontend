@@ -302,7 +302,7 @@ export default function CheckinSettingsPage({ token }: CheckinSettingsPageProps)
       <section className="cat-form">
         <h2 className="cat-form__title">{tx("⛪ Ajudantes do check-in na igreja")}</h2>
         <p className="cat-hint">
-          {tx("Quem ajuda no check-in é quem tem o papel “Check-in na igreja” no IPAlpha (Mordomia → Projetos → Acampa Kids). Durante a janela, essas pessoas veem todas as crianças.")}
+          {tx("Quem ajuda no check-in é quem tem o papel “Check-in na igreja” no IPAlpha (Oikos → Projetos → Acampa Kids). Durante a janela, essas pessoas veem todas as crianças.")}
         </p>
       </section>
 

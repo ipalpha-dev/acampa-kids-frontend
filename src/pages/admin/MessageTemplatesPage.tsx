@@ -28,7 +28,7 @@ interface MessageTemplatesPageProps {
  * Configurações → Mensagens (coordenação): the project's SMS / e-mail
  * templates, in 5 languages. Each template keeps the variables Acampa fills
  * in ({name}, {room}…); SMS stay within 160 characters per language. Saved
- * in IPAlpha (projects-api) — Mordomia shows the same copy.
+ * in IPAlpha (projects-api) — Oikos shows the same copy.
  */
 export default function MessageTemplatesPage({ token }: MessageTemplatesPageProps) {
   const { tx, te } = useI18n();

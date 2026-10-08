@@ -173,5 +173,5 @@ function buildSummaryLine(result: ImportFromCampResult, tx: (pt: string, vars?: 
   }
   const base = parts.length > 0 ? parts.join(", ") : tx("Nada novo para importar");
   const line = skipped > 0 ? tx("{summary} · {n} já estavam aqui", { summary: base, n: skipped }) : base;
-  return waiting > 0 ? `${line} · ${tx("{n} pessoa(s) ainda precisa(m) ser incluída(s) nesta edição pelo Mordomia", { n: waiting })}` : line;
+  return waiting > 0 ? `${line} · ${tx("{n} pessoa(s) ainda precisa(m) ser incluída(s) nesta edição pelo Oikos", { n: waiting })}` : line;
 }

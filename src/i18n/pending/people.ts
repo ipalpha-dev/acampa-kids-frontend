@@ -41,18 +41,18 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Versão {version}": { en: "Version {version}", es: "Versión {version}", fr: "Version {version}", de: "Version {version}" },
 
   // ── roles live in IPAlpha ──
-  "Quem serve na coordenação é definido no IPAlpha (Mordomia → Projetos → Acampa Kids → Papéis).": {
-    en: "Who serves in the coordination is set in IPAlpha (Mordomia → Projects → Acampa Kids → Roles).",
-    es: "Quién sirve en la coordinación se define en IPAlpha (Mordomia → Proyectos → Acampa Kids → Papeles).",
-    fr: "Qui sert dans la coordination se définit dans IPAlpha (Mordomia → Projets → Acampa Kids → Rôles).",
-    de: "Wer in der Koordination dient, wird in IPAlpha festgelegt (Mordomia → Projekte → Acampa Kids → Rollen).",
+  "Quem serve na coordenação é definido no IPAlpha (Oikos → Projetos → Acampa Kids → Papéis).": {
+    en: "Who serves in the coordination is set in IPAlpha (Oikos → Projects → Acampa Kids → Roles).",
+    es: "Quién sirve en la coordinación se define en IPAlpha (Oikos → Proyectos → Acampa Kids → Papeles).",
+    fr: "Qui sert dans la coordination se définit dans IPAlpha (Oikos → Projets → Acampa Kids → Rôles).",
+    de: "Wer in der Koordination dient, wird in IPAlpha festgelegt (Oikos → Projekte → Acampa Kids → Rollen).",
   },
   "Copiar link do app": { en: "Copy the app link", es: "Copiar el enlace de la app", fr: "Copier le lien de l'appli", de: "App-Link kopieren" },
-  "Quem ajuda no check-in é quem tem o papel “Check-in na igreja” no IPAlpha (Mordomia → Projetos → Acampa Kids). Durante a janela, essas pessoas veem todas as crianças.": {
-    en: "The check-in helpers are whoever holds the “Church check-in” role in IPAlpha (Mordomia → Projects → Acampa Kids). During the window they see every child.",
-    es: "Quien ayuda en el check-in es quien tiene el papel “Check-in en la iglesia” en IPAlpha (Mordomia → Proyectos → Acampa Kids). Durante la ventana ven a todos los niños.",
-    fr: "Les aides à l'accueil sont les personnes ayant le rôle « Accueil à l'église » dans IPAlpha (Mordomia → Projets → Acampa Kids). Pendant la fenêtre, elles voient tous les enfants.",
-    de: "Beim Check-in helfen alle mit der Rolle „Check-in in der Kirche“ in IPAlpha (Mordomia → Projekte → Acampa Kids). Während des Zeitfensters sehen sie alle Kinder.",
+  "Quem ajuda no check-in é quem tem o papel “Check-in na igreja” no IPAlpha (Oikos → Projetos → Acampa Kids). Durante a janela, essas pessoas veem todas as crianças.": {
+    en: "The check-in helpers are whoever holds the “Church check-in” role in IPAlpha (Oikos → Projects → Acampa Kids). During the window they see every child.",
+    es: "Quien ayuda en el check-in es quien tiene el papel “Check-in en la iglesia” en IPAlpha (Oikos → Proyectos → Acampa Kids). Durante la ventana ven a todos los niños.",
+    fr: "Les aides à l'accueil sont les personnes ayant le rôle « Accueil à l'église » dans IPAlpha (Oikos → Projets → Acampa Kids). Pendant la fenêtre, elles voient tous les enfants.",
+    de: "Beim Check-in helfen alle mit der Rolle „Check-in in der Kirche“ in IPAlpha (Oikos → Projekte → Acampa Kids). Während des Zeitfensters sehen sie alle Kinder.",
   },
   "Os avisos saem por SMS e e-mail pelo IPAlpha, com os modelos de Configurações → Mensagens. Ligue-os aqui ou um a um em Notificações.": {
     en: "Notices go out by SMS and email through IPAlpha, using the templates in Settings → Messages. Turn them on here or one by one in Notifications.",

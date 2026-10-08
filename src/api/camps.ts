@@ -148,7 +148,7 @@ export interface ImportBlockResult {
   created: number;
   updated: number;
   skipped: number;
-  /** people copied whose membership in this edition IPAlpha refused (granted later in Mordomia) */
+  /** people copied whose membership in this edition IPAlpha refused (granted later in Oikos) */
   membershipsFailed?: number;
 }
 

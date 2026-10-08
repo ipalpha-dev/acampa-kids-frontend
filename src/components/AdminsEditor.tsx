@@ -10,7 +10,7 @@ interface AdminsEditorProps {
 
 /**
  * Who coordinates the camp (setup wizard's step and the Superusuário page).
- * Read-only: the `coordenacao` role is granted in Mordomia (IPAlpha), where
+ * Read-only: the `coordenacao` role is granted in Oikos (IPAlpha), where
  * every role of the project lives — this only shows the current list.
  */
 export default function AdminsEditor({ token, user }: AdminsEditorProps) {
@@ -53,7 +53,7 @@ export default function AdminsEditor({ token, user }: AdminsEditorProps) {
           ))}
         </ul>
       )}
-      <p className="cat-hint">{tx("Quem serve na coordenação é definido no IPAlpha (Mordomia → Projetos → Acampa Kids → Papéis).")}</p>
+      <p className="cat-hint">{tx("Quem serve na coordenação é definido no IPAlpha (Oikos → Projetos → Acampa Kids → Papéis).")}</p>
       {info?.appUrl && (
         <div className="cat-form__actions">
           <button type="button" className="button button--secondary" onClick={() => void copyLink()}>

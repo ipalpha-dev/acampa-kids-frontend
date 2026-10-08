@@ -315,7 +315,7 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
     <section className="wizard-card">
       <h2 className="wizard-card__title">{tx("🔑 Administradores")}</h2>
       <p className="admin-intro">
-        {tx("Quem serve na coordenação recebe esse papel no IPAlpha (Mordomia). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.")}
+        {tx("Quem serve na coordenação recebe esse papel no IPAlpha (Oikos). Depois é só mandar o link: a pessoa entra com o próprio celular, com um código por SMS.")}
       </p>
       <AdminsEditor token={token} user={user} />
     </section>
