@@ -8,6 +8,7 @@ import HealthHeart from "./HealthHeart";
 import TeamTag from "./TeamTag";
 import TransportTag from "./TransportTag";
 import styles from "./campers.module.scss";
+import { unnamedText } from "../store/people";
 
 interface CamperCardProps {
   camper: Camper;
@@ -33,7 +34,7 @@ export default function CamperCard({ camper: k, labelOf, hideBedroom, bedroom, o
   const { tx } = useI18n();
   const age = ageOf(k.birthDate ?? null);
   const showBedroom = !hideBedroom && bedroom;
-  const name = k.name || tx("Carregando nome…");
+  const name = k.name || tx(unnamedText(k.id));
 
   const body = (
     <div className="kid-card__body">

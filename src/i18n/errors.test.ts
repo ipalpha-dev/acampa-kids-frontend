@@ -13,6 +13,7 @@ describe("error texts — every error shown in the person's language", () => {
     expect(errorText("en", new ApiError(0, "OFFLINE", "Sem conexão com o servidor. Verifique o Wi-Fi do acampamento e tente novamente."))).toBe("No connection to the server. Check the camp Wi-Fi and try again.");
     expect(errorText("de", new ApiError(403, "CAMP_FORBIDDEN", "Você não tem acesso a este acampamento."))).toBe(LITERALS["Você não tem acesso a esse ano."]?.de);
     expect(errorText("es", new ApiError(423, "ACCOUNT_FROZEN", "Muitas tentativas incorretas. Tente novamente em 5 minuto(s).", { minutesLeft: 5 }))).toBe("Demasiados intentos incorrectos. Inténtalo de nuevo en 5 minuto(s).");
+    expect(errorText("fr", new ApiError(409, "EDITION_MISSING", "Ainda não encontramos a edição 2027 no Oikos.", { year: 2027 }))).toBe("Nous n'avons pas encore trouvé l'édition 2027 dans Oikos. Demandez gentiment à la coordination du projet de la créer, puis réessayez.");
   });
 
   it("then a catalogued message, then the code's family, then the screen's fallback — never raw Portuguese", () => {

@@ -139,6 +139,16 @@ async function flushNames(): Promise<void> {
   }
 }
 
+/** Core answered without a name (the acting role may not see it — roles policy `seesNamesOf`): no point waiting for it. */
+export function nameSettled(id: string | null | undefined): boolean {
+  return !!id && (unknown.has(id) || people.get(id)?.name === "");
+}
+
+/** The pt-BR placeholder for a person shown without a name: still loading, or not available to this profile. */
+export function unnamedText(id: string | null | undefined): "Nome indisponível no momento" | "Carregando nome…" {
+  return nameSettled(id) ? "Nome indisponível no momento" : "Carregando nome…";
+}
+
 /** The name of one person (requested on demand); "" while unknown. */
 export function usePersonName(id: string | null | undefined): string {
   usePeopleVersion();

@@ -4,7 +4,7 @@ import Dialog from "../../components/Dialog";
 import { speakDateTime } from "../../dates";
 import { useI18n } from "../../i18n";
 import { roleMeta } from "../../roles";
-import { useNames } from "../../store/people";
+import { useNames, nameSettled, unnamedText } from "../../store/people";
 import styles from "../../components/campers.module.scss";
 
 interface CamperHistoryDialogProps {
@@ -57,7 +57,7 @@ export default function CamperHistoryDialog({ token, open, camperId, camperName,
               return (
                 <li key={c.id} className={`history-item ${styles.historyItem} ${c.medical ? "history-item--medical" : ""}`}>
                   <p className="history-item__head">
-                    <strong className={who ? undefined : styles.pendingName}>{who || tx("Carregando nome…")}</strong>
+                    <strong className={who || nameSettled(c.byPersonId) ? undefined : styles.pendingName}>{who || tx(unnamedText(c.byPersonId))}</strong>
                     {" · "}
                     {tx(roleMeta(c.byRole).label)} · {speakDateTime(c.at)}
                     <span className={`staff-tag ${c.medical ? "staff-tag--late" : "staff-tag--soft"}`}>{c.medical ? tx("🩺 saúde") : tx("📝 observações")}</span>

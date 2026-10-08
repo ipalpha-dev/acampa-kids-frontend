@@ -45,7 +45,6 @@ import TrialsPage from "./admin/TrialsPage";
 import CleanupPage from "./admin/CleanupPage";
 import SeedsPage from "./admin/SeedsPage";
 import SuperPage from "./admin/SuperPage";
-import MessageTemplatesPage from "./admin/MessageTemplatesPage";
 import Breadcrumbs from "../components/Breadcrumbs";
 import ScoreboardPage from "./ScoreboardPage";
 import GalleryPage from "./GalleryPage";
@@ -82,7 +81,7 @@ interface DashboardProps {
 type View = TabKey | "profile" | "badge" | "settings" | "wizard" | SettingsKey;
 
 /** Admin settings live behind the ⚙️ button; each one is its own URL (#/categories, #/settings). `superOnly`: just the deployment owner (SUPER_ADMIN_PHONE). */
-type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "contacts" | "notifications" | "templates" | "super" | "about";
+type SettingsKey = "general" | "trials" | "categories" | "cleanup" | "preparation" | "instructions-admin" | "checkin-settings" | "contacts" | "notifications" | "super" | "about";
 /** `adminOnly`: an ORGANIZER (Settings → Organizadores) gets every other page — these four stay with the real admin. `superOnly`: only the deployment owner. */
 const SETTINGS: readonly { key: SettingsKey; label: string; emoji?: string; icon?: string; adminOnly?: boolean; superOnly?: boolean }[] = [
   { key: "general", label: "Geral", emoji: "⚙️" },
@@ -91,7 +90,6 @@ const SETTINGS: readonly { key: SettingsKey; label: string; emoji?: string; icon
   { key: "checkin-settings", label: "Check-in", emoji: "✅" },
   { key: "contacts", label: "Contatos importantes", emoji: "📞" },
   { key: "notifications", label: "Notificações", icon: ICONS.notifications, adminOnly: true },
-  { key: "templates", label: "Mensagens", emoji: "✉️", adminOnly: true },
   { key: "trials", label: "Testes", emoji: "🚧" },
   { key: "categories", label: "Categorias", emoji: "🗂️", adminOnly: true },
   { key: "cleanup", label: "Limpeza", icon: ICONS.cleanup, adminOnly: true },
@@ -782,7 +780,6 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
             {view === "gallery" && <GalleryPage token={token} canManage={settingsAllowed || helper.photographer} parentMode={isParent} />}
             {view === "contacts" && <ParentContactsPage token={token} />}
             {view === "notifications" && <NotificationsPage token={token} />}
-            {view === "templates" && <MessageTemplatesPage token={token} />}
             {view === "about" && <AboutPage token={token} />}
             {view === "checkin" && !settingsAllowed && <CheckinPage token={token} />}
             {view === "checkin" && settingsAllowed && segments.length === 1 && <AdminCheckinPage />}

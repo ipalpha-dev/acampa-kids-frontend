@@ -10,12 +10,14 @@ export class ApiError extends Error {
   audience?: "staff" | "parent";
   /** core's refusal detail (403 CORE_FORBIDDEN / 409 CORE_REJECTED), e.g. "decisionsPending" */
   reason?: string;
+  /** 409 EDITION_MISSING: the year without an edition in Oikos */
+  year?: number;
 
   constructor(
     status: number,
     code: string,
     message: string,
-    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent"; reason?: string },
+    extra?: { attemptsLeft?: number; minutesLeft?: number; secondsLeft?: number; opensAt?: string | null; closesAt?: string | null; audience?: "staff" | "parent"; reason?: string; year?: number },
   ) {
     super(message);
     this.status = status;
@@ -27,6 +29,7 @@ export class ApiError extends Error {
     this.closesAt = extra?.closesAt;
     this.audience = extra?.audience;
     this.reason = extra?.reason;
+    this.year = extra?.year;
   }
 }
 
@@ -127,6 +130,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
         closesAt: err?.closesAt as string | null | undefined,
         audience: err?.audience as "staff" | "parent" | undefined,
         reason: typeof err?.reason === "string" ? err.reason : undefined,
+        year: typeof err?.year === "number" ? err.year : undefined,
       },
     );
   }

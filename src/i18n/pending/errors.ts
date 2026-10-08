@@ -222,6 +222,12 @@ export const LITERALS: Record<string, { en: string; es: string; fr: string; de: 
     fr: "Cette personne n'est pas encore dans cette édition dans IPAlpha.",
     de: "Diese Person ist in IPAlpha noch nicht in dieser Ausgabe.",
   },
+  "Ainda não encontramos a edição {year} no Oikos. Peça com carinho à coordenação do projeto para criá-la por lá e tente de novo.": {
+    en: "We haven't found the {year} edition in Oikos yet. Kindly ask the project's coordination to create it there, then try again.",
+    es: "Todavía no encontramos la edición {year} en Oikos. Pide con cariño a la coordinación del proyecto que la cree allí y vuelve a intentarlo.",
+    fr: "Nous n'avons pas encore trouvé l'édition {year} dans Oikos. Demandez gentiment à la coordination du projet de la créer, puis réessayez.",
+    de: "Wir haben die Ausgabe {year} in Oikos noch nicht gefunden. Bitte die Projektkoordination freundlich, sie dort anzulegen, und versuch es dann noch einmal.",
+  },
   "O IPAlpha não confirmou o cadastro.": {
     en: "IPAlpha did not confirm the registration.",
     es: "IPAlpha no confirmó el registro.",

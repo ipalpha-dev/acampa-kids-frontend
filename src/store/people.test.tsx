@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { saveAuth } from "../auth/store";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyServerData, clearStore, useCollection } from "./index";
-import { NAMES_BATCH_MAX, personInfo, rememberPeople, useNames } from "./people";
+import { NAMES_BATCH_MAX, personInfo, rememberPeople, unnamedText, useNames } from "./people";
 
 const CAMP = { id: "c1", label: "Acampa", year: 2026, active: true };
 
@@ -37,6 +37,8 @@ describe("people cache — live names joined to camp-ops records", () => {
     await waitFor(() => expect(result.current("p249")).toBe("Nome p249"));
     expect(bodies.map((b) => b.length)).toEqual([NAMES_BATCH_MAX, 51]);
     expect(result.current("hidden")).toBe("");
+    expect(unnamedText("hidden")).toBe("Nome indisponível no momento");
+    expect(unnamedText("not-asked-yet")).toBe("Carregando nome…");
     rerender();
     expect(bodies).toHaveLength(2);
     expect(personInfo("p0")?.name).toBe("Nome p0");

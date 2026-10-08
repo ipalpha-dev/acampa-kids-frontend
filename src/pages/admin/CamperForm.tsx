@@ -24,6 +24,7 @@ import { ICONS } from "../../icons";
 import { maskBrazilPhone, toE164 } from "../../phone";
 import { collatorLocale, useI18n } from "../../i18n";
 import styles from "../../components/campers.module.scss";
+import { unnamedText } from "../../store/people";
 
 /** What the form asks the page to do. */
 export type CamperFormAction =
@@ -406,7 +407,7 @@ export default function CamperForm({ token, camper, categories, busy, onSubmit, 
                     <option value="">{!bedroom ? tx("Escolha o quarto primeiro") : caretakers.length ? tx("Sem líder") : tx("Nenhum líder neste quarto")}</option>
                     {caretakers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name || tx("Carregando nome…")}
+                        {s.name || tx(unnamedText(s.id))}
                       </option>
                     ))}
                   </select>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { resetForeignLookups } from "../../api/settings";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useCollection } from "../../store";
-import { useNames } from "../../store/people";
+import { useNames, unnamedText } from "../../store/people";
 import { useI18n } from "../../i18n";
 
 interface ForeignLookupsCardProps {
@@ -65,7 +65,7 @@ export default function ForeignLookupsCard({ token }: ForeignLookupsCardProps) {
         {offenders.map((o) => (
           <li key={o.personId} className={`foreign-lookup-list__item ${o.blocked ? "foreign-lookup-list__item--blocked" : ""}`}>
             <div>
-              <strong>{nameOf(o.personId) || tx("Carregando nome…")}</strong>
+              <strong>{nameOf(o.personId) || tx(unnamedText(o.personId))}</strong>
               <span className="foreign-lookup-list__count">
                 {o.count === 1
                   ? tx("{n} criança", { n: o.count })

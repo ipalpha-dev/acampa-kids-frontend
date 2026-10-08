@@ -21,7 +21,7 @@ export const GENERIC_ERROR = "Algo deu errado. Tente novamente.";
 /** Codes whose server text is technical: never shown, even in pt-BR. */
 const TECHNICAL = new Set(["INTERNAL", "INVALID_JSON", "BODY_INVALID", "PAYLOAD_TOO_LARGE", "CURSOR_INVALID", "UNKNOWN", "SNAPSHOT_FAILED"]);
 
-/** pt-BR source text per code (translations in ./pending/errors.ts); `{n}` comes from the error's own numbers. */
+/** pt-BR source text per code (translations in ./pending/errors.ts); `{n}` / `{year}` come from the error's own numbers. */
 const BY_CODE: Record<string, string> = {
   OFFLINE: "Sem conexão com o servidor. Verifique o Wi-Fi do acampamento e tente novamente.",
   UNAUTHORIZED: "Sua sessão terminou. Entre de novo.",
@@ -72,6 +72,7 @@ const BY_CODE: Record<string, string> = {
   INACTIVE: "Seu cadastro na equipe está inativo.",
   ALREADY_IN_CAMP: "Esta pessoa já está neste acampamento.",
   NOT_IN_EDITION: "Esta pessoa ainda não está nesta edição no IPAlpha.",
+  EDITION_MISSING: "Ainda não encontramos a edição {year} no Oikos. Peça com carinho à coordenação do projeto para criá-la por lá e tente de novo.",
   REGISTRATION_FAILED: "O IPAlpha não confirmou o cadastro.",
   FILE_TOO_LARGE: "O arquivo é grande demais.",
   FILE_TYPE: "Use uma imagem JPG, PNG, WebP ou GIF.",
@@ -103,6 +104,7 @@ interface CodedError {
   attemptsLeft?: number;
   minutesLeft?: number;
   secondsLeft?: number;
+  year?: number;
 }
 
 function coded(err: unknown): CodedError | null {
@@ -120,7 +122,7 @@ function translate(locale: Locale, pt: string, vars?: Record<string, string | nu
 
 function numbersOf(err: CodedError): Record<string, number> {
   const n = err.minutesLeft ?? err.secondsLeft ?? err.attemptsLeft;
-  return typeof n === "number" ? { n } : {};
+  return { ...(typeof n === "number" ? { n } : {}), ...(typeof err.year === "number" ? { year: err.year } : {}) };
 }
 
 /** The text of the error's code (exact, then family), or null. */
@@ -128,8 +130,8 @@ function codeText(locale: Locale, err: CodedError): string | null {
   const exact = BY_CODE[err.code];
   if (exact) {
     const vars = numbersOf(err);
-    // a {n} the error did not carry: the gentle generic of that code instead of a stray "{n}"
-    if (exact.includes("{n}") && vars.n === undefined) return null;
+    // a {n} / {year} the error did not carry: the gentle generic of that code instead of a stray placeholder
+    if ((exact.includes("{n}") && vars.n === undefined) || (exact.includes("{year}") && vars.year === undefined)) return null;
     return translate(locale, exact, vars);
   }
   return null;

@@ -12,6 +12,7 @@ import { navigate } from "../router";
 import { useI18n } from "../i18n";
 import { useCamperDetail, useLabelOf } from "../store/derive";
 import styles from "./campers.module.scss";
+import { nameSettled, unnamedText } from "../store/people";
 
 interface CamperPeekDialogProps {
   /** null = closed */
@@ -48,7 +49,7 @@ export default function CamperPeekDialog({ camperId, name, health, onClose }: Ca
         <header className="kid-peek__head">
           <KidIcon sex={sex} size={40} />
           <h2 className="cat-form__title kid-peek__name">
-            {shownName || <span className={styles.pendingName}>{tx("Carregando nome…")}</span>}
+            {shownName || <span className={nameSettled(camperId) ? undefined : styles.pendingName}>{tx(unnamedText(camperId))}</span>}
             <HealthHeart show={k?.hasHealth} />
             {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
           </h2>

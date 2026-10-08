@@ -4,7 +4,7 @@ import { ROOM_ROLE_META, type RoomRole } from "../api/staff";
 import { transportLabel } from "../api/transports";
 import { useI18n } from "../i18n";
 import { useCollection, useCollectionOrEmpty } from "../store";
-import { useNames } from "../store/people";
+import { useNames, unnamedText } from "../store/people";
 import styles from "./ImportConflictsCard.module.scss";
 
 /**
@@ -112,7 +112,7 @@ export default function ImportConflictsCard({ token, subject }: Props) {
         <ul className={styles.list}>
           {items.map((item) => {
             const label = APP_FIELD_LABEL[item.field] ? tx(APP_FIELD_LABEL[item.field]) : item.field;
-            const who = nameOf(item.personId) || tx("Carregando nome…");
+            const who = nameOf(item.personId) || tx(unnamedText(item.personId));
             return (
               <li key={item.id} className={styles.item}>
                 <p className={styles.itemHead}>

@@ -13,7 +13,7 @@ import {
   type StaffRegistration,
 } from "../../api/staff";
 import { useCollection, useCollectionOrEmpty } from "../../store";
-import { rememberPeople } from "../../store/people";
+import { rememberPeople, nameSettled, unnamedText } from "../../store/people";
 import { useLabelOf } from "../../store/derive";
 import DetailStack from "./DetailStack";
 import { useRoute } from "../../router";
@@ -457,7 +457,7 @@ export default function StaffPage({ token, camp, camps, readOnly = false }: Staf
                     }}
                   >
                     <h3 className="staff-card__name">
-                      <span className={s.name ? undefined : css.pendingName} title={s.name ? undefined : tx("Carregando nome…")}>{shownName(s.name)}</span>
+                      <span className={s.name || nameSettled(s.id) ? undefined : css.pendingName} title={s.name ? undefined : tx(unnamedText(s.id))}>{shownName(s.name)}</span>
                       <HealthHeart show={s.hasHealth} />
                       {!s.active && <span className="staff-card__inactive">{tx("inativo")}</span>}
                     </h3>

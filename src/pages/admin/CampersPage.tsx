@@ -5,7 +5,7 @@ import { addCamper, ageOf, deleteCamper, registerCamper, updateCamper, type Camp
 import { fetchCampersPage, fetchHealthCounts, HEALTH_DETAIL_MAX, type CamperListItem, type HealthCounts } from "../../api/people";
 import { useRoute } from "../../router";
 import { useCollection, useCollectionOrEmpty } from "../../store";
-import { rememberPeople } from "../../store/people";
+import { rememberPeople, unnamedText } from "../../store/people";
 import { useCategories, useLabelOf } from "../../store/derive";
 import HealthAlerts, { useHealthLabelOf } from "../../components/HealthAlerts";
 import HealthHeart from "../../components/HealthHeart";
@@ -544,7 +544,7 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
               const noRoom = !k.bedroom;
               const showAttention = attentionEnabled && (orphan || noRoom);
               const detail = detailOf(k.id);
-              const shownName = k.name || tx("Carregando nome…");
+              const shownName = k.name || tx(unnamedText(k.id));
 
               return (
                 // `staff-card--cover`: every blank spot of the row opens the kid — only the family button keeps its own action

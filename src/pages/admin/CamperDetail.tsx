@@ -24,7 +24,7 @@ import { loadAuth } from "../../auth/store";
 import { useCamperLive } from "../../hooks/usePersonData";
 import { useCollectionOrEmpty } from "../../store";
 import { useCamperDetail, useLabelOf } from "../../store/derive";
-import { useNames } from "../../store/people";
+import { useNames, nameSettled, unnamedText } from "../../store/people";
 import TransportTag from "../../components/TransportTag";
 import type { DetailNav } from "./DetailStack";
 import { useI18n } from "../../i18n";
@@ -165,7 +165,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
       <header className="admin-head">
         <h1 className="admin-title detail-title">
           <KidIcon sex={sex} size={40} />
-          {k.name || <span className={styles.pendingName}>{tx("Carregando nome…")}</span>}
+          {k.name || <span className={nameSettled(k.id) ? undefined : styles.pendingName}>{tx(unnamedText(k.id))}</span>}
           <HealthHeart show={health === undefined ? k.hasHealth : false} />
           {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
         </h1>
@@ -188,10 +188,10 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
             {caretaker ? (
               onOpenStaff ? (
                 <button type="button" className="link-btn" title={tx("Ver líder")} onClick={() => onOpenStaff(caretaker.id)}>
-                  {caretakerName || tx("Carregando nome…")}
+                  {caretakerName || tx(unnamedText(caretaker.id))}
                 </button>
               ) : (
-                caretakerName || tx("Carregando nome…")
+                caretakerName || tx(unnamedText(caretaker.id))
               )
             ) : k.caretakerId ? (
               "—"
@@ -280,7 +280,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
                   const rName = r.name || nameOf(r.personId);
                   return (
                     <li key={r.personId} className={styles.responsible}>
-                      <span className={`${styles.responsibleName} ${rName ? "" : styles.pendingName}`}>{rName || tx("Carregando nome…")}</span>
+                      <span className={`${styles.responsibleName} ${rName || nameSettled(r.personId) ? "" : styles.pendingName}`}>{rName || tx(unnamedText(r.personId))}</span>
                       <PersonContact token={token} personId={r.personId} name={rName} about={k.name} />
                     </li>
                   );
