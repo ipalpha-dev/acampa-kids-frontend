@@ -40,7 +40,7 @@ export default function OpsFamilyContact({ camperId, kidName, token: tokenProp, 
       <span className={`cat-hint ${styles.loading}`}>{tx("Carregando…")}</span>
     );
   }
-  if (live.data.responsibles.length === 0) return <span className="cat-hint">{tx("Nenhum responsável ligado a esta criança.")}</span>;
+  if (live.data.responsibles.length === 0) return <span className="cat-hint">{live.data.responsiblesHidden ? tx("Os responsáveis desta criança não aparecem para o seu perfil. A coordenação pode ajudar.") : tx("Nenhum responsável ligado a esta criança.")}</span>;
   return (
     <ul className={`${styles.family} ${className}`}>
       {live.data.responsibles.map((r) => (

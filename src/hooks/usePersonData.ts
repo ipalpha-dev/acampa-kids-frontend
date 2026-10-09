@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchCamper, fetchCamperResponsibles, type Camper, type CamperResponsibles, type Responsible } from "../api/campers";
+import { fetchCamper, fetchCamperResponsibles, type CamperResponsibles, type CamperWithResponsibles } from "../api/campers";
 import { fetchHealthLists, fetchPersonData, type HealthList, type PersonDataKind, type PersonDataMap } from "../api/people";
 import { fetchStaff, type Staff } from "../api/staff";
 import { useI18n, type Locale } from "../i18n";
@@ -42,7 +42,7 @@ function useLive<T>(key: string | null, load: () => Promise<T>): Live<T> {
 }
 
 /** The kid's page: camp ops + name + health (roles allowed) + responsáveis, read live (GET /api/campers/:id). */
-export function useCamperLive(token: string, id: string | null): Live<Camper & { responsibles: Responsible[] }> {
+export function useCamperLive(token: string, id: string | null): Live<CamperWithResponsibles> {
   return useLive(id ? `camper:${id}` : null, async () => {
     const c = await fetchCamper(token, id!);
     rememberPeople([{ personId: c.id, name: c.name, nickname: c.nickname, sex: c.sex }, ...c.responsibles.map((r) => ({ personId: r.personId, name: r.name }))]);

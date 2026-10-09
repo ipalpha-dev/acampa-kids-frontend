@@ -51,4 +51,12 @@ describe("GuardianWhatsApp — family contact without a health read", () => {
     fireEvent.click(screen.getByRole("button", { name: "Falar com a família de Ana" }));
     expect(await screen.findByText("Não foi possível ver o contato agora.")).toBeInTheDocument();
   });
+
+  it("a role IPAlpha does not show the responsáveis gets a gentle note, never 'nobody'", async () => {
+    stubApi({ status: 200, body: { camper: { id: "k1", name: "Ana Souza" }, responsibles: [], responsiblesHidden: true } });
+    renderButton();
+    fireEvent.click(screen.getByRole("button", { name: "Falar com a família de Ana" }));
+    expect(await screen.findByText("Os responsáveis desta criança não aparecem para o seu perfil. A coordenação pode ajudar.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhum responsável visível.")).toBeNull();
+  });
 });

@@ -266,14 +266,14 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
       </section>
 
       {/* the family: names from IPAlpha, contacts read only on tap (LGPD) — no section on an out-of-scope emergency lookup */}
-      {!k.redacted && !camperOverride && (responsibles.length > 0 || mayAddResponsible || live.loading) && (
+      {!k.redacted && !camperOverride && (responsibles.length > 0 || mayAddResponsible || live.loading || live.data?.responsiblesHidden) && (
         <section className="detail-section">
           <h2 className="detail-h2">
             <ParentIcon size={24} /> {responsibles.length > 1 ? tx("Responsáveis") : tx("Responsável")}
           </h2>
           <div className="detail-card">
             {live.loading && !live.data && <p className="cat-hint">{tx("Carregando…")}</p>}
-            {live.data && responsibles.length === 0 && <p className="cat-hint">{tx("Nenhum responsável cadastrado ainda.")}</p>}
+            {live.data && responsibles.length === 0 && <p className="cat-hint">{live.data.responsiblesHidden ? tx("Os responsáveis desta criança não aparecem para o seu perfil. A coordenação pode ajudar.") : tx("Nenhum responsável cadastrado ainda.")}</p>}
             {responsibles.length > 0 && (
               <ul className={styles.responsibles}>
                 {responsibles.map((r) => {

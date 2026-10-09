@@ -1,11 +1,11 @@
 import type { Locale } from "../locales";
 
 export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, string>>> = {
-  "AcampaKids: João, hoje é aniversário da Ana, do quarto 103! 🎂 Vamos fazer o dia dela especial.": {
-    en: "AcampaKids: João, today is Ana's birthday, from room 103! 🎂 Let's make her day special.",
-    es: "AcampaKids: João, ¡hoy es el cumpleaños de Ana, del cuarto 103! 🎂 Hagamos especial su día.",
-    fr: "AcampaKids : João, c'est l'anniversaire d'Ana, de la chambre 103 ! 🎂 Rendons sa journée spéciale.",
-    de: "AcampaKids: João, heute hat Ana aus Zimmer 103 Geburtstag! 🎂 Lass uns ihren Tag zu etwas Besonderem machen.",
+  "Acampa Kids: João, hoje é aniversário de Ana! 🎂 Vamos celebrar com carinho.": {
+    en: "Acampa Kids: João, today is Ana's birthday! 🎂 Let's celebrate with love.",
+    es: "Acampa Kids: João, ¡hoy es el cumpleaños de Ana! 🎂 Celebremos con cariño.",
+    fr: "Acampa Kids : João, c'est l'anniversaire d'Ana ! 🎂 Fêtons-le avec tendresse.",
+    de: "Acampa Kids: João, heute hat Ana Geburtstag! 🎂 Feiern wir mit viel Herz.",
   },
   "AcampaKids: Marcela, a Ana está a caminho de um fim de semana incrível para aprender sobre Jesus! Aproveite o fim de semana livre: vamos cuidar muito bem dela.": {
     en: "AcampaKids: Marcela, Ana is on her way to an amazing weekend to learn about Jesus! Enjoy your free weekend: we'll take great care of her.",
@@ -349,11 +349,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Quand un parent modifie les données médicales de l'enfant (allergies, médicaments, mutuelle…), l'équipe médicale, les administrateurs et le leader de chambre reçoivent un SMS. Si seules les notes changent, seul le leader de chambre est prévenu.",
     de: "Wenn Eltern die Gesundheitsdaten ihres Kindes ändern (Allergien, Medikamente, Krankenversicherung…), bekommen das Gesundheitsteam, die Admins und die Zimmerleitung eine SMS. Ändern sich nur die Hinweise, wird nur die Zimmerleitung benachrichtigt.",
   },
-  "Quando uma criança faz aniversário num dia do acampamento, toda a equipe do quarto dela recebe um SMS às": {
-    en: "When a child has a birthday on a camp day, their whole room staff gets an SMS at",
-    es: "Cuando un niño cumple años un día del campamento, todo el equipo de su cuarto recibe un SMS a las",
-    fr: "Quand un enfant a son anniversaire un jour de camp, toute l'équipe de sa chambre reçoit un SMS à",
-    de: "Hat ein Kind an einem Camp-Tag Geburtstag, bekommen alle Mitarbeitenden seines Zimmers eine SMS um",
+  "Quando uma criança faz aniversário num dia do acampamento, a equipe que a acompanha recebe um SMS às": {
+    en: "When a child has a birthday on a camp day, the team who looks after them gets an SMS at",
+    es: "Cuando un niño cumple años un día del campamento, el equipo que lo acompaña recibe un SMS a las",
+    fr: "Quand un enfant a son anniversaire un jour de camp, l'équipe qui l'accompagne reçoit un SMS à",
+    de: "Hat ein Kind an einem Camp-Tag Geburtstag, bekommt das Team, das es begleitet, eine SMS um",
   },
   "Quando uma criança passa a ser (ou deixa de ser) responsabilidade de alguem, só o líder envolvido recebe um SMS — auxiliares não são avisados.": {
     en: "When a child becomes (or stops being) someone's responsibility, only the leader involved gets an SMS — assistants are not notified.",

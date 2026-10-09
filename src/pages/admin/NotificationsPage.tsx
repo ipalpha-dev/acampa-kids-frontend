@@ -16,7 +16,7 @@ interface NotificationsPageProps {
 }
 
 const BUS_SMS_EXAMPLE = "AcampaKids: Marcela, a Ana está a caminho de um fim de semana incrível para aprender sobre Jesus! Aproveite o fim de semana livre: vamos cuidar muito bem dela.";
-const BIRTHDAY_SMS_EXAMPLE = "AcampaKids: João, hoje é aniversário da Ana, do quarto 103! 🎂 Vamos fazer o dia dela especial.";
+const BIRTHDAY_SMS_EXAMPLE = "Acampa Kids: João, hoje é aniversário de Ana! 🎂 Vamos celebrar com carinho.";
 const PARENT_WELCOME_EXAMPLE = "AcampaKids: Marcela, a Ana está inscrita no Acampa Kids! Acompanhe tudo pelo app. Entre com o celular (11) 99999-9999 em <link do app>";
 const PHOTOS_SMS_EXAMPLE = "AcampaKids: Marcela, as fotos do acampamento já estão no app \u{1F4F7}. <link do app>";
 
@@ -96,7 +96,7 @@ function buildGroups(tx: Tx): NotifGroup[] {
           title: tx("Aniversário de criança no acampamento"),
           text: (
             <>
-              {tx("Quando uma criança faz aniversário num dia do acampamento, toda a equipe do quarto dela recebe um SMS às")}{" "}
+              {tx("Quando uma criança faz aniversário num dia do acampamento, a equipe que a acompanha recebe um SMS às")}{" "}
               <strong>07:45</strong>{" "}
               {tx("desse dia:")}
               <br />

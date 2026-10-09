@@ -148,5 +148,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Não foi possível preparar a planilha agora.": { en: "We couldn't prepare the spreadsheet right now.", es: "No fue posible preparar la planilla ahora.", fr: "Impossible de préparer le tableau pour l'instant.", de: "Die Tabelle konnte gerade nicht vorbereitet werden." },
   "Preparando a planilha… {done} de {total}": { en: "Preparing the spreadsheet… {done} of {total}", es: "Preparando la planilla… {done} de {total}", fr: "Préparation du tableau… {done} sur {total}", de: "Tabelle wird vorbereitet … {done} von {total}" },
   "Preparando a planilha com os dados de agora…": { en: "Preparing the spreadsheet with the current data…", es: "Preparando la planilla con los datos actuales…", fr: "Préparation du tableau avec les données actuelles…", de: "Tabelle wird mit den aktuellen Daten vorbereitet …" },
+  "Os responsáveis desta criança não aparecem para o seu perfil. A coordenação pode ajudar.": {
+    en: "This child's guardians aren't shown for your profile. The coordination team can help.",
+    es: "Los responsables de este niño no aparecen para tu perfil. La coordinación puede ayudar.",
+    fr: "Les responsables de cet enfant ne s'affichent pas pour votre profil. La coordination peut aider.",
+    de: "Die Bezugspersonen dieses Kindes werden für dein Profil nicht angezeigt. Die Koordination kann helfen.",
+  },
   "Não foi possível aplicar este filtro agora.": { en: "We couldn't apply this filter right now.", es: "No fue posible aplicar este filtro ahora.", fr: "Impossible d'appliquer ce filtre pour l'instant.", de: "Dieser Filter konnte gerade nicht angewendet werden." },
 };

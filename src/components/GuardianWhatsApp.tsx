@@ -44,7 +44,7 @@ export default function GuardianWhatsApp({ camper: k, className = "wa-btn--sm" }
   }
   if (live.loading || (!live.data && !live.error)) return <span className="cat-hint person-contact__loading">{tx("Carregando…")}</span>;
   const responsibles = live.data?.responsibles ?? [];
-  if (live.error || responsibles.length === 0) return <span className="cat-hint">{live.error ? tx("Não foi possível ver o contato agora.") : tx("Nenhum responsável visível.")}</span>;
+  if (live.error || responsibles.length === 0) return <span className="cat-hint">{live.error ? tx("Não foi possível ver o contato agora.") : live.data?.responsiblesHidden ? tx("Os responsáveis desta criança não aparecem para o seu perfil. A coordenação pode ajudar.") : tx("Nenhum responsável visível.")}</span>;
   return (
     <span className="person-contact">
       {responsibles.map((r) => (

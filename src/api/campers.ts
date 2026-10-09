@@ -217,8 +217,11 @@ export function isHealthForbidden(err: unknown): boolean {
   return err instanceof ApiError && err.status === 403 && err.code === "CORE_FORBIDDEN";
 }
 
-export async function fetchCamper(token: string, id: string): Promise<Camper & { responsibles: Responsible[] }> {
-  const res = await api<{ camper: Camper & { responsibles: Responsible[] } }>(`/api/campers/${encodeURIComponent(id)}`, { headers: bearer(token) });
+/** `responsiblesHidden`: IPAlpha does not show this role the kid's responsáveis (roles policy `seesPersonsOf`) — not "none". */
+export type CamperWithResponsibles = Camper & { responsibles: Responsible[]; responsiblesHidden?: boolean };
+
+export async function fetchCamper(token: string, id: string): Promise<CamperWithResponsibles> {
+  const res = await api<{ camper: CamperWithResponsibles }>(`/api/campers/${encodeURIComponent(id)}`, { headers: bearer(token) });
   return res.camper;
 }
 
@@ -226,12 +229,14 @@ export async function fetchCamper(token: string, id: string): Promise<Camper & {
 export interface CamperResponsibles {
   camper: { id: string; name: string };
   responsibles: Responsible[];
+  /** IPAlpha does not show this role the kid's responsáveis — not "none" */
+  responsiblesHidden?: boolean;
 }
 
 /** The kid's responsáveis (names only) — the WhatsApp button reads phones per responsável, on tap. */
 export async function fetchCamperResponsibles(token: string, id: string): Promise<CamperResponsibles> {
   const res = await api<CamperResponsibles>(`/api/campers/${encodeURIComponent(id)}/responsibles`, { headers: bearer(token), cache: "no-store" });
-  return { camper: res.camper, responsibles: res.responsibles ?? [] };
+  return { camper: res.camper, responsibles: res.responsibles ?? [], ...(res.responsiblesHidden ? { responsiblesHidden: true } : {}) };
 }
 
 /** The fields a PARENT may edit on their own kid ("Informações de saúde"). Everything but `generalNotes` is medical. */

@@ -139,7 +139,7 @@ async function flushNames(): Promise<void> {
   }
 }
 
-/** Core answered without a name (the acting role may not see it — roles policy `seesNamesOf`): no point waiting for it. */
+/** Core answered without a name (the acting role may not see it — roles policy `seesPersonsOf`): no point waiting for it. */
 export function nameSettled(id: string | null | undefined): boolean {
   return !!id && (unknown.has(id) || people.get(id)?.name === "");
 }
