@@ -762,7 +762,7 @@ function NotificationsGateCard({ token }: { token: string }) {
           onChange={(v) => void setAll(v)}
         />
       </div>
-      <p className="cat-hint">{tx("Os avisos saem por SMS e e-mail pelo IPAlpha, com os modelos de Configurações → Mensagens. Ligue-os aqui ou um a um em Notificações.")}</p>
+      <p className="cat-hint">{tx("Os avisos saem por SMS e e-mail pelo IPAlpha; os textos são cuidados no portal de desenvolvedores do IPAlpha. Ligue-os aqui ou um a um em Notificações.")}</p>
       {onCount > 0 && onCount < ALL_NOTIFICATION_KEYS.length && (
         <p className="message message--warn">{tx("{on} de {total} notificações ligadas.", { on: onCount, total: ALL_NOTIFICATION_KEYS.length })}</p>
       )}

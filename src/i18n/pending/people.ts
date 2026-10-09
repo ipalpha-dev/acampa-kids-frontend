@@ -54,11 +54,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Les aides à l'accueil sont les personnes ayant le rôle « Accueil à l'église » dans IPAlpha (Oikos → Projets → Acampa Kids). Pendant la fenêtre, elles voient tous les enfants.",
     de: "Beim Check-in helfen alle mit der Rolle „Check-in in der Kirche“ in IPAlpha (Oikos → Projekte → Acampa Kids). Während des Zeitfensters sehen sie alle Kinder.",
   },
-  "Os avisos saem por SMS e e-mail pelo IPAlpha, com os modelos de Configurações → Mensagens. Ligue-os aqui ou um a um em Notificações.": {
-    en: "Notices go out by SMS and email through IPAlpha, using the templates in Settings → Messages. Turn them on here or one by one in Notifications.",
-    es: "Los avisos salen por SMS y correo a través de IPAlpha, con las plantillas de Ajustes → Mensajes. Actívalos aquí o uno a uno en Notificaciones.",
-    fr: "Les avis partent par SMS et e-mail via IPAlpha, avec les modèles de Réglages → Messages. Activez-les ici ou un par un dans Notifications.",
-    de: "Hinweise gehen per SMS und E-Mail über IPAlpha raus, mit den Vorlagen unter Einstellungen → Nachrichten. Schalte sie hier oder einzeln unter Benachrichtigungen ein.",
+  "Os avisos saem por SMS e e-mail pelo IPAlpha; os textos são cuidados no portal de desenvolvedores do IPAlpha. Ligue-os aqui ou um a um em Notificações.": {
+    en: "Notices go out by SMS and email through IPAlpha; their texts are kept in the IPAlpha developers portal. Turn them on here or one by one in Notifications.",
+    es: "Los avisos salen por SMS y correo a través de IPAlpha; sus textos se cuidan en el portal de desarrolladores de IPAlpha. Actívalos aquí o uno a uno en Notificaciones.",
+    fr: "Les avis partent par SMS et e-mail via IPAlpha ; leurs textes sont gérés dans le portail développeurs d'IPAlpha. Activez-les ici ou un par un dans Notifications.",
+    de: "Hinweise gehen per SMS und E-Mail über IPAlpha raus; ihre Texte werden im IPAlpha-Entwicklerportal gepflegt. Schalte sie hier oder einzeln unter Benachrichtigungen ein.",
   },
   "As janelas de acesso e de check-in e os avisos. Quem serve em cada papel (organização, saúde, check-in…) é definido no IPAlpha. Cada card salva por si — nada precisa ser preenchido de uma vez.": {
     en: "The access and check-in windows and the notices. Who serves in each role (organization, health, check-in…) is set in IPAlpha. Each card saves on its own — nothing has to be filled in at once.",
