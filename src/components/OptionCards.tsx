@@ -23,7 +23,7 @@ interface OptionCardsProps<K extends string> {
 /**
  * The house way to pick one thing among a few: one card per option, an icon
  * from the project set + a title (+ a subtitle when the choice needs it).
- * Radio buttons are for engineering settings only — see AGENTS.md.
+ * Radio buttons are for engineering settings only.
  */
 export default function OptionCards<K extends string>({ options, value, onChange, label, disabled, row }: OptionCardsProps<K>) {
   return (
