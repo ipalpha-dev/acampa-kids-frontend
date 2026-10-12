@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import churchLogo from "../../assets/church-logo.png";
 import { useT } from "../../i18n";
 import styles from "./IpalphaSignInButton.module.scss";
 
@@ -29,8 +28,8 @@ export default function IpalphaSignInButton({ busy, disabled, error, notice, onS
       </div>
 
       <button type="button" className={styles.button} onClick={onStart} disabled={disabled || busy} aria-busy={busy || undefined}>
-        <img className={styles.mark} src={churchLogo} alt="" aria-hidden="true" width={28} height={28} />
-        <span>{busy ? t("login.ipalphaOpening") : t("login.ipalpha")}</span>
+        <span>{busy ? t("login.ipalphaOpening") : t("login.ipalphaWith")}</span>
+        {!busy && <img className={styles.mark} src="/logo-mark-dark.png" alt="IPAlpha" width={2194} height={597} />}
       </button>
 
       <div className={`${styles.feedback} ${message ? styles.feedbackOpen : ""}`} aria-live="polite">

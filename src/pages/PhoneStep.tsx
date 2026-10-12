@@ -15,9 +15,7 @@ interface PhoneStepProps {
   phone: string; // masked
   onPhoneChange: (masked: string) => void;
   onSent: (info: PendingOtp) => void;
-  /** NOT_IN_PROJECT: nobody with this phone is in this camp's project */
-  onNotInProject: () => void;
-  /** gentle note above the form (not in this camp, session ended) */
+  /** gentle note above the form (not in this camp after sign-in, session ended) */
   note?: string | null;
   /** IPALPHA_UNAVAILABLE (the code is relayed through IPAlpha): show the maintenance scene. */
   onUnavailable: () => void;
@@ -31,7 +29,7 @@ interface PhoneStepProps {
 }
 
 /** Step 1 — Brazilian cell phone entry (rendered inside the green panel). */
-export default function PhoneStep({ phone, onPhoneChange, onSent, onNotInProject, note = null, onUnavailable, ipalpha }: PhoneStepProps) {
+export default function PhoneStep({ phone, onPhoneChange, onSent, note = null, onUnavailable, ipalpha }: PhoneStepProps) {
   const t = useT();
   const { te } = useI18n();
   const [loading, setLoading] = useState(false);
@@ -65,8 +63,6 @@ export default function PhoneStep({ phone, onPhoneChange, onSent, onNotInProject
     } catch (err) {
       if (isIpalphaUnavailable(err)) {
         onUnavailable();
-      } else if (err instanceof ApiError && err.code === "NOT_IN_PROJECT") {
-        onNotInProject();
       } else if (isStaffAccessError(err)) {
         setAccessError(err);
       } else if (err instanceof ApiError && err.code === "ACCOUNT_FROZEN") {

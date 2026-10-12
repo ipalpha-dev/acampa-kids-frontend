@@ -16,7 +16,7 @@ interface OtpStepProps {
   onVerified: (res: LoginResult) => void;
   /** back to the phone step (also how a new code is asked for: the phone is never kept) */
   onBack: () => void;
-  /** NOT_IN_PROJECT: the person is not in this camp's project */
+  /** NOT_IN_PROJECT after the code was verified: signed in, but no access to this camp */
   onNotInProject: () => void;
   /** IPALPHA_UNAVAILABLE (the code is relayed through IPAlpha): show the maintenance scene. */
   onUnavailable: () => void;
@@ -166,6 +166,8 @@ export default function OtpStep({ challenge, phoneMasked, expiresAt, codeLength,
       >
         {loading ? t("login.verifying") : t("login.verify")}
       </button>
+
+      <p className="panel-text panel-text--hint">{t("login.otpHint")}</p>
 
       <button
         type="button"

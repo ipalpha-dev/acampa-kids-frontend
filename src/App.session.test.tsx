@@ -128,14 +128,15 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     expect(screen.queryByText(/•••••-4567/)).toBeNull();
   });
 
-  it("NOT_IN_PROJECT on the phone step shows the gentle note and keeps the form", async () => {
-    stubApi({ ...COMMON, "POST /api/auth/otp/request": { status: 404, body: { error: { code: "NOT_IN_PROJECT", message: "x" } } } });
+  it("the phone step always moves on to the code step, with the gentle hint (pt-BR)", async () => {
+    stubApi({
+      ...COMMON,
+      "POST /api/auth/otp/request": { status: 200, body: { success: true, challenge: "c1", codeLength: 6, expiresAt: new Date(Date.now() + 300_000).toISOString(), expireMinutes: 5, delivery: "sms" } },
+    });
     renderApp();
     fireEvent.change(screen.getByPlaceholderText("(11) 98123-4567"), { target: { value: "11981234567" } });
     fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Não encontramos seu cadastro neste acampamento — fale com a organização.");
-    expect(screen.getByRole("heading", { name: "Qual é o seu celular?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continuar" })).not.toBeDisabled();
+    expect(await screen.findByText("Não recebeu? Confira o número. Se ele ainda não estiver no cadastro da igreja, fale com a secretaria.")).toBeInTheDocument();
   });
 
   it("NOT_IN_PROJECT after the code (no role in the project) returns to the phone step with the note", async () => {
@@ -146,7 +147,7 @@ describe("session — roles, NOT_IN_PROJECT, 401", () => {
     });
     renderApp();
     await signInBySms();
-    expect(await screen.findByText("Não encontramos seu cadastro neste acampamento — fale com a organização.")).toBeInTheDocument();
+    expect(await screen.findByText("Ainda não encontramos seu acesso ao Acampa. Fale com a coordenação.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Qual é o seu celular?" })).toBeInTheDocument();
     expect(localStorage.getItem("acampa.auth")).toBeNull();
   });

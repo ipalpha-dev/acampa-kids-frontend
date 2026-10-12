@@ -46,14 +46,14 @@ describe("login screen — IPAlpha", () => {
     const fetchMock = stubApi({ "/api/auth/ipalpha/config": CONFIG_OFF });
     const { container } = renderApp();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/auth/ipalpha/config"), expect.anything()));
-    expect(screen.queryByRole("button", { name: /Entrar com IPAlpha/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Entrar com\s*IPAlpha/ })).toBeNull();
     expect(container.ownerDocument.querySelector("iframe")).toBeNull();
   });
 
   it("shows the button and the One Tap frame when enabled", async () => {
     stubApi({ "/api/auth/ipalpha/config": CONFIG_ON });
     renderApp();
-    expect(await screen.findByRole("button", { name: /Entrar com IPAlpha/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Entrar com\s*IPAlpha/ })).toBeInTheDocument();
     expect(document.querySelector(`iframe[src^="${AUTH}/one-tap"]`)).not.toBeNull();
   });
 
@@ -75,7 +75,7 @@ describe("login screen — IPAlpha", () => {
     const popup = { closed: false, close: vi.fn(), focus: vi.fn(), location: { href: "about:blank" } };
     const open = vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
     renderApp();
-    fireEvent.click(await screen.findByRole("button", { name: /Entrar com IPAlpha/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Entrar com\s*IPAlpha/ }));
     expect(open).toHaveBeenCalledWith("about:blank", "ipalpha-auth", expect.stringContaining("popup=yes,width=480,height=720"));
     expect(await screen.findByRole("heading", { name: "Estamos arrumando o acampamento!" })).toBeInTheDocument();
     expect(popup.close).toHaveBeenCalled();
@@ -92,7 +92,7 @@ describe("login screen — IPAlpha", () => {
       const popup = { closed: false, close: vi.fn(), focus: vi.fn(), location: { href: "about:blank" } };
       vi.spyOn(window, "open").mockReturnValue(popup as unknown as Window);
       renderApp();
-      fireEvent.click(await screen.findByRole("button", { name: /Entrar com IPAlpha/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /Entrar com\s*IPAlpha/ }));
       expect(await screen.findByText(text)).toBeInTheDocument();
       expect(popup.close).toHaveBeenCalled();
       expect(screen.queryByRole("heading", { name: "Estamos arrumando o acampamento!" })).toBeNull();
@@ -101,7 +101,7 @@ describe("login screen — IPAlpha", () => {
       expect(phone).not.toBeDisabled();
       fireEvent.change(phone, { target: { value: "11981234567" } });
       expect(screen.getByRole("button", { name: "Continuar" })).not.toBeDisabled();
-      expect(screen.getByRole("button", { name: /Entrar com IPAlpha/ })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /Entrar com\s*IPAlpha/ })).not.toBeDisabled();
     });
   }
 
@@ -109,7 +109,7 @@ describe("login screen — IPAlpha", () => {
     stubApi({ "/api/auth/ipalpha/config": CONFIG_ON });
     vi.spyOn(window, "open").mockReturnValue(null);
     renderApp();
-    fireEvent.click(await screen.findByRole("button", { name: /Entrar com IPAlpha/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Entrar com\s*IPAlpha/ }));
     expect(await screen.findByText(/bloqueou a janela do IPAlpha/)).toBeInTheDocument();
   });
 });
