@@ -8,6 +8,7 @@ import KidIcon from "../../components/KidIcon";
 import LinkRequestsCard from "../../components/LinkRequestsCard";
 import ParentKidTabs from "../../components/ParentKidTabs";
 import PendingKindsCard from "../../components/PendingKindsCard";
+import CampAuthorizationCard from "../../components/CampAuthorizationCard";
 import PersonContact from "../../components/PersonContact";
 import PlayScene from "../../components/PlayScene";
 import HealthIcon from "../../components/HealthIcon";
@@ -267,6 +268,9 @@ export default function ParentHomePage({ user, token, access }: ParentHomePagePr
 
       {/* what the camp asks about THEM, not shared until they confirm (decision 87) */}
       <PendingKindsCard token={token} />
+
+      {/* the camp authorization each child still needs, with the exact text (decision 13) — never withdrawn here */}
+      <CampAuthorizationCard token={token} kids={kids.map((k) => ({ id: k.id, name: k.name }))} />
 
       {/* another responsável the coordenação asked to include — the family decides (decision 80) */}
       <LinkRequestsCard token={token} />

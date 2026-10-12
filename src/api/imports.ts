@@ -146,10 +146,28 @@ export async function fetchAppFields(token: string, subject: ImportSubject): Pro
   return res.appFields ?? [];
 }
 
-export async function createImport(token: string, subject: ImportSubject, file: File): Promise<ImportView> {
+/** A document the camp's edition requires of the kids, at its current version (the import's enrollment checkbox). */
+export interface ImportConsentDocument {
+  document: string;
+  version: number;
+  title: Record<string, string>;
+  markdown: string;
+}
+
+export async function fetchImportConsentDocuments(token: string): Promise<ImportConsentDocument[]> {
+  const res = await api<{ documents: ImportConsentDocument[] }>("/api/imports/consent-documents", { headers: bearer(token), cache: "no-store" });
+  return res.documents ?? [];
+}
+
+/**
+ * `consents`: ONLY what the coordenação ticked on the import screen ("the families accepted it on the enrollment form"),
+ * applied by persons-api to every child row of the import. Never derived from the sheet or AI.
+ */
+export async function createImport(token: string, subject: ImportSubject, file: File, consents: { document: string; version: number }[] = []): Promise<ImportView> {
   const form = new FormData();
   form.append("file", file, file.name);
   form.append("subject", subject);
+  if (consents.length > 0) form.append("consents", JSON.stringify(consents));
   const res = await api<{ import: ImportView }>("/api/imports", { method: "POST", headers: bearer(token), body: form });
   return res.import;
 }

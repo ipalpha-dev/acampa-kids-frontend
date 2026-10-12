@@ -1,0 +1,48 @@
+// A document's text, readable on a phone: calm type, comfortable line height, no surprises.
+
+.doc {
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+
+  h3,
+  h4,
+  h5 {
+    margin: 4px 0 0;
+    color: var(--forest);
+    font-family: var(--font-display);
+    line-height: 1.25;
+  }
+
+  h3 { font-size: 1.05rem; }
+  h4 { font-size: 1rem; }
+  h5 { font-size: .95rem; }
+
+  p,
+  ul,
+  ol {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.3em;
+    display: grid;
+    gap: 4px;
+  }
+
+  hr {
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--sage);
+    margin: 4px 0;
+  }
+
+  code {
+    font-size: .9em;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: rgba(15, 154, 138, .08);
+  }
+}

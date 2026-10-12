@@ -9,6 +9,7 @@ import TeamTag from "./TeamTag";
 import TransportTag from "./TransportTag";
 import styles from "./campers.module.scss";
 import { unnamedText } from "../store/people";
+import ConsentBadge from "./ConsentBadge";
 
 interface CamperCardProps {
   camper: Camper;
@@ -42,6 +43,7 @@ export default function CamperCard({ camper: k, labelOf, hideBedroom, bedroom, o
         <span className={k.name ? undefined : styles.pendingName}>{name}</span>
         <HealthHeart show={k.hasHealth} />
         {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
+        <ConsentBadge personId={k.id} />
       </h4>
       {(showBedroom || k.team || k.transportation) && (
         <div className="staff-card__tags">

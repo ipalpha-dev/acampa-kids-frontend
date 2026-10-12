@@ -22,6 +22,7 @@ import {
   type ResultStatus,
 } from "../../api/imports";
 import Breadcrumbs from "../../components/Breadcrumbs";
+import ImportConsentChecks from "../../components/ImportConsentChecks";
 import { useConfirm } from "../../components/ConfirmDialog";
 import OptionCards from "../../components/OptionCards";
 import { peekPendingImportFile, setPendingImportFile, useFileDrop } from "../../hooks/useFileDrop";
@@ -226,6 +227,9 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
   const confirm = useConfirm();
   const [subject, setSubject] = useState<ImportSubject>(initialSubject);
   const [file, setFile] = useState<File | null>(() => peekPendingImportFile());
+  /** the job-level enrollment authorization the coordenação ticked (kids only; unticked by default) */
+  const [consents, setConsents] = useState<{ document: string; version: number }[]>([]);
+  const [consentReload, setConsentReload] = useState(0);
   const [preview, setPreview] = useState<AppField[]>([]);
   const [view, setView] = useState<ImportView | null>(null);
   const [busy, setBusy] = useState<"upload" | "apply" | "cancel" | null>(null);
@@ -360,7 +364,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
     setBusy("upload");
     setError(null);
     try {
-      const created = await createImport(token, subject, file);
+      const created = await createImport(token, subject, file, subject === "camper" ? consents : []);
       remembered.set(initialSubject, { token, id: created.id });
       setResults([]);
       setNextCursor(null);
@@ -368,6 +372,8 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
       setView(created);
     } catch (err) {
       setError(importErrorMessage(tx, err, te));
+      // the document changed meanwhile: read it again (the old tick is dropped, the coordenação ticks the new one)
+      if (err instanceof ApiError && (err.code === "CONSENT_VERSION_CHANGED" || err.code === "CONSENT_NOT_REQUIRED")) setConsentReload((n) => n + 1);
     } finally {
       setBusy(null);
     }
@@ -518,6 +524,7 @@ export default function ImportPage({ token, subject: initialSubject, onDone }: I
                 </ul>
               </div>
             )}
+            {subject === "camper" && <ImportConsentChecks token={token} value={consents} onChange={setConsents} disabled={busy === "upload"} reloadKey={consentReload} />}
             {subject === "camper" && <p className="cat-hint">{tx("Se a criança tiver um 2º responsável, traga o nome e o celular dele em colunas próprias: ele é ligado à criança nesta importação.")}</p>}
             <p className="cat-hint">{tx("O IPAlpha lê a planilha, encontra quem já tem cadastro e prepara tudo. Nada é gravado antes de você conferir.")}</p>
             <div className="cat-form__actions">

@@ -38,6 +38,7 @@ import SearchField from "../../components/SearchField";
 import { setPendingImportFile, useWindowFileDrop } from "../../hooks/useFileDrop";
 import { collatorLocale, useI18n } from "../../i18n";
 import styles from "../../components/campers.module.scss";
+import ConsentBadge from "../../components/ConsentBadge";
 
 interface CampersPageProps {
   token: string;
@@ -566,6 +567,7 @@ export default function CampersPage({ token, camp, camps, readOnly = false, lock
                       <span className={k.name ? undefined : styles.pendingName}>{shownName}</span>
                       {!detail && <HealthHeart show={k.hasHealth} />}
                       {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
+                      <ConsentBadge personId={k.id} />
                     </h3>
                     {showAttention && (
                       <p className="staff-card__meta orphan-msg">

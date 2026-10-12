@@ -1,0 +1,79 @@
+// The kids' import enrollment authorization: a calm box, the document text unfolds with its real height.
+
+$ease: cubic-bezier(.2, .7, .2, 1);
+
+.box {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sage);
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.legend {
+  padding: 0 6px;
+  color: var(--forest);
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+.doc {
+  display: grid;
+  gap: 6px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.35;
+  cursor: pointer;
+
+  input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    accent-color: var(--pine);
+  }
+}
+
+.read {
+  justify-self: start;
+  padding-left: 30px;
+}
+
+.text {
+  max-height: min(40vh, 320px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--sage);
+  overscroll-behavior: contain;
+}
+
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .28s $ease, opacity .2s ease;
+}
+
+.revealOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.revealInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
+  }
+}

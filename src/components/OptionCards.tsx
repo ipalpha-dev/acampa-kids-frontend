@@ -43,3 +43,33 @@ export default function OptionCards<K extends string>({ options, value, onChange
     </div>
   );
 }
+
+interface MultiOptionCardsProps<K extends string> {
+  options: OptionCard<K>[];
+  /** the picked ones */
+  value: readonly K[];
+  onChange: (keys: K[]) => void;
+  label: string;
+  disabled?: boolean;
+  row?: boolean;
+}
+
+/** Same cards, several can be on at once (a group of toggles, not a radio group). */
+export function MultiOptionCards<K extends string>({ options, value, onChange, label, disabled, row }: MultiOptionCardsProps<K>) {
+  return (
+    <div className={`option-cards ${row ? "option-cards--row" : ""}`} role="group" aria-label={label}>
+      {options.map((o) => {
+        const on = value.includes(o.key);
+        return (
+          <button key={o.key} type="button" aria-pressed={on} className={`option-card ${on ? "option-card--on" : ""}`} disabled={disabled} onClick={() => onChange(on ? value.filter((k) => k !== o.key) : options.map((x) => x.key).filter((k) => k === o.key || value.includes(k)))}>
+            <img src={o.icon} alt="" aria-hidden="true" />
+            <span>
+              <strong>{o.title}</strong>
+              {o.subtitle && <small>{o.subtitle}</small>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

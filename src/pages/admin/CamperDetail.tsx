@@ -29,6 +29,7 @@ import TransportTag from "../../components/TransportTag";
 import type { DetailNav } from "./DetailStack";
 import { useI18n } from "../../i18n";
 import styles from "../../components/campers.module.scss";
+import ConsentBadge from "../../components/ConsentBadge";
 
 /** An emergency-lookup record: camp ops + the name (+ health) the lookup answered. */
 export type CamperOverride = CamperRecord & { name: string; health?: HealthInfo | null } & Partial<Omit<PersonLive, "name" | "health">>;
@@ -168,6 +169,7 @@ export default function CamperDetail({ token, camperId, nav, camperOverride, bed
           {k.name || <span className={nameSettled(k.id) ? undefined : styles.pendingName}>{tx(unnamedText(k.id))}</span>}
           <HealthHeart show={health === undefined ? k.hasHealth : false} />
           {age !== null && <span className="kid-card__age">{tx("{age} anos", { age })}</span>}
+          <ConsentBadge personId={k.id} />
         </h1>
         {onEdit && (
           <>

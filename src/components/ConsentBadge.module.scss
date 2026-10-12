@@ -1,0 +1,35 @@
+// A small status pill beside a child's name; it fades in when the live status arrives.
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-family: var(--font-body, inherit);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: middle;
+  animation: badge-in .2s ease-out both;
+}
+
+.done {
+  background: #e4f4ea;
+  color: var(--pine);
+}
+
+.waiting {
+  background: #fff4e0;
+  color: #8a5200;
+}
+
+@keyframes badge-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge { animation: none; }
+}
