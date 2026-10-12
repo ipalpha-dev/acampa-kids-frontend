@@ -61,7 +61,6 @@ const BLOCKS: readonly Block[] = [
   { key: "occurrences", label: "Ocorrências", emoji: "📋", hint: "Todo o registro de ocorrências do acampamento.", unit: ["ocorrência", "ocorrências"] },
   { key: "medications", label: "Medicações", icon: ICONS.medications, hint: "As marcações da equipe de cuidado (o que cada criança tomou). A medicação das crianças continua no IPAlpha.", unit: ["marcação", "marcações"] },
   { key: "scores", label: "Placar", emoji: "🏆", hint: "Todos os pontos dados e tirados dos times.", unit: ["lançamento", "lançamentos"] },
-  { key: "gallery", label: "Fotos", icon: ICONS.camera, hint: "Todas as fotos do álbum e os arquivos delas.", unit: ["foto", "fotos"] },
   {
     key: "welcomes",
     label: "Boas-vindas",
@@ -141,7 +140,6 @@ export default function CleanupPage({ token, camp, onSwitchCamp }: CleanupPagePr
     occurrences: useCollection("occurrences")?.length ?? 0,
     medications: useCollection("medications")?.length ?? 0,
     scores: useCollection("scores")?.length ?? 0,
-    gallery: useCollection("gallery")?.length ?? 0,
     welcomes: marks.welcomes,
     notices: marks.notices,
   };

@@ -5,7 +5,6 @@ import { bearer } from "../auth/store";
 export interface CampCounts {
   campers: number;
   staff: number;
-  photos: number;
 }
 
 /** A camp in the registry (Superusuário → Acampamentos). */

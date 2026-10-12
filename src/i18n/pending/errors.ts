@@ -1,5 +1,35 @@
 /** Error texts by code / family (../errors.ts) — pt-BR source, the four other languages here. */
 export const LITERALS: Record<string, { en: string; es: string; fr: string; de: string }> = {
+  "Só quem coordena o acampamento pode alterar a programação. Nada foi alterado.": {
+    en: "Only the camp coordination can change the programme. Nothing was changed.",
+    es: "Solo la coordinación del campamento puede cambiar la programación. No se cambió nada.",
+    fr: "Seule la coordination du camp peut modifier le programme. Rien n'a été modifié.",
+    de: "Nur die Koordination des Camps kann das Programm ändern. Es wurde nichts geändert.",
+  },
+  "A agenda do IPAlpha não respondeu agora. Nada foi alterado — tente de novo em instantes.": {
+    en: "The IPAlpha agenda did not answer just now. Nothing was changed — please try again in a moment.",
+    es: "La agenda de IPAlpha no respondió ahora. No se cambió nada: inténtalo de nuevo en un momento.",
+    fr: "L'agenda IPAlpha n'a pas répondu. Rien n'a été modifié — réessayez dans un instant.",
+    de: "Der IPAlpha-Kalender hat gerade nicht geantwortet. Es wurde nichts geändert – versuch es gleich noch einmal.",
+  },
+  "A agenda do IPAlpha não aceitou este momento. Confira o horário, os perfis e os locais.": {
+    en: "The IPAlpha agenda did not accept this moment. Check the time, the roles and the places.",
+    es: "La agenda de IPAlpha no aceptó este momento. Revisa el horario, los perfiles y los lugares.",
+    fr: "L'agenda IPAlpha n'a pas accepté ce moment. Vérifiez l'horaire, les rôles et les lieux.",
+    de: "Der IPAlpha-Kalender hat diesen Programmpunkt nicht angenommen. Prüf Uhrzeit, Rollen und Orte.",
+  },
+  "Este momento não existe mais na agenda do IPAlpha.": {
+    en: "This moment no longer exists in the IPAlpha agenda.",
+    es: "Este momento ya no existe en la agenda de IPAlpha.",
+    fr: "Ce moment n'existe plus dans l'agenda IPAlpha.",
+    de: "Dieser Programmpunkt existiert im IPAlpha-Kalender nicht mehr.",
+  },
+  "A agenda mudou enquanto você editava. Tente de novo.": {
+    en: "The agenda changed while you were editing. Try again.",
+    es: "La agenda cambió mientras editabas. Inténtalo de nuevo.",
+    fr: "L'agenda a changé pendant votre modification. Réessayez.",
+    de: "Der Kalender hat sich geändert, während du bearbeitet hast. Versuch es noch einmal.",
+  },
   "Sem conexão com o servidor. Verifique o Wi-Fi do acampamento e tente novamente.": {
     en: "No connection to the server. Check the camp Wi-Fi and try again.",
     es: "Sin conexión con el servidor. Revisa el Wi-Fi del campamento e inténtalo de nuevo.",
@@ -246,24 +276,6 @@ export const LITERALS: Record<string, { en: string; es: string; fr: string; de: 
     fr: "Utilisez une image JPG, PNG, WebP ou GIF.",
     de: "Verwende ein JPG-, PNG-, WebP- oder GIF-Bild.",
   },
-  "Não encontrei um rosto nítido nessa foto.": {
-    en: "I could not find a clear face in this photo.",
-    es: "No encontré un rostro nítido en esa foto.",
-    fr: "Je n'ai pas trouvé de visage net sur cette photo.",
-    de: "Auf diesem Foto ist kein klares Gesicht zu erkennen.",
-  },
-  "Use uma foto com apenas uma pessoa.": {
-    en: "Use a photo with just one person.",
-    es: "Usa una foto con una sola persona.",
-    fr: "Utilisez une photo avec une seule personne.",
-    de: "Verwende ein Foto mit nur einer Person.",
-  },
-  "A busca por rosto está indisponível no momento.": {
-    en: "Face search is unavailable right now.",
-    es: "La búsqueda por rostro no está disponible en este momento.",
-    fr: "La recherche par visage est indisponible pour le moment.",
-    de: "Die Gesichtssuche ist gerade nicht verfügbar.",
-  },
   "O assistente não está disponível agora.": {
     en: "The assistant is not available right now.",
     es: "El asistente no está disponible ahora.",
@@ -341,5 +353,114 @@ export const LITERALS: Record<string, { en: string; es: string; fr: string; de: 
     es: "No se pudo enviar la imagen.",
     fr: "Impossible d'envoyer l'image.",
     de: "Das Bild konnte nicht gesendet werden.",
+  },
+  // ── the camp album (photos-api) ──
+  "Só quem cuida das fotos (fotografia ou coordenação) pode enviar ou organizar o álbum. Nada foi alterado.": {
+    en: "Only those who look after the photos (photography or coordination) can send or organize the album. Nothing was changed.",
+    es: "Solo quienes cuidan de las fotos (fotografía o coordinación) pueden enviar u organizar el álbum. No se cambió nada.",
+    fr: "Seules les personnes chargées des photos (photographie ou coordination) peuvent envoyer ou organiser l'album. Rien n'a été modifié.",
+    de: "Nur wer sich um die Fotos kümmert (Fotografie oder Koordination), kann das Album füllen oder ordnen. Es wurde nichts geändert.",
+  },
+  "O álbum deste ano ainda não está liberado para o Acampa no IPAlpha. Fale com a secretaria da igreja.": {
+    en: "This year's album is not yet open to Acampa in IPAlpha. Please talk to the church office.",
+    es: "El álbum de este año aún no está habilitado para Acampa en IPAlpha. Habla con la secretaría de la iglesia.",
+    fr: "L'album de cette année n'est pas encore ouvert à Acampa dans IPAlpha. Parlez-en au secrétariat de l'église.",
+    de: "Das Album dieses Jahres ist in IPAlpha noch nicht für Acampa freigegeben. Sprich bitte mit dem Gemeindebüro.",
+  },
+  "Esta foto não está mais no álbum.": {
+    en: "This photo is no longer in the album.",
+    es: "Esta foto ya no está en el álbum.",
+    fr: "Cette photo n'est plus dans l'album.",
+    de: "Dieses Foto ist nicht mehr im Album.",
+  },
+  "O álbum deste acampamento não existe mais no IPAlpha. Crie um novo álbum para continuar.": {
+    en: "This camp's album no longer exists in IPAlpha. Create a new album to continue.",
+    es: "El álbum de este campamento ya no existe en IPAlpha. Crea un álbum nuevo para continuar.",
+    fr: "L'album de ce camp n'existe plus dans IPAlpha. Créez un nouvel album pour continuer.",
+    de: "Das Album dieses Camps gibt es in IPAlpha nicht mehr. Leg ein neues Album an, um weiterzumachen.",
+  },
+  "Este acampamento já tem um álbum.": {
+    en: "This camp already has an album.",
+    es: "Este campamento ya tiene un álbum.",
+    fr: "Ce camp a déjà un album.",
+    de: "Dieses Camp hat schon ein Album.",
+  },
+  "Publique o álbum para organizar as fotos por aqui.": {
+    en: "Publish the album to organize the photos here.",
+    es: "Publica el álbum para organizar las fotos aquí.",
+    fr: "Publiez l'album pour organiser les photos ici.",
+    de: "Veröffentliche das Album, um die Fotos hier zu ordnen.",
+  },
+  "Crie o álbum do acampamento primeiro.": {
+    en: "Create the camp album first.",
+    es: "Crea primero el álbum del campamento.",
+    fr: "Créez d'abord l'album du camp.",
+    de: "Leg zuerst das Album des Camps an.",
+  },
+  "Escolha o primeiro e o último dia do acampamento.": {
+    en: "Choose the first and the last day of the camp.",
+    es: "Elige el primer y el último día del campamento.",
+    fr: "Choisissez le premier et le dernier jour du camp.",
+    de: "Wähle den ersten und den letzten Tag des Camps.",
+  },
+  "A edição deste acampamento ainda não existe no IPAlpha.": {
+    en: "This camp's edition does not exist in IPAlpha yet.",
+    es: "La edición de este campamento aún no existe en IPAlpha.",
+    fr: "L'édition de ce camp n'existe pas encore dans IPAlpha.",
+    de: "Die Ausgabe dieses Camps gibt es in IPAlpha noch nicht.",
+  },
+  "Uma das fotos não pôde ser aberta. Nada deste lote foi enviado — tente sem ela.": {
+    en: "One of the photos could not be opened. Nothing from this batch was sent — try without it.",
+    es: "Una de las fotos no se pudo abrir. No se envió nada de este lote; inténtalo sin ella.",
+    fr: "L'une des photos n'a pas pu être ouverte. Rien de ce lot n'a été envoyé — réessayez sans elle.",
+    de: "Eines der Fotos ließ sich nicht öffnen. Aus diesem Stapel wurde nichts gesendet – versuch es ohne dieses Foto.",
+  },
+  "Uma das fotos é grande demais (máx. 25 MB por foto).": {
+    en: "One of the photos is too large (max. 25 MB per photo).",
+    es: "Una de las fotos es demasiado grande (máx. 25 MB por foto).",
+    fr: "L'une des photos est trop lourde (25 Mo max. par photo).",
+    de: "Eines der Fotos ist zu groß (max. 25 MB pro Foto).",
+  },
+  "Envie até 50 fotos por vez.": {
+    en: "Send up to 50 photos at a time.",
+    es: "Envía hasta 50 fotos por vez.",
+    fr: "Envoyez jusqu'à 50 photos à la fois.",
+    de: "Schick bis zu 50 Fotos auf einmal.",
+  },
+  "Este momento ainda tem fotos. Mova as fotos antes de tirá-lo do álbum.": {
+    en: "This moment still has photos. Move them before removing it from the album.",
+    es: "Este momento todavía tiene fotos. Muévelas antes de quitarlo del álbum.",
+    fr: "Ce moment contient encore des photos. Déplacez-les avant de le retirer de l'album.",
+    de: "Dieser Programmpunkt hat noch Fotos. Verschieb sie, bevor du ihn aus dem Album nimmst.",
+  },
+  "Não deu para ligar este momento da programação ao álbum. Confira se ele tem horário de término.": {
+    en: "This programme moment could not be linked to the album. Check that it has an end time.",
+    es: "No se pudo vincular este momento de la programación al álbum. Revisa si tiene hora de término.",
+    fr: "Impossible de lier ce moment du programme à l'album. Vérifiez qu'il a une heure de fin.",
+    de: "Dieser Programmpunkt ließ sich nicht mit dem Album verbinden. Prüf, ob er eine Endzeit hat.",
+  },
+  "Dê um nome ao momento (até 120 caracteres).": {
+    en: "Give the moment a name (up to 120 characters).",
+    es: "Dale un nombre al momento (hasta 120 caracteres).",
+    fr: "Donnez un nom au moment (jusqu'à 120 caractères).",
+    de: "Gib dem Programmpunkt einen Namen (bis 120 Zeichen).",
+  },
+  "O álbum do IPAlpha não aceitou isso agora. Nada foi alterado.": {
+    en: "The IPAlpha album did not accept this right now. Nothing was changed.",
+    es: "El álbum de IPAlpha no aceptó esto ahora. No se cambió nada.",
+    fr: "L'album IPAlpha n'a pas accepté cela pour le moment. Rien n'a été modifié.",
+    de: "Das IPAlpha-Album hat das gerade nicht angenommen. Es wurde nichts geändert.",
+  },
+  "O álbum de fotos está descansando um instante. Tente de novo daqui a pouco.": {
+    en: "The photo album is taking a short rest. Try again in a little while.",
+    es: "El álbum de fotos está descansando un momento. Inténtalo de nuevo en un rato.",
+    fr: "L'album photo se repose un instant. Réessayez un peu plus tard.",
+    de: "Das Fotoalbum ruht gerade kurz. Versuch es gleich noch einmal.",
+  },
+  "Por aqui você vê as fotos das crianças que estão sob seus cuidados.": {
+    en: "Here you see the photos of the children in your care.",
+    es: "Aquí ves las fotos de los niños que están a tu cuidado.",
+    fr: "Ici, vous voyez les photos des enfants dont vous prenez soin.",
+    de: "Hier siehst du die Fotos der Kinder in deiner Obhut.",
   },
 };

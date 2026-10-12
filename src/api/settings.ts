@@ -106,8 +106,6 @@ export interface Settings {
   scoreHideWindow: CheckinWindow;
   /** setup wizard lock: the admin lands in the assistant until they finish or leave; settings gear is blocked */
   wizardMode: boolean;
-  /** the photo album is visible to the camp; while false only the photographers (and the admin) see it */
-  galleryPublished: boolean;
   /** the "do your check-in" SMS to the whole team, scheduled for one instant */
   checkinReminder: CheckinReminder;
   /** read-only: this session is a deployment owner (SUPER_ADMIN_PERSON_IDS) — the only one who sees / edits ⚙️ → Sementes */
@@ -151,7 +149,6 @@ export interface SettingsPatch {
   kidsRoomsDraft?: boolean;
   scoreDraft?: boolean;
   wizardMode?: boolean;
-  galleryPublished?: boolean;
   checkinReminder?: { at: string | null };
 }
 

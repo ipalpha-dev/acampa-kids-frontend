@@ -121,7 +121,7 @@ interface Tab {
  * "scoreboard draft" is on (read-only unless GAME organizer / score helper /
  * organizer / admin) — see hooks/useCheckinHelper and campPhase. The admin
  * (and organizers) open "Sorteio" from inside Acampantes / Equipe (not a tab).
- * "Fotos" only shows up for the TEAM once the album is published (`galleryOpen`):
+ * "Fotos" only shows up for the TEAM once the edition has an album (`galleryOpen`, from the realtime album stamp):
  * before that there is nothing to see, so the tab would just be an empty page.
  */
 function tabsFor(role: Audience, phase: CampPhase, helper: HelperAccess, roomsDraft: boolean, scoreOpen: boolean, galleryOpen: boolean, during: boolean): Tab[] {
@@ -192,8 +192,8 @@ function tabsFor(role: Audience, phase: CampPhase, helper: HelperAccess, roomsDr
         // a bus helper rolls-call inside the window
         ...(helper.bus ? [{ key: "bus" as const, label: "Check-in Ônibus", icon: ICONS.transport }] : []),
         ...(helper.vest ? [{ key: "vests" as const, label: "Coletes", emoji: "🦺" }] : []),
-        // the photo album is always the LAST tab — and only once it is published
-        // (the photographers see it from the start, to send and publish)
+        // the photo album is always the LAST tab — and only once the edition has one
+        // (the photographers see it from the start, to create, send and publish)
         ...(galleryOpen ? [{ key: "gallery" as const, label: "Fotos", icon: ICONS.camera }] : []),
       ];
     // parents: their kids (Início) + the programme — the photos close the tab row
@@ -226,8 +226,9 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
   const roomsDraft = !!settings?.kidsRoomsDraft;
   /** the scoreboard opens for everyone on the camp days; the "Placar em teste" switch opens it any day, but only for the admin, organizers, game organizers and score helpers */
   const scoreOpen = during || (!!settings?.scoreDraft && (user.audience === "admin" || helper.organizer || helper.gameOrganizer || helper.scoreHelper));
-  /** the album shows up for the team once it is published; whoever manages it (organizer / photographer) always has the tab */
-  const galleryOpen = !!settings?.galleryPublished || helper.organizer || helper.photographer;
+  /** the album shows up for the team once the edition has one (photos-api); whoever manages it (organizer / photographer) always has the tab */
+  const galleryStamp = useCollection("gallery");
+  const galleryOpen = !!galleryStamp?.albumId || helper.organizer || helper.photographer;
   const tabs = tabsFor(user.audience, phase, helper, roomsDraft, scoreOpen, galleryOpen, during);
   /**
    * "ADM layout": eight or more visible tabs use the left navigation shell.
@@ -759,7 +760,7 @@ export default function Dashboard({ user, token, camp, camps, onLogout, onSwitch
             {view === "staff" && <StaffPage token={token} camp={camp} camps={camps} readOnly={!settingsAllowed || isHistory} />}
             {view === "bedrooms" && segments[1] === "assign" &&
               (settingsAllowed && !isHistory ? <RoomAssignPage token={token} onBack={() => navigate("/bedrooms")} /> : <BedroomsPage token={token} readOnly />)}
-            {view === "bedrooms" && segments[1] !== "assign" && <BedroomsPage token={token} readOnly={!settingsAllowed || isHistory} />}
+            {view === "bedrooms" && segments[1] !== "assign" && <BedroomsPage token={token} readOnly={!settingsAllowed || isHistory} campId={camp.id} />}
             {view === "schedule" && (isParent ? <ParentSchedulePage /> : settingsAllowed || helper.gameOrganizer ? <SchedulePage token={token} readOnly={isHistory} /> : <MySchedulePage user={user} />)}
             {view === "categories" && <CategoriesPage token={token} />}
             {view === "buses" && <BusAssignPage token={token} />}

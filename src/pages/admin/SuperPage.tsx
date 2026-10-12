@@ -133,10 +133,9 @@ export default function SuperPage({ token, user, camp, onSwitchCamp }: SuperPage
                   </span>
                 </div>
                 <p className="cat-hint">
-                  {tx("{campers} acampante(s) · {staff} na equipe · {photos} foto(s)", {
+                  {tx("{campers} acampante(s) · {staff} na equipe", {
                     campers: c.counts.campers,
                     staff: c.counts.staff,
-                    photos: c.counts.photos,
                   })}
                 </p>
                 <div className="camps-row__actions">
@@ -326,10 +325,9 @@ function DeleteCampDialog({ camp, token, onClose, onDeleted }: { camp: CampRow |
           <span className="sheet__handle" aria-hidden="true" />
           <h2 className="cat-form__title">{tx('Apagar "{label}"?', { label: camp.label })}</h2>
           <p className="cat-hint">
-            {tx("Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins) e {photos} foto(s). Os cadastros das pessoas continuam no IPAlpha. Não pode ser desfeito.", {
+            {tx("Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins). Os cadastros das pessoas e o álbum de fotos continuam no IPAlpha. Não pode ser desfeito.", {
               campers: camp.counts.campers,
               staff: camp.counts.staff,
-              photos: camp.counts.photos,
               label: camp.label,
             })}
           </p>

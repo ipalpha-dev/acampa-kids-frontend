@@ -12,7 +12,7 @@ import type { Staff, StaffRecord } from "../api/staff";
 import type { Settings } from "../api/settings";
 import type { Team } from "../api/teams";
 import type { ScoreEntry } from "../api/scores";
-import type { GalleryPhoto } from "../api/gallery";
+import type { GalleryStamp } from "../api/gallery";
 import type { Prescription } from "../api/medications";
 import { onAuthSuccess } from "../api/client";
 import { fetchOfflineKey, type OfflineKeyAnswer } from "../auth/store";
@@ -58,13 +58,14 @@ export interface Collections {
   occurrences: Occurrence[];
   /** the medical team's checklist: one record per dose given */
   medications: MedicationDose[];
-  gallery: GalleryPhoto[];
+  /** the camp album lives in photos-api: only its id + a change stamp arrive here (the Fotos tab refetches when it moves) */
+  gallery: GalleryStamp;
   settings: Settings;
   /** LOCAL ONLY (never pushed): the kids' medicines read live from IPAlpha for the care team's checklist (health) */
   prescriptions: Prescription[];
 }
 export type CollectionName = keyof Collections;
-type ListCollectionName = Exclude<CollectionName, "settings" | "prescriptions">;
+type ListCollectionName = Exclude<CollectionName, "settings" | "prescriptions" | "gallery">;
 /** what the server pushes (hydration waits for these; `prescriptions` is filled locally) */
 export const COLLECTION_NAMES: CollectionName[] = ["campers", "staff", "bedrooms", "categories", "transports", "teams", "scores", "roles", "events", "preparation", "instructions", "occurrences", "medications", "gallery", "settings"];
 

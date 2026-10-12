@@ -396,7 +396,6 @@ export default function App() {
           setLoginNote(null);
           setOtp(pending);
         }}
-        onNotInProject={showNotInProject}
         onUnavailable={showMaintenance}
         ipalpha={ipalphaConfig ? { busy: ipalpha.busy, error: ipalpha.error, notice: ipalpha.notice, onStart: () => ipalpha.start() } : undefined}
       />

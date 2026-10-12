@@ -171,11 +171,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
   "Quando quem serve na fotografia liga": { en: "When whoever serves in photography turns on", es: "Cuando quien sirve en la fotografía activa", fr: "Quand la personne qui sert à la photographie active", de: "Wenn, wer in der Fotografie dient, Folgendes einschaltet:" },
 
   // ── Superusuário ──
-  "Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins) e {photos} foto(s). Os cadastros das pessoas continuam no IPAlpha. Não pode ser desfeito.": {
-    en: "This permanently deletes what the camp app keeps for {label}: the participation of {campers} camper(s) and {staff} team member(s) (rooms, teams, check-ins) and {photos} photo(s). The people's records stay in IPAlpha. It cannot be undone.",
-    es: "Esto borra para siempre lo que el campamento guarda de {label}: la participación de {campers} campista(s) y {staff} persona(s) del equipo (habitaciones, equipos, check-ins) y {photos} foto(s). Los registros de las personas siguen en IPAlpha. No se puede deshacer.",
-    fr: "Cela supprime définitivement ce que le camp garde de {label} : la participation de {campers} campeur(s) et {staff} membre(s) de l'équipe (chambres, équipes, accueils) et {photos} photo(s). Les fiches des personnes restent dans IPAlpha. C'est irréversible.",
-    de: "Das löscht endgültig, was das Camp zu {label} speichert: die Teilnahme von {campers} Kind(ern) und {staff} Teammitglied(ern) (Zimmer, Teams, Check-ins) und {photos} Foto(s). Die Personendaten bleiben in IPAlpha. Das lässt sich nicht rückgängig machen.",
+  "Isso apaga para sempre o que o acampamento guarda de {label}: a participação de {campers} acampante(s) e {staff} pessoa(s) da equipe (quartos, times, check-ins). Os cadastros das pessoas e o álbum de fotos continuam no IPAlpha. Não pode ser desfeito.": {
+    en: "This permanently deletes what the camp app keeps for {label}: the participation of {campers} camper(s) and {staff} team member(s) (rooms, teams, check-ins). The people's records and the photo album stay in IPAlpha. It cannot be undone.",
+    es: "Esto borra para siempre lo que el campamento guarda de {label}: la participación de {campers} campista(s) y {staff} persona(s) del equipo (habitaciones, equipos, check-ins). Los registros de las personas y el álbum de fotos siguen en IPAlpha. No se puede deshacer.",
+    fr: "Cela supprime définitivement ce que le camp garde de {label} : la participation de {campers} campeur(s) et {staff} membre(s) de l'équipe (chambres, équipes, accueils). Les fiches des personnes et l'album photo restent dans IPAlpha. C'est irréversible.",
+    de: "Das löscht endgültig, was das Camp zu {label} speichert: die Teilnahme von {campers} Kind(ern) und {staff} Teammitglied(ern) (Zimmer, Teams, Check-ins). Die Personendaten und das Fotoalbum bleiben in IPAlpha. Das lässt sich nicht rückgängig machen.",
   },
   "Mandamos um código por SMS para o seu celular cadastrado no IPAlpha. Ele vale até {time}.": {
     en: "We sent a code by SMS to your phone registered in IPAlpha. It is valid until {time}.",

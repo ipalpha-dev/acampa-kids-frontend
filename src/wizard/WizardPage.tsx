@@ -30,6 +30,8 @@ import { DAY_LABELS, type TemplateEvent, type TemplateRole } from "./scheduleTem
 import { defaultSeeds } from "./defaults";
 import PreviousYearStep from "./PreviousYearStep";
 import RoomsEditor from "./RoomsEditor";
+import VenuePicker from "../components/VenuePicker";
+import { useVenue } from "../hooks/useVenue";
 import { recalledWizardPlace, rememberWizardPlace, setWizardDismissed, type WizardPlaceChoice } from "./state";
 import { collatorLocale, useI18n } from "../i18n";
 
@@ -194,7 +196,7 @@ export default function WizardPage({ token, user, camp, camps, onExit }: WizardP
             <CamperImportPage token={token} onDone={next} />
           </StepShell>
         )}
-        {step === "venue" && <VenueStep token={token} places={templates.places} onNext={next} />}
+        {step === "venue" && <VenueStep token={token} campId={camp.id} places={templates.places} onNext={next} />}
         {step === "schedule" && <ScheduleStep token={token} roles={templates.roles} events={templates.events} />}
         {step === "docs" && <DocsStep token={token} docs={templates.docs} />}
         {step === "config" && <ConfigStep token={token} />}
@@ -326,8 +328,11 @@ function AdminsStep({ token, user }: { token: string; user: LoggedUser }) {
 
 const spotDraft = (v: string) => v.replace(",", ".");
 
-function VenueStep({ token, places, onNext }: { token: string; places: KnownPlace[]; onNext: () => void }) {
+function VenueStep({ token, campId, places, onNext }: { token: string; campId: string; places: KnownPlace[]; onNext: () => void }) {
   const { tx, te } = useI18n();
+  // the rooms are made inside the camp venue of the church's places catalog: it is chosen first
+  const venue = useVenue(token);
+  const venueMissing = !venue.loading && !venue.unavailable && !venue.venue;
   const settings = useCollection("settings");
   const bedrooms = useCollectionOrEmpty("bedrooms");
   const recalled = useRef(recalledWizardPlace()).current;
@@ -389,6 +394,7 @@ function VenueStep({ token, places, onNext }: { token: string; places: KnownPlac
 
   return (
     <section className="wizard-card">
+      {venueMissing && <VenuePicker token={token} campId={campId} onChosen={() => venue.reload()} />}
       <h2 className="wizard-card__title">{tx("📍 O local do acampamento")}</h2>
       <p className="admin-intro">
         {tx("O assistente conhece os lugares que a igreja já usa — os")} <strong>{tx("quartos com as camas")}</strong>{tx(", o endereço e a localização vêm preenchidos. Confira, ajuste o que mudou e aplique.")}
@@ -441,7 +447,7 @@ function VenueStep({ token, places, onNext }: { token: string; places: KnownPlac
       {applied > 0 && <p className="message message--ok">{tx("✅ {n} quarto(s) criado(s){spot}. Continue nos passos de Quartos para alocar as crianças.", { n: applied, spot: lat && lng ? tx(" e ponto do acampamento salvo") : "" })}</p>}
       {applied === 0 && bedrooms.length > 0 && <p className="cat-hint">{tx("O acampamento já tem {n} quarto(s); só os novos nomes serão criados.", { n: bedrooms.length })}</p>}
       <div className="cat-form__actions">
-        <button type="button" className="button button--primary" disabled={busy || !coordsOk || !roomsOk || (toCreate.length === 0 && !(lat && lng))} onClick={() => void apply()}>
+        <button type="button" className="button button--primary" disabled={busy || venueMissing || !coordsOk || !roomsOk || (toCreate.length === 0 && !(lat && lng))} onClick={() => void apply()}>
           {busy ? tx("Aplicando…") : toCreate.length > 0 ? tx("Aplicar ({n} quartos)", { n: toCreate.length }) : tx("Salvar local")}
         </button>
         <button type="button" className="button button--secondary" onClick={onNext}>

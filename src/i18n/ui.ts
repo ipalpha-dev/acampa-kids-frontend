@@ -27,6 +27,8 @@ export type UiKey =
   | "login.ipalphaDenied"
   | "login.ipalphaFailed"
   | "login.notInProject"
+  | "login.ipalphaWith"
+  | "login.otpHint"
   | "login.sessionEnded"
   | "login.roleGone"
   | "login.popupBlocked"
@@ -168,7 +170,9 @@ const pt: Catalog = {
   "login.ipalphaOpening": "Abrindo o IPAlpha…",
   "login.ipalphaDenied": "Tudo bem, você pode entrar com o celular.",
   "login.ipalphaFailed": "Não conseguimos entrar com o IPAlpha agora. Tente de novo ou entre com o celular.",
-  "login.notInProject": "Não encontramos seu cadastro neste acampamento — fale com a organização.",
+  "login.notInProject": "Ainda não encontramos seu acesso ao Acampa. Fale com a coordenação.",
+  "login.ipalphaWith": "Entrar com",
+  "login.otpHint": "Não recebeu? Confira o número. Se ele ainda não estiver no cadastro da igreja, fale com a secretaria.",
   "login.sessionEnded": "Sua sessão terminou. É só entrar de novo quando quiser. 🌲",
   "login.roleGone": "Este perfil não está mais disponível para você.",
   "login.popupBlocked": "O navegador bloqueou a janela do IPAlpha. Permita janelas pop-up para este site e tente de novo.",
@@ -254,7 +258,9 @@ const en: Catalog = {
   "login.ipalphaOpening": "Opening IPAlpha…",
   "login.ipalphaDenied": "That's okay — you can sign in with your phone.",
   "login.ipalphaFailed": "We couldn't sign you in with IPAlpha right now. Try again or sign in with your phone.",
-  "login.notInProject": "We couldn't find your registration for this camp — please talk to the organizers.",
+  "login.notInProject": "We haven't found your access to Acampa yet. Please talk to the coordination team.",
+  "login.ipalphaWith": "Sign in with",
+  "login.otpHint": "Didn't get it? Check the number. If it isn't in the church's records yet, please talk to the secretary's office.",
   "login.sessionEnded": "Your session has ended. Just sign in again whenever you like. 🌲",
   "login.roleGone": "This profile is no longer available to you.",
   "login.popupBlocked": "Your browser blocked the IPAlpha window. Allow pop-ups for this site and try again.",
@@ -340,7 +346,9 @@ const es: Catalog = {
   "login.ipalphaOpening": "Abriendo IPAlpha…",
   "login.ipalphaDenied": "No pasa nada, puedes entrar con tu celular.",
   "login.ipalphaFailed": "No pudimos entrar con IPAlpha ahora. Inténtalo de nuevo o entra con tu celular.",
-  "login.notInProject": "No encontramos tu registro en este campamento — habla con la organización.",
+  "login.notInProject": "Aún no encontramos tu acceso a Acampa. Habla con la coordinación.",
+  "login.ipalphaWith": "Entrar con",
+  "login.otpHint": "¿No lo recibiste? Revisa el número. Si aún no está en el registro de la iglesia, habla con la secretaría.",
   "login.sessionEnded": "Tu sesión terminó. Solo vuelve a entrar cuando quieras. 🌲",
   "login.roleGone": "Este perfil ya no está disponible para ti.",
   "login.popupBlocked": "El navegador bloqueó la ventana de IPAlpha. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.",
@@ -426,7 +434,9 @@ const fr: Catalog = {
   "login.ipalphaOpening": "Ouverture d'IPAlpha…",
   "login.ipalphaDenied": "Pas de souci, vous pouvez vous connecter avec votre portable.",
   "login.ipalphaFailed": "Impossible de vous connecter avec IPAlpha pour le moment. Réessayez ou connectez-vous avec votre portable.",
-  "login.notInProject": "Nous n'avons pas trouvé votre inscription à ce camp — parlez-en à l'organisation.",
+  "login.notInProject": "Nous n'avons pas encore trouvé votre accès à Acampa. Parlez-en à la coordination.",
+  "login.ipalphaWith": "Se connecter avec",
+  "login.otpHint": "Rien reçu ? Vérifiez le numéro. S'il ne figure pas encore dans le registre de l'église, parlez-en au secrétariat.",
   "login.sessionEnded": "Votre session est terminée. Reconnectez-vous quand vous voulez. 🌲",
   "login.roleGone": "Ce profil n'est plus disponible pour vous.",
   "login.popupBlocked": "Le navigateur a bloqué la fenêtre IPAlpha. Autorisez les fenêtres pop-up pour ce site et réessayez.",
@@ -512,7 +522,9 @@ const de: Catalog = {
   "login.ipalphaOpening": "IPAlpha wird geöffnet…",
   "login.ipalphaDenied": "Alles gut – du kannst dich auch mit deinem Handy anmelden.",
   "login.ipalphaFailed": "Die Anmeldung mit IPAlpha hat gerade nicht geklappt. Versuch es noch einmal oder melde dich mit deinem Handy an.",
-  "login.notInProject": "Wir haben deine Anmeldung für dieses Camp nicht gefunden — sprich bitte mit der Organisation.",
+  "login.notInProject": "Wir haben deinen Zugang zu Acampa noch nicht gefunden. Sprich bitte mit der Koordination.",
+  "login.ipalphaWith": "Anmelden mit",
+  "login.otpHint": "Nichts erhalten? Prüfe die Nummer. Falls sie noch nicht im Verzeichnis der Kirche steht, sprich bitte mit dem Sekretariat.",
   "login.sessionEnded": "Deine Sitzung ist beendet. Melde dich einfach wieder an, wann du möchtest. 🌲",
   "login.roleGone": "Dieses Profil ist für dich nicht mehr verfügbar.",
   "login.popupBlocked": "Dein Browser hat das IPAlpha-Fenster blockiert. Erlaube Pop-ups für diese Seite und versuch es noch einmal.",

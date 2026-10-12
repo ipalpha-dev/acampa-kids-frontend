@@ -19,11 +19,11 @@ export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, stri
     fr: "Archivé",
     de: "Archiviert",
   },
-  "{campers} acampante(s) · {staff} na equipe · {photos} foto(s)": {
-    en: "{campers} camper(s) · {staff} on staff · {photos} photo(s)",
-    es: "{campers} campista(s) · {staff} en el equipo · {photos} foto(s)",
-    fr: "{campers} campeur(s) · {staff} dans l'équipe · {photos} photo(s)",
-    de: "{campers} Kind(er) · {staff} Mitarbeitende · {photos} Foto(s)",
+  "{campers} acampante(s) · {staff} na equipe": {
+    en: "{campers} camper(s) · {staff} on staff",
+    es: "{campers} campista(s) · {staff} en el equipo",
+    fr: "{campers} campeur(s) · {staff} dans l'équipe",
+    de: "{campers} Kind(er) · {staff} Mitarbeitende",
   },
   "Não foi possível carregar os acampamentos agora.": {
     en: "Could not load the camps right now.",

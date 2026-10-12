@@ -816,6 +816,11 @@ $detail-colors: (verde: #0f9a8a, laranja: #f2843b, amarelo: #f4c430, vermelho: #
 .day-group { display: flex; flex-direction: column; gap: 10px; }
 .timeline { list-style: none; margin: 0; padding: 0 0 0 14px; display: flex; flex-direction: column; gap: 8px; border-left: 3px dashed var(--sage); }
 .timeline__item { display: flex; gap: 14px; align-items: flex-start; }
+/* a moment added / removed: slides in, fades out and collapses (the global reduced-motion rule drops both; the hook skips the leaving state too) */
+.timeline__item--enter { animation: timeline-in .26s cubic-bezier(.2, .8, .2, 1) both; }
+.timeline__item--leave { overflow: hidden; pointer-events: none; animation: timeline-out .24s ease both; }
+@keyframes timeline-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes timeline-out { from { opacity: 1; max-height: 220px; } to { opacity: 0; max-height: 0; transform: translateX(-14px); } }
 .timeline__time { flex: none; width: 54px; display: flex; flex-direction: column; align-items: flex-start; padding-top: 12px; font-family: var(--font-display); font-weight: 800; color: var(--forest); line-height: 1.2; position: relative; }
 /* the dot: centred on the dashed line (line is 3px wide, 14px to the left of the text) and on the start-time text */
 .timeline__time::before { content: ""; position: absolute; left: -24.5px; top: calc(12px + .6em); width: 18px; height: 18px; box-sizing: border-box; transform: translateY(-50%); border-radius: 50%; background: var(--sun); border: 3px solid var(--sand); }

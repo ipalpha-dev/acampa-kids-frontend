@@ -64,17 +64,8 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // the photo album's thumbnails (immutable like the files): cached on
-          // first sight so the Fotos grid still renders with no connectivity
-          {
-            urlPattern: ({ url }) => /\/api\/gallery\/[a-f0-9]+\/thumb$/.test(url.pathname),
-            handler: "CacheFirst",
-            options: {
-              cacheName: "acampa-thumbs",
-              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 24 * 3600 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+          // the photo album (photos-api, streamed by the backend) is NEVER cached here: its bytes are fetched with
+          // the session and kept in memory for that session only (src/api/photoBytes.ts)
         ],
       },
       devOptions: {

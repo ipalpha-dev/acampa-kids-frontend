@@ -16,6 +16,19 @@ describe("error texts — every error shown in the person's language", () => {
     expect(errorText("fr", new ApiError(409, "EDITION_MISSING", "Ainda não encontramos a edição 2027 no Oikos.", { year: 2027 }))).toBe("Nous n'avons pas encore trouvé l'édition 2027 dans Oikos. Demandez gentiment à la coordination du projet de la créer, puis réessayez.");
   });
 
+  it("the programme's schedule-api refusals read the same in the five languages (forbidden, retry, rejected)", () => {
+    const forbidden = new ApiError(403, "SCHEDULE_FORBIDDEN", "Só quem coordena o acampamento pode alterar a programação. Nada foi alterado.");
+    const away = new ApiError(503, "SCHEDULE_UNAVAILABLE", "A agenda do IPAlpha não respondeu agora. Nada foi alterado — tente de novo em instantes.");
+    expect(errorText("pt", forbidden)).toBe(forbidden.message);
+    expect(errorText("en", forbidden)).toBe("Only the camp coordination can change the programme. Nothing was changed.");
+    expect(errorText("es", away)).toContain("No se cambió nada");
+    expect(errorText("fr", away)).toContain("Rien n'a été modifié");
+    expect(errorText("de", away)).toContain("nichts geändert");
+    for (const code of ["SCHEDULE_REJECTED", "SCHEDULE_ENTRY_NOT_FOUND", "SCHEDULE_CONFLICT"]) {
+      for (const locale of ["en", "es", "fr", "de"] as const) expect(errorText(locale, new ApiError(400, code, "x"))).not.toMatch(/agenda do IPAlpha|Tente de novo/);
+    }
+  });
+
   it("then a catalogued message, then the code's family, then the screen's fallback — never raw Portuguese", () => {
     expect(errorText("fr", new ApiError(404, "SOMETHING_ODD", "Algo deu errado."))).toBe(LITERALS["Algo deu errado."]?.fr);
     expect(errorText("en", new ApiError(404, "TEAM_NOT_FOUND", "Esse time não está mais aqui."))).toBe("We could not find what you were looking for. It may have been removed.");
