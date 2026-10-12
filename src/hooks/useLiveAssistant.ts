@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { assistantLiveSession, assistantTool } from "../api/assistant";
+import { assistantLiveSession, assistantTool, assistantTurn, assistantUsage, type AssistantToolAnswer } from "../api/assistant";
 import { useI18n } from "../i18n";
 
 /**
@@ -7,9 +7,13 @@ import { useI18n } from "../i18n";
  *
  * The browser owns the media: the microphone and the speaker ride a WebRTC
  * connection straight to the model, so both sides can talk at once and the
- * person can cut the assistant off mid-sentence. The backend only trades the
- * SDP (keeping the API key) and runs the MongoDB tools the model asks for,
- * which arrive here on the `oai-events` data channel.
+ * person can cut the assistant off mid-sentence. Everything else goes through
+ * the Acampa backend, which relays to core ai-api with the person's own token:
+ * the SDP trade, the tool calls that arrive on the `oai-events` data channel
+ * (ai-api runs the skill, or answers `client: true` and this browser runs it —
+ * `navigate_app`), the usage report (seconds, every minute and on stop) and the
+ * person's own transcribed words (for the church's review in ai-api; Acampa
+ * never keeps them).
  */
 export type LiveStatus = "idle" | "connecting" | "live" | "ended" | "error";
 export type LiveSpeaker = "user" | "assistant" | null;
@@ -34,6 +38,21 @@ const SPEAKING_FLOOR = 0.05;
 const SPEAKING_HOLD_MS = 650;
 const CONNECT_TIMEOUT_MS = 15_000;
 const ICE_TIMEOUT_MS = 10_000;
+/** how often a live session reports what it consumed (also on stop) */
+const USAGE_EVERY_MS = 60_000;
+const NAVIGATE_SKILL = /(^|__)navigate_app$/;
+
+/** What goes back to the model for one tool answer: the skill output, or the client skill this browser runs. */
+export function toolOutputOf(answer: AssistantToolAnswer, onNavigate?: (rawArgs: string) => string): string {
+  if (!answer.client) return answer.output;
+  // only navigation runs here — it never writes
+  return NAVIGATE_SKILL.test(answer.name) && onNavigate ? onNavigate(answer.arguments) : JSON.stringify({ error: "Esta ação não está disponível neste aparelho." });
+}
+
+interface UsageTally {
+  startedAt: number;
+  reportedAt: number;
+}
 
 interface Delegation {
   calls: number;
@@ -101,13 +120,45 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
   const turnId = useRef(1);
   const eventId = useRef(1);
   const greetedRef = useRef(false);
+  const sessionIdRef = useRef("");
+  const usageRef = useRef<UsageTally | null>(null);
+  const usageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** the person's words of the turn being spoken, relayed once the turn ends */
+  const spokenRef = useRef<{ id: number; text: string } | null>(null);
+  const lastTurnRef = useRef<{ id: number; role: "user" | "assistant"; endMs: number } | null>(null);
 
   const applyStatus = useCallback((next: LiveStatus) => {
     statusRef.current = next;
     setStatus(next);
   }, []);
 
+  /** sends how long the session ran since the last report (fire and forget: the backend relays to ai-api) */
+  const reportUsage = useCallback(() => {
+    const tally = usageRef.current;
+    const sessionId = sessionIdRef.current;
+    if (!tally || !sessionId) return;
+    const seconds = Math.floor((Date.now() - tally.reportedAt) / 1000);
+    if (seconds < 1) return;
+    usageRef.current = { ...tally, reportedAt: tally.reportedAt + seconds * 1000 };
+    void assistantUsage(token, { sessionId, seconds }).catch(() => {});
+  }, [token]);
+
+  /** relays the person's own words of the turn that just ended (never stored by Acampa) */
+  const relaySpoken = useCallback(() => {
+    const spoken = spokenRef.current;
+    spokenRef.current = null;
+    const text = spoken?.text.trim() ?? "";
+    if (!text || !sessionIdRef.current) return;
+    void assistantTurn(token, { sessionId: sessionIdRef.current, text }).catch(() => {});
+  }, [token]);
+
   const teardown = useCallback(() => {
+    relaySpoken();
+    reportUsage();
+    if (usageTimerRef.current) clearInterval(usageTimerRef.current);
+    usageTimerRef.current = null;
+    usageRef.current = null;
+    sessionIdRef.current = "";
     cancelAnimationFrame(frameRef.current);
     frameRef.current = 0;
     analysersRef.current = { user: null, assistant: null };
@@ -126,7 +177,7 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
     speakerRef.current = null;
     setTalking(null);
     setThinking(false);
-  }, []);
+  }, [relaySpoken, reportUsage]);
 
   const send = useCallback((event: Record<string, unknown>) => {
     const channel = dcRef.current;
@@ -136,14 +187,23 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
 
   const appendTurn = useCallback((role: "user" | "assistant", delta: unknown, startMs: number, endMs: number) => {
     if (typeof delta !== "string" || !delta) return;
+    const last = lastTurnRef.current;
+    const grows = !!last && last.role === role && startMs - last.endMs < TURN_GAP_MS;
+    const id = grows && last ? last.id : turnId.current++;
+    lastTurnRef.current = { id, role, endMs: grows && last ? Math.max(last.endMs, endMs) : endMs };
+    // the person's words leave once their turn ends (the assistant answers, or a new turn starts)
+    if (role === "assistant") relaySpoken();
+    else if (grows && spokenRef.current?.id === id) spokenRef.current.text += delta;
+    else {
+      relaySpoken();
+      spokenRef.current = { id, text: delta };
+    }
     setTurns((list) => {
-      const last = list[list.length - 1];
-      if (last && last.role === role && startMs - last.endMs < TURN_GAP_MS) {
-        return [...list.slice(0, -1), { ...last, text: last.text + delta, endMs: Math.max(last.endMs, endMs) }];
-      }
-      return [...list, { id: turnId.current++, role, text: delta, endMs }];
+      const tail = list[list.length - 1];
+      if (grows && tail && tail.id === id) return [...list.slice(0, -1), { ...tail, text: tail.text + delta, endMs: Math.max(tail.endMs, endMs) }];
+      return [...list, { id, role, text: delta, endMs }];
     });
-  }, []);
+  }, [relaySpoken]);
 
   const delegationOf = useCallback((id: string): Delegation => {
     const found = delegationsRef.current.get(id);
@@ -170,11 +230,10 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
     setThinking(true);
     let output = JSON.stringify({ error: "A consulta não pôde ser feita agora." });
     try {
-      output = call.name === "navigate_app" && onNavigate
-        ? onNavigate(call.arguments ?? "{}")
-        : (await assistantTool(token, call.name, call.arguments ?? "{}")).output;
+      const answer = await assistantTool(token, { sessionId: sessionIdRef.current, callId: call.call_id, name: call.name, arguments: call.arguments ?? "{}" });
+      output = toolOutputOf(answer, onNavigate);
     } catch (failure) {
-      console.error("live assistant tool failed", failure);
+      console.error("live assistant tool failed", (failure as Error)?.name ?? "error");
     }
     send({ type: "response.item.create", item: { type: "function_call_output", call_id: call.call_id, output } });
     delegation.calls -= 1;
@@ -288,6 +347,7 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
     teardown();
     setError("");
     setTurns([]);
+    lastTurnRef.current = null;
     applyStatus("connecting");
     try {
       const mic = await navigator.mediaDevices.getUserMedia({
@@ -330,6 +390,10 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
       await waitForIce(pc);
       const answer = await assistantLiveSession(token, pc.localDescription?.sdp ?? "");
       if (pc !== pcRef.current) return;
+      sessionIdRef.current = answer.sessionId;
+      const startedAt = Date.now();
+      usageRef.current = { startedAt, reportedAt: startedAt };
+      usageTimerRef.current = setInterval(reportUsage, USAGE_EVERY_MS);
       await pc.setRemoteDescription({ type: "answer", sdp: answer.sdp });
       listen(mic, "user");
       setTimeout(() => {
@@ -346,7 +410,7 @@ export function useLiveAssistant(token: string, userName = "", onNavigate?: (raw
         : te(failure, "Não consegui abrir a conversa por voz."));
       applyStatus("error");
     }
-  }, [applyStatus, handleEvent, listen, te, teardown, token]);
+  }, [applyStatus, handleEvent, listen, reportUsage, te, teardown, token]);
 
   const toggleMute = useCallback(() => {
     const next = !mutedRef.current;

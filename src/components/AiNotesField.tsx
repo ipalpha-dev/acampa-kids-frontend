@@ -24,18 +24,20 @@ export default function AiNotesField({ label, value, onChange, placeholder, rows
     <label className="cat-field cat-field--grow">
       <span className="cat-field__label cat-field__label--ai">
         {label}
-        <button
-          type="button"
-          className={`ai-notes-btn ${sorter.on ? "ai-notes-btn--on" : ""} ${sorter.running ? "ai-notes-btn--busy" : ""}`}
-          role="switch"
-          aria-checked={sorter.on}
-          title={sorter.on ? tx("IA ligada: ao colar ou sair do campo, o texto é distribuído nos campos acima") : tx("IA desligada")}
-          disabled={disabled}
-          onMouseDown={(e) => e.preventDefault()} // don't blur the textarea (which would fire the sorter)
-          onClick={sorter.toggle}
-        >
-          <AiGlyph /> {sorter.running ? tx("organizando…") : sorter.on ? tx("organizar com IA") : tx("IA desligada")}
-        </button>
+        {sorter.available && (
+          <button
+            type="button"
+            className={`ai-notes-btn ${sorter.on ? "ai-notes-btn--on" : ""} ${sorter.running ? "ai-notes-btn--busy" : ""}`}
+            role="switch"
+            aria-checked={sorter.on}
+            title={sorter.on ? tx("IA ligada: ao colar ou sair do campo, o texto é distribuído nos campos acima") : tx("IA desligada")}
+            disabled={disabled}
+            onMouseDown={(e) => e.preventDefault()} // don't blur the textarea (which would fire the sorter)
+            onClick={sorter.toggle}
+          >
+            <AiGlyph /> {sorter.running ? tx("organizando…") : sorter.on ? tx("organizar com IA") : tx("IA desligada")}
+          </button>
+        )}
       </span>
       <textarea
         className={`cat-input cat-input--area ${sorter.running ? "cat-input--busy" : ""}`}
