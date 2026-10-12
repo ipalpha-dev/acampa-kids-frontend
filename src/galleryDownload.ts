@@ -10,9 +10,10 @@
  * dependency, and the browser keeps the bytes in a Blob instead of the heap.
  */
 import { isMobile } from "./pwa/install";
+import { photoBlob } from "./api/photoBytes";
 
 export interface DownloadItem {
-  /** absolute url of the full-size picture */
+  /** the original's path (`/api/gallery/photos/:id/original`) — fetched with the session, never cached */
   url: string;
   /** folder inside the .zip ("" = the zip's root) — ignored on phones */
   folder: string;
@@ -37,6 +38,8 @@ export interface DownloadOptions {
   onProgress: (p: DownloadProgress) => void;
   /** file name of the .zip (computers only) */
   zipName: string;
+  /** the Acampa session (the album bytes are proxied with it) */
+  token: string;
 }
 
 /** A computer gets one .zip; a phone gets the photos one by one. */
@@ -89,15 +92,13 @@ function stopIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError();
 }
 
-async function fetchPhoto(url: string, signal: AbortSignal): Promise<Blob> {
-  // the pictures are immutable and already in the http cache after browsing the album
-  const res = await fetch(url, { signal, cache: "force-cache" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.blob();
+/** with the session, never from / into the HTTP cache (a child's photo is not kept beyond the screen) */
+function fetchPhoto(url: string, signal: AbortSignal, token: string): Promise<Blob> {
+  return photoBlob(token, url, signal);
 }
 
 /** Hands a blob to the browser as a download (the object url is freed later). */
-function saveBlob(blob: Blob, filename: string): void {
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -174,7 +175,7 @@ async function buildZip(items: DownloadItem[], opts: DownloadOptions): Promise<B
     stopIfAborted(opts.signal);
     let blob: Blob | null = null;
     try {
-      blob = await fetchPhoto(item.url, opts.signal);
+      blob = await fetchPhoto(item.url, opts.signal, opts.token);
     } catch (err) {
       if (isAbort(err)) throw err;
       failed++;
@@ -264,7 +265,7 @@ async function downloadEachFile(items: DownloadItem[], opts: DownloadOptions): P
   for (const item of items) {
     stopIfAborted(opts.signal);
     try {
-      const blob = await fetchPhoto(item.url, opts.signal);
+      const blob = await fetchPhoto(item.url, opts.signal, opts.token);
       // no folders on a phone: the event name becomes part of the file name
       const flat: DownloadItem = { ...item, name: item.folder ? `${item.folder} - ${item.name}` : item.name, folder: "" };
       saveBlob(blob, uniquePath(used, flat, extOf(blob.type)));

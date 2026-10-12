@@ -1,1539 +1,735 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type TouchEvent } from "react";
-import { createPortal } from "react-dom";
-import { deleteGalleryPhotos, extractZipImages, galleryUrl, isZip, reorderGalleryPhotos, searchGalleryPerson, setAlbumPublished, updateGalleryPhotos, uploadGalleryPhoto, zipSupported, type GalleryPhoto } from "../api/gallery";
-import { type CampEvent } from "../api/schedule";
-import { downloadPhotos, isAbort, safeName, zipsDownloads, type DownloadItem } from "../galleryDownload";
-import { useMarqueeSelect } from "../hooks/useMarqueeSelect";
-import { useMediaQuery } from "../hooks/useMediaQuery";
-import { dayKey, speakDay } from "../dates";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  createAlbum,
+  createGalleryEvent,
+  deleteGalleryEvent,
+  deletePhotos,
+  eventsFromProgramme,
+  extractZipImages,
+  fetchGallery,
+  fetchGalleryPhotos,
+  fetchKidPhotos,
+  importBatch,
+  isZip,
+  movePhotos,
+  planBatches,
+  updateAlbum,
+  type GalleryEvent,
+  type GalleryPhoto,
+  type GalleryState,
+} from "../api/gallery";
+import { photoBlob, photoObjectUrl } from "../api/photoBytes";
+import { downloadPhotos, isAbort, saveBlob } from "../galleryDownload";
 import { useCollection, useCollectionOrEmpty } from "../store";
 import Dialog from "../components/Dialog";
-import { DownloadGlyph, UploadGlyph } from "../components/Glyph";
-import SearchField from "../components/SearchField";
-import PageFooter from "../components/PageFooter";
+import OptionCards from "../components/OptionCards";
 import Toggle from "../components/Toggle";
 import { useConfirm } from "../components/ConfirmDialog";
 import { ICONS } from "../icons";
-import { personInfo, requestNames, usePeopleVersion } from "../store/people";
-import { collatorLocale, useI18n } from "../i18n";
+import { useI18n } from "../i18n";
+import css from "./GalleryPage.module.scss";
 
 interface GalleryPageProps {
   token: string;
-  /** admin / organizer or a listed photographer: may upload, edit and publish */
+  /** organizer / photographer on Acampa's side — the server's `canManage` (and photos-api's canUploadPhotos) decide last */
   canManage: boolean;
-  /** parents see the published album and may filter it with a face-reference search */
+  /** a family: the album + "find my child" */
   parentMode?: boolean;
 }
 
-/** A download under way (or the card that just finished one). */
-interface DownloadState {
-  total: number;
-  done: number;
-  failed: number;
-  /** every picture is in, the .zip is being closed */
-  zipping: boolean;
-  state: "running" | "done" | "stopped" | "error";
-  error?: string;
-  /** one .zip (computer) or file by file (phone) */
-  zip: boolean;
-}
-
-type Filter = "all" | "general" | { event: string };
-
-interface UploadJob {
-  name: string;
-  state: "sending" | "done" | "error";
-  error?: string;
-}
-
-/** how long the finished upload card takes to fade out (matches the CSS) */
-const UPLOAD_LEAVE_MS = 420;
-
-/** how long a deleted tile takes to shrink away (matches `tile-poof` in the CSS) */
-const DELETE_LEAVE_MS = 380;
-
-/** touch and hold this long on a photo to pick it (phones have no checkbox) */
-const HOLD_MS = 420;
-
-/** how far a finger must travel across the photo sheet to flick to the next one */
-const SWIPE_PX = 60;
-
-/** One drop target of the grid: an event, or the general "camp photos" block. */
+/** a section of the album: one moment, or the photos without one */
 interface Section {
-  /** "event:<id>" or "general" */
   key: string;
   title: string;
-  emoji: string;
-  /** where a photo dropped here belongs (null = general) */
-  eventId: string | null;
+  when: string | null;
+  linked: boolean;
   photos: GalleryPhoto[];
 }
 
-/** collects every file inside a dropped folder (and its sub-folders) */
-async function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
-  if (entry.isFile) {
-    const file = await new Promise<File | null>((resolve) => (entry as FileSystemFileEntry).file(resolve, () => resolve(null)));
-    // skip .DS_Store & friends
-    if (file && !file.name.startsWith(".")) out.push(file);
-    return;
-  }
-  if (!entry.isDirectory) return;
-  const reader = (entry as FileSystemDirectoryEntry).createReader();
-  // readEntries returns at most ~100 entries per call: keep reading until it's empty
-  for (;;) {
-    const batch = await new Promise<FileSystemEntry[]>((resolve) => reader.readEntries(resolve, () => resolve([])));
-    if (batch.length === 0) return;
-    for (const child of batch) await walkEntry(child, out);
-  }
+const ZONE = "America/Sao_Paulo";
+
+/** "YYYY-MM-DD" of an instant, São Paulo calendar */
+function dayOf(iso: string): string {
+  return new Date(new Date(iso).getTime() - 3 * 3600_000).toISOString().slice(0, 10);
 }
 
-
 /**
- * The camp's photo album. Everyone logged in sees the PUBLISHED photos;
- * photographers (and the admin / organizers) additionally see their drafts,
- * send new pictures and flip the album switch — from that moment every parent
- * and team member sees the photos. Pictures may belong to a programme event or
- * be general photos of the camp.
+ * The camp album (photos-api through Acampa). Everyone signed in sees the published album, moment by moment, each
+ * moment's photos by camera time. Whoever looks after the photos (fotografia, coordenação) creates the edition's album,
+ * publishes it, sends the originals (camera time places them on their programme moment) and organizes the rest. A family
+ * can look for their own child: only children whose family agreed are ever recognised, and an empty answer is never a
+ * statement about the child.
  */
 export default function GalleryPage({ token, canManage, parentMode = false }: GalleryPageProps) {
-  const { tx, te } = useI18n();
-  const storePhotos = useCollectionOrEmpty("gallery");
-  /** parent face-search: null = the whole album; a Set = only those ids */
-  const [matchedIds, setMatchedIds] = useState<Set<string> | null>(null);
-  const photos = matchedIds ? storePhotos.filter((p) => matchedIds.has(p.id)) : storePhotos;
-  const events = useCollectionOrEmpty("events");
-  const settings = useCollection("settings");
+  const { tx, te, tag } = useI18n();
+  const stamp = useCollection("gallery");
+  const [state, setState] = useState<GalleryState | null>(null);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [momentsOpen, setMomentsOpen] = useState(false);
+  const [viewer, setViewer] = useState<{ list: GalleryPhoto[]; index: number } | null>(null);
+  const [kid, setKid] = useState<string>("all");
+  const [kidPhotos, setKidPhotos] = useState<GalleryPhoto[] | null>(null);
+  const [kidBusy, setKidBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
 
-  const [filter, setFilter] = useState<Filter>("all");
-  const [lightbox, setLightbox] = useState<{ list: GalleryPhoto[]; index: number } | null>(null);
-  const [albumBusy, setAlbumBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<UploadJob[] | null>(null);
-  /** the finished card is playing its fade-out */
-  const [leaving, setLeaving] = useState(false);
-  /** photos playing the delete animation (still on screen, already on their way out) */
-  const [vanishing, setVanishing] = useState<Set<string>>(new Set());
-  /** the "drop or choose files" panel, opened by the “Enviar fotos” button */
-  const [pickerOpen, setPickerOpen] = useState(false);
-  /** which event the next upload belongs to (null = general camp photos) */
-  const [uploadEventId, setUploadEventId] = useState<string | null>(null);
-  const [eventPickOpen, setEventPickOpen] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  /** ids ticked for a bulk action (empty = selection mode is off) */
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
-  const [moveOpen, setMoveOpen] = useState(false);
-  /** the photos being dragged to another section / position */
-  const [moveDrag, setMoveDrag] = useState<{ ids: string[] } | null>(null);
-  /** the download card (progress, then the result) */
-  const [dl, setDl] = useState<DownloadState | null>(null);
-  const [dlLeaving, setDlLeaving] = useState(false);
-  /** aborting it stops the run between (and during) photos */
-  const dlAbort = useRef<AbortController | null>(null);
-  /** where the insertion marker sits while rearranging */
-  const [dropAt, setDropAt] = useState<{ key: string; index: number } | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const referenceInput = useRef<HTMLInputElement>(null);
-  const cameraInput = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const cameraGen = useRef(0);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraStarting, setCameraStarting] = useState(false);
-  const [faceSearching, setFaceSearching] = useState(false);
-  /** how the last reference arrived — “Tentar de novo” repeats exactly that */
-  const [lastSource, setLastSource] = useState<"camera" | "file">("camera");
-  const [referencePreview, setReferencePreview] = useState<string | null>(null);
-  const [facePending, setFacePending] = useState(0);
-  /** dragenter/dragleave fire for every child element: count them so the overlay doesn't flicker */
-  const dragDepth = useRef(0);
-
-  // the preview is an object url: the browser frees it when it is replaced or the tab closes
-  useEffect(() => () => {
-    if (referencePreview) URL.revokeObjectURL(referencePreview);
-  }, [referencePreview]);
-
-  function stopCamera() {
-    cameraGen.current += 1;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    const video = videoRef.current;
-    if (video) video.srcObject = null;
-    setCameraOpen(false);
-    setCameraStarting(false);
-  }
-
-  useEffect(() => () => {
-    cameraGen.current += 1;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }, []);
-
-  /** Live viewfinder in the face-search picture. Started from the tap: iPhone drops getUserMedia without a user gesture, and ignores `.click()` on a hidden file input. */
-  async function openCamera() {
-    if (faceSearching || !anyPublished) return;
-    if (cameraOpen) {
-      void captureStill();
-      return;
-    }
-    setError(null);
-    if (!navigator.mediaDevices?.getUserMedia) {
-      cameraInput.current?.click();
-      return;
-    }
-    const gen = cameraGen.current + 1;
-    cameraGen.current = gen;
-    setCameraStarting(true);
-    setCameraOpen(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: "environment" } },
-      }).catch(() => navigator.mediaDevices.getUserMedia({ audio: false, video: true }));
-      if (cameraGen.current !== gen) {
-        stream.getTracks().forEach((track) => track.stop());
-        return;
-      }
-      streamRef.current = stream;
-      const video = videoRef.current;
-      if (!video) {
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-        setCameraOpen(false);
-        setCameraStarting(false);
-        return;
-      }
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      video.setAttribute("playsinline", "");
-      video.setAttribute("webkit-playsinline", "");
-      await video.play();
-      if (cameraGen.current !== gen) return;
-      setCameraStarting(false);
-    } catch (err) {
-      if (cameraGen.current !== gen) return;
-      stopCamera();
-      setError(cameraErrorText(err, tx));
-      const name = typeof err === "object" && err && "name" in err ? String((err as { name: unknown }).name) : "";
-      if (name !== "NotAllowedError") cameraInput.current?.click();
-    }
-  }
-
-  async function captureStill() {
-    const video = videoRef.current;
-    if (!video) return;
-    if (!video.videoWidth) {
-      await new Promise<void>((resolve) => {
-        const done = () => { video.removeEventListener("loadeddata", done); resolve(); };
-        video.addEventListener("loadeddata", done);
-        window.setTimeout(done, 800);
-      });
-    }
-    if (!video.videoWidth) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-    stopCamera();
-    if (!blob) {
-      setError(tx("Não foi possível fotografar. Tente novamente."));
-      return;
-    }
-    void handleReference(new File([blob], "camera.jpg", { type: "image/jpeg" }));
-  }
-
-  /**
-   * The parent's reference picture. It travels in ONE request, is matched
-   * against the album's stored face vectors and is never saved anywhere.
-   */
-  async function handleReference(file: File | null) {
-    if (!parentMode || !file || faceSearching || !anyPublished) return;
-    stopCamera();
-    setReferencePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-    setFaceSearching(true);
-    setError(null);
-    try {
-      const result = await searchGalleryPerson(token, file);
-      setMatchedIds(new Set(result.matches.map((match) => match.photo.id)));
-      setFacePending(result.pendingPhotos);
-      setSelected(new Set());
-      setLightbox(null);
-      setFilter("all");
-    } catch (err) {
-      setError(te(err, "Não foi possível procurar as fotos."));
-    } finally {
-      setFaceSearching(false);
-      if (referenceInput.current) referenceInput.current.value = "";
-      if (cameraInput.current) cameraInput.current.value = "";
-    }
-  }
-
-  function clearSearch() {
-    stopCamera();
-    setMatchedIds(null);
-    setFacePending(0);
-    setReferencePreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
-    setSelected(new Set());
-    setLightbox(null);
-    setFilter("all");
-    setError(null);
-  }
-
-  const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
-  /** phones: the header actions are icons only — the Publicadas switch becomes a globe */
-  const phone = useMediaQuery("(max-width: 700px)");
-  /** the album switch: one flag for the whole gallery, not per photo */
-  const anyPublished = !!settings?.galleryPublished;
-  /** events that actually have photos, in programme order (as they happened) */
-  const eventSections = useMemo(() => {
-    const withPhotos = new Map<string, number>();
-    for (const p of photos) if (p.eventId) withPhotos.set(p.eventId, (withPhotos.get(p.eventId) ?? 0) + 1);
-    return events
-      .filter((e) => withPhotos.has(e.id))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
-      .map((e) => ({ event: e, count: withPhotos.get(e.id)! }));
-  }, [photos, events]);
-
-  const filterKey = (f: Filter) => (f === "all" || f === "general" ? f : `event:${f.event}`);
-  /** a photo whose event is not in the viewer's programme counts as general */
-  const isGeneral = (p: GalleryPhoto) => !p.eventId || !eventById.has(p.eventId);
-  const visible = useMemo(() => {
-    if (filter === "all") return photos;
-    if (filter === "general") return photos.filter(isGeneral);
-    return photos.filter((p) => p.eventId === filter.event);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos, filter, eventById]);
-  const generalCount = photos.filter(isGeneral).length;
-
-  /** which section a photo lives in (its event, or the general block) */
-  const sectionKeyOf = (p: GalleryPhoto) => (isGeneral(p) ? "general" : `event:${p.eventId}`);
-
-  /** groups of the "Todas" view: one section per event (programme order), photos without an event last */
-  const groups = useMemo(() => {
-    if (filter !== "all") return null;
-    const out: Section[] = [];
-    for (const { event } of eventSections) {
-      out.push({ key: `event:${event.id}`, title: event.title, emoji: event.emoji || "📅", eventId: event.id, photos: photos.filter((p) => p.eventId === event.id) });
-    }
-    const general = photos.filter(isGeneral);
-    if (general.length > 0) out.push({ key: "general", title: tx("Fotos do acampamento"), emoji: "🏕️", eventId: null, photos: general });
-    return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, eventSections, photos, eventById]);
-
-  /**
-   * The single section shown by the filtered views. Rearranging works there
-   * too; only the "Todas" view offers several sections to move photos between.
-   */
-  const flatSection: Section = useMemo(() => {
-    if (filter !== "all" && filter !== "general") {
-      const event = eventById.get(filter.event);
-      return { key: `event:${filter.event}`, title: event?.title ?? tx("Evento"), emoji: event?.emoji || "📅", eventId: filter.event, photos: visible };
-    }
-    return { key: "general", title: tx("Fotos do acampamento"), emoji: "🏕️", eventId: null, photos: visible };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, visible, eventById]);
-
-  // ── uploading ──────────────────────────────────────────────────────────────
-
-  /** the album is empty → the panel is the page, so it stays open and cannot be dismissed */
-  const panelOpen = canManage && !jobs && (pickerOpen || photos.length === 0);
-  const uploadEvent = uploadEventId ? eventById.get(uploadEventId) ?? null : null;
-
-  const doneCount = jobs ? jobs.filter((j) => j.state !== "sending").length : 0;
-  const sending = !!jobs && doneCount < jobs.length;
-  const failedCount = jobs ? jobs.filter((j) => j.state === "error").length : 0;
-  const progress = jobs && jobs.length > 0 ? Math.round((doneCount / jobs.length) * 100) : 0;
-
-  /**
-   * Once everything landed the card ticks, waits, then fades out instead of
-   * vanishing: `leaving` plays the animation, a second timer unmounts it when
-   * the animation is over (kept in sync with `--up-leave` in the stylesheet).
-   */
-  useEffect(() => {
-    if (!jobs || sending) return;
-    const hold = setTimeout(() => setLeaving(true), failedCount > 0 ? 6000 : 2800);
-    return () => clearTimeout(hold);
-  }, [jobs, sending, failedCount]);
+  const manage = canManage && !!state?.canManage;
+  const album = state?.album ?? null;
 
   useEffect(() => {
-    if (!leaving) return;
-    const gone = setTimeout(() => {
-      setJobs(null);
-      setLeaving(false);
-    }, UPLOAD_LEAVE_MS);
-    return () => clearTimeout(gone);
-  }, [leaving]);
-
-  async function handlePicked(files: FileList | File[] | null) {
-    if (!files || files.length === 0 || !canManage) return;
-    // a .zip is opened on the device: every picture inside becomes one upload
-    const picked = [...files];
-    const opening: UploadJob[] = picked.map((f) => ({ name: f.name, state: "sending" as const }));
-    setJobs(opening);
-    setLeaving(false); // a new batch cancels a fade-out already under way
-    setPickerOpen(false);
-    setError(null);
-    const list: File[] = [];
-    const failures: UploadJob[] = [];
-    for (const f of picked) {
-      if (!isZip(f)) {
-        list.push(f);
-        continue;
-      }
+    let alive = true;
+    (async () => {
       try {
-        const inside = await extractZipImages(f);
-        if (inside.length === 0) failures.push({ name: f.name, state: "error", error: tx("nenhuma foto dentro do zip") });
-        else list.push(...inside);
-      } catch (err) {
-        failures.push({ name: f.name, state: "error", error: te(err, "não consegui abrir o zip") });
+        const next = await fetchGallery(token);
+        if (!alive) return;
+        setState(next);
+        setError(null);
+        const list = next.album?.readable ? (await fetchGalleryPhotos(token)).photos : [];
+        if (alive) setPhotos(list);
+      } catch (e) {
+        if (alive) setError(te(e, "Não foi possível abrir o álbum agora."));
       }
-    }
-    setJobs([...list.map((f) => ({ name: f.name, state: "sending" as const })), ...failures]);
-    // the panel's event wins; otherwise uploading inside a filtered event adopts it
-    const presetEvent = uploadEventId ?? (filter !== "all" && filter !== "general" ? filter.event : null);
-    for (let i = 0; i < list.length; i++) {
-      try {
-        await uploadGalleryPhoto(token, { file: list[i], caption: "", eventId: presetEvent });
-        setJobs((prev) => prev?.map((j, k) => (k === i ? { ...j, state: "done" } : j)) ?? null);
-      } catch (err) {
-        setJobs((prev) => prev?.map((j, k) => (k === i ? { ...j, state: "error", error: te(err, "Falhou.") } : j)) ?? null);
-      }
-    }
-    if (fileInput.current) fileInput.current.value = "";
-  }
-
-  // ── downloading ────────────────────────────────────────────────────────────
-
-  const dlRunning = dl?.state === "running";
-  /** while the .zip is being written the count is full but the work is not over */
-  const dlProgress = dl && dl.total > 0 ? Math.round((dl.done / dl.total) * 100) : 0;
-
-  /** the card ticks, waits, then fades out — exactly like the upload one */
-  useEffect(() => {
-    if (!dl || dl.state === "running") return;
-    const hold = setTimeout(() => setDlLeaving(true), dl.state === "done" && dl.failed === 0 ? 2800 : 6000);
-    return () => clearTimeout(hold);
-  }, [dl]);
-
-  useEffect(() => {
-    if (!dlLeaving) return;
-    const gone = setTimeout(() => {
-      setDl(null);
-      setDlLeaving(false);
-    }, UPLOAD_LEAVE_MS);
-    return () => clearTimeout(gone);
-  }, [dlLeaving]);
-
-  // leaving the tab mid-download stops it instead of downloading into nothing
-  useEffect(() => () => dlAbort.current?.abort(), []);
-
-  /**
-   * Names the files: one folder per event (dropped when everything lands in the
-   * same one), each picture numbered in the order it is shown, with its caption
-   * when it has one.
-   */
-  function downloadItems(list: GalleryPhoto[]): DownloadItem[] {
-    const seq = new Map<string, number>();
-    const items = list.map((p) => {
-      const event = p.eventId ? eventById.get(p.eventId) : undefined;
-      const folder = event ? safeName(event.title, tx("Evento")) : tx("Fotos do acampamento");
-      const n = (seq.get(folder) ?? 0) + 1;
-      seq.set(folder, n);
-      const caption = p.caption ? safeName(p.caption, "") : "";
-      return { url: galleryUrl(p.url), folder, name: `${String(n).padStart(3, "0")}${caption ? ` ${caption}` : ""}`, createdAt: p.createdAt };
-    });
-    // a single event / the general block: no folder, the pictures sit in the root
-    if (new Set(items.map((i) => i.folder)).size < 2) for (const i of items) i.folder = "";
-    return items;
-  }
-
-  /** what the current view is called, for the .zip's file name */
-  function viewLabel(): string {
-    if (filter === "all") return tx("acampamento");
-    if (filter === "general") return tx("gerais");
-    return safeName(eventById.get(filter.event)?.title ?? tx("evento"), tx("evento"));
-  }
-
-  async function startDownload(list: GalleryPhoto[], label: string) {
-    if (list.length === 0 || dlRunning) return;
-    const zip = zipsDownloads();
-    // a phone saves one file after another: say so before the prompts start
-    if (
-      !zip &&
-      list.length > 1 &&
-      !(await confirm({
-        title: tx("Baixar {n} fotos?", { n: list.length }),
-        message: tx("No celular as fotos são salvas uma de cada vez. Deixe a tela ligada até terminar."),
-        confirmLabel: tx("Baixar"),
-        emoji: "⬇️",
-      }))
-    )
-      return;
-
-    const controller = new AbortController();
-    dlAbort.current = controller;
-    setDlLeaving(false);
-    setError(null);
-    setDl({ total: list.length, done: 0, failed: 0, zipping: false, state: "running", zip });
-    try {
-      await downloadPhotos(downloadItems(list), {
-        signal: controller.signal,
-        zipName: `${tx("fotos")}-${label}-${new Date().toISOString().slice(0, 10)}.zip`,
-        onProgress: (p) => setDl((prev) => (prev && prev.state === "running" ? { ...prev, ...p } : prev)),
-      });
-      setDl((prev) => (prev ? { ...prev, zipping: false, state: "done" } : prev));
-    } catch (err) {
-      if (isAbort(err)) setDl((prev) => (prev ? { ...prev, zipping: false, state: "stopped" } : prev));
-      else setDl((prev) => (prev ? { ...prev, zipping: false, state: "error", error: te(err, "Algo deu errado.") } : prev));
-    } finally {
-      dlAbort.current = null;
-    }
-  }
-
-  // ── drag & drop ────────────────────────────────────────────────────────────
-
-  /** files dropped straight on the page (a dropped folder is walked recursively) */
-  async function filesFromDrop(dt: DataTransfer): Promise<File[]> {
-    const entries = [...dt.items]
-      .filter((it) => it.kind === "file")
-      .map((it) => (typeof it.webkitGetAsEntry === "function" ? it.webkitGetAsEntry() : null));
-    if (entries.some((e) => e?.isDirectory)) {
-      const out: File[] = [];
-      await Promise.all(entries.map((e) => (e ? walkEntry(e, out) : Promise.resolve())));
-      return out;
-    }
-    return [...dt.files];
-  }
-
-  // the overlay covers the viewport, so the listeners live on the window: a drop
-  // anywhere on the tab is accepted and nothing falls through to the browser
-  // (which would navigate away to the dropped file)
-  useEffect(() => {
-    if (!canManage && !(parentMode && anyPublished)) return;
-    const hasFiles = (e: globalThis.DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
-
-    const onEnter = (e: globalThis.DragEvent) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      dragDepth.current += 1;
-      setDragging(true);
-    };
-    const onOver = (e: globalThis.DragEvent) => {
-      if (!hasFiles(e)) return;
-      // without preventDefault on dragover the browser opens the file instead of dropping it
-      e.preventDefault();
-      e.dataTransfer!.dropEffect = "copy";
-    };
-    const onLeave = (e: globalThis.DragEvent) => {
-      if (!hasFiles(e)) return;
-      dragDepth.current = Math.max(0, dragDepth.current - 1);
-      if (dragDepth.current === 0) setDragging(false);
-    };
-    const onDrop = (e: globalThis.DragEvent) => {
-      if (!hasFiles(e)) return;
-      e.preventDefault();
-      dragDepth.current = 0;
-      setDragging(false);
-      void filesFromDrop(e.dataTransfer!).then((files) => {
-        if (parentMode) {
-          const first = files.find((f) => f.type.startsWith("image/"));
-          if (first) void handleReference(first);
-          return;
-        }
-        void handlePicked(files.filter((f) => f.type.startsWith("image/") || isZip(f)));
-      });
-    };
-
-    window.addEventListener("dragenter", onEnter);
-    window.addEventListener("dragover", onOver);
-    window.addEventListener("dragleave", onLeave);
-    window.addEventListener("drop", onDrop);
+    })();
     return () => {
-      window.removeEventListener("dragenter", onEnter);
-      window.removeEventListener("dragover", onOver);
-      window.removeEventListener("dragleave", onLeave);
-      window.removeEventListener("drop", onDrop);
-      dragDepth.current = 0;
+      alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManage, parentMode, filter, token, uploadEventId, anyPublished]);
+  }, [token, stamp?.version, stamp?.albumId, reload]);
 
-  /** master switch: publishes every draft (the server texts everyone once) or hides the album again */
-  async function toggleAlbum(next: boolean) {
-    if (albumBusy) return;
-    setAlbumBusy(true);
-    setError(null);
-    try {
-      await setAlbumPublished(token, next);
-    } catch (err) {
-      setError(te(err, "Algo deu errado."));
-    } finally {
-      setAlbumBusy(false);
-    }
-  }
-
-  // ── selection (bulk actions) ───────────────────────────────────────────────
-
-  /** the photos the bar acts on, in the order they appear on screen */
-  const selectedPhotos = useMemo(() => visible.filter((p) => selected.has(p.id)), [visible, selected]);
-
-  // parents without a reference may tick photos one by one, never the whole album
-  const parentLocked = parentMode && !matchedIds;
-  const marquee = useMarqueeSelect({ enabled: !parentLocked, selected, onChange: setSelected });
-
-  /**
-   * Which section shows the action buttons: the first one (top to bottom) that
-   * holds a selected photo. A selection may span several sections, and the
-   * buttons act on all of it — they just need one home.
-   */
-  const actionsSectionKey = useMemo(() => {
-    if (selected.size === 0) return null;
-    if (!groups) return flatSection.key;
-    return groups.find((g) => g.photos.some((p) => selected.has(p.id)))?.key ?? null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, groups, flatSection.key]);
-
-  // leaving the current filter would keep invisible photos selected
-  useEffect(() => setSelected(new Set()), [filter]);
-
-  // Esc clears the selection
+  // a family's search follows the album: new photos may show the child
   useEffect(() => {
-    if (selected.size === 0) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !lightbox) setSelected(new Set());
+    if (!parentMode || kid === "all") return;
+    let alive = true;
+    setKidBusy(true);
+    fetchKidPhotos(token, kid)
+      .then((res) => alive && setKidPhotos(res.photos))
+      .catch((e) => {
+        if (!alive) return;
+        setKidPhotos(null);
+        setError(te(e, "Não conseguimos procurar as fotos agora. Tente de novo daqui a pouco."));
+      })
+      .finally(() => alive && setKidBusy(false));
+    return () => {
+      alive = false;
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected.size, lightbox]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, kid, parentMode, stamp?.version]);
 
-  function toggleOne(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
-  }
-
-  /**
-   * Touch: there is no checkbox on the tiles — a TOUCH AND HOLD picks the photo
-   * (and opens the selection); after that a plain tap keeps ticking, exactly
-   * like the phone's own photo app. The hold is cancelled by scrolling.
-   */
-  const hold = useRef<{ timer: number | null; fired: boolean; x: number; y: number }>({ timer: null, fired: false, x: 0, y: 0 });
-  function cancelHold() {
-    if (hold.current.timer !== null) {
-      clearTimeout(hold.current.timer);
-      hold.current.timer = null;
+  const sections = useMemo<Section[]>(() => {
+    if (!album) return [];
+    const fmtDay = new Intl.DateTimeFormat(tag, { weekday: "short", day: "numeric", month: "short", timeZone: ZONE });
+    const fmtTime = new Intl.DateTimeFormat(tag, { hour: "2-digit", minute: "2-digit", timeZone: ZONE });
+    const events = [...album.events].sort((a, b) => (a.span?.start ?? "~").localeCompare(b.span?.start ?? "~") || a.name.localeCompare(b.name));
+    const byEvent = new Map<string, GalleryPhoto[]>();
+    const loose: GalleryPhoto[] = [];
+    for (const p of photos) {
+      if (p.eventId && events.some((e) => e.id === p.eventId)) byEvent.set(p.eventId, [...(byEvent.get(p.eventId) ?? []), p]);
+      else loose.push(p);
     }
-  }
-  function startHold(e: TouchEvent<HTMLElement>, id: string) {
-    const touch = e.touches[0];
-    if (!touch) return;
-    cancelHold();
-    hold.current.fired = false;
-    hold.current.x = touch.clientX;
-    hold.current.y = touch.clientY;
-    hold.current.timer = window.setTimeout(() => {
-      hold.current.timer = null;
-      hold.current.fired = true;
-      navigator.vibrate?.(25);
-      toggleOne(id);
-    }, HOLD_MS);
-  }
-  function moveHold(e: TouchEvent<HTMLElement>) {
-    const touch = e.touches[0];
-    if (!touch) return;
-    if (Math.abs(touch.clientX - hold.current.x) > 10 || Math.abs(touch.clientY - hold.current.y) > 10) cancelHold();
-  }
-
-  async function bulkMove(eventId: string | null) {
-    const ids = selectedPhotos.map((p) => p.id);
-    if (ids.length === 0 || bulkBusy) return;
-    setBulkBusy(true);
-    setError(null);
-    try {
-      await updateGalleryPhotos(token, ids, { eventId });
-      setMoveOpen(false);
-      setSelected(new Set());
-    } catch (err) {
-      setError(te(err, "Algo deu errado."));
-    } finally {
-      setBulkBusy(false);
-    }
-  }
-
-  /** lets the tiles play their exit before the store drops them */
-  function playVanish(ids: string[]): Promise<void> {
-    setVanishing((prev) => new Set([...prev, ...ids]));
-    return new Promise((resolve) => setTimeout(resolve, DELETE_LEAVE_MS));
-  }
-
-  /** takes the ids out of the "leaving" set once the server confirmed (or failed) */
-  function endVanish(ids: string[]) {
-    setVanishing((prev) => {
-      const next = new Set(prev);
-      for (const id of ids) next.delete(id);
-      return next;
-    });
-  }
-
-  async function bulkDelete() {
-    const ids = selectedPhotos.map((p) => p.id);
-    if (ids.length === 0 || bulkBusy) return;
-    const many = ids.length > 1;
-    if (
-      !(await confirm({
-        title: many ? tx("Excluir {n} fotos?", { n: ids.length }) : tx("Excluir esta foto?"),
-        message: many ? tx("Elas somem para todo mundo. Não dá para desfazer.") : tx("Ela some para todo mundo. Não dá para desfazer."),
-        confirmLabel: tx("Excluir"),
-        danger: true,
-        emoji: "🗑️",
+    const out: Section[] = events
+      .map((e) => ({
+        key: e.id,
+        title: e.name,
+        when: e.span ? `${fmtDay.format(new Date(e.span.start))} · ${fmtTime.format(new Date(e.span.start))}–${fmtTime.format(new Date(e.span.end))}` : null,
+        linked: !!e.scheduleEntryId,
+        photos: byEvent.get(e.id) ?? [],
       }))
-    )
-      return;
-    setBulkBusy(true);
-    setError(null);
-    // the selection clears first: the tiles shrink away without their checkmarks
-    setSelected(new Set());
-    try {
-      await playVanish(ids);
-      await deleteGalleryPhotos(token, ids);
-    } catch (err) {
-      setError(te(err, "Algo deu errado."));
-    } finally {
-      endVanish(ids);
-      setBulkBusy(false);
-    }
-  }
+      // the families see moments that already have photos; whoever organizes sees every moment (a place to drop them)
+      .filter((s) => manage || s.photos.length > 0);
+    if (loose.length > 0) out.push({ key: "loose", title: manage ? tx("Fotos para organizar") : tx("Mais fotos do acampamento"), when: null, linked: false, photos: loose });
+    return out;
+  }, [album, photos, manage, tx, tag]);
 
-  // ── rearranging (dragging photos between / inside sections) ─────────────────
-
-  /**
-   * Dragging a tile onto another section moves the photo(s) to that event;
-   * dropping inside the same section rearranges it. Dragging a photo that is
-   * part of the current selection carries the whole selection along.
-   */
-  function startMove(e: DragEvent<HTMLDivElement>, photo: GalleryPhoto) {
-    if (!canManage) return;
-    const ids = selected.has(photo.id) ? selectedPhotos.map((p) => p.id) : [photo.id];
-    setMoveDrag({ ids });
-    e.dataTransfer.effectAllowed = "move";
-    // Firefox only starts a drag when something is written to the payload
-    e.dataTransfer.setData("text/plain", ids.join(","));
-  }
-
-  function endMove() {
-    setMoveDrag(null);
-    setDropAt(null);
-  }
-
-  /** remembers where the insertion marker goes (before the tile under the pointer) */
-  function overTile(e: DragEvent<HTMLDivElement>, section: Section, index: number) {
-    if (!moveDrag) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-    setDropAt((prev) => (prev?.key === section.key && prev.index === index ? prev : { key: section.key, index }));
-  }
-
-  async function dropMove(e: DragEvent<HTMLDivElement>, section: Section, index: number) {
-    if (!moveDrag) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const ids = moveDrag.ids;
-    endMove();
-    if (ids.length === 0) return;
-
-    const moved = photos.filter((p) => ids.includes(p.id));
-    // every dragged photo already in this section → a pure rearrangement
-    const sameSection = moved.every((p) => sectionKeyOf(p) === section.key);
-
-    setBulkBusy(true);
-    setError(null);
-    try {
-      if (!sameSection) await updateGalleryPhotos(token, ids, { eventId: section.eventId });
-      // the section as it will look, with the dragged photos lifted out and
-      // spliced back in at the drop point
-      const rest = section.photos.filter((p) => !ids.includes(p.id));
-      const before = section.photos.slice(0, index).filter((p) => !ids.includes(p.id)).length;
-      const nextOrder = [...rest.slice(0, before), ...moved, ...rest.slice(before)];
-      if (nextOrder.length > 1) await reorderGalleryPhotos(token, nextOrder.map((p) => p.id));
-      setSelected(new Set());
-    } catch (err) {
-      setError(te(err, "Algo deu errado."));
-    } finally {
-      setBulkBusy(false);
-    }
-  }
-
-  // ── lightbox keyboard ──────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!lightbox) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") step(-1);
-      if (e.key === "ArrowRight") step(1);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lightbox]);
-
-  /** phones: flick left / right across the sheet to walk the set */
-  const swipe = useRef<{ x: number; y: number } | null>(null);
-  function swipeStart(e: TouchEvent<HTMLElement>) {
-    const touch = e.touches[0];
-    swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-  }
-  function swipeEnd(e: TouchEvent<HTMLElement>) {
-    const from = swipe.current;
-    const touch = e.changedTouches[0];
-    swipe.current = null;
-    if (!from || !touch) return;
-    const dx = touch.clientX - from.x;
-    // a mostly-horizontal flick, so scrolling the sheet never changes the photo
-    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(touch.clientY - from.y)) return;
-    step(dx < 0 ? 1 : -1);
-  }
-
-  function step(delta: number) {
-    setLightbox((lb) => {
-      if (!lb || lb.list.length === 0) return lb;
-      const index = (lb.index + delta + lb.list.length) % lb.list.length;
-      return { ...lb, index };
+  function toggle(id: string) {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }
 
-  // ── render ─────────────────────────────────────────────────────────────────
+  function endSelection() {
+    setSelecting(false);
+    setSelected(new Set());
+  }
 
-  const chip = (key: Filter, label: ReactNode, count: number) => (
-    <button type="button" key={filterKey(key)} className={`cat-tab ${filterKey(filter) === filterKey(key) ? "cat-tab--active" : ""}`} onClick={() => setFilter(key)}>
-      {label} <span className="cat-tab__count">{count}</span>
-    </button>
-  );
+  async function run(fn: () => Promise<string | void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const done = await fn();
+      if (done) setNotice(done);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setError(te(e, "Algo deu errado. Tente novamente."));
+    } finally {
+      setBusy(false);
+    }
+  }
 
-  /**
-   * The right-hand side of a section title: what to do with the selection
-   * (only on the section where it starts, so the buttons never double up) and
-   * the "select all" checkbox for that section — a tick when every photo is
-   * picked, a dash when only some are.
-   *
-   * There is no "publish" here: publishing is a property of the ALBUM (the
-   * “Publicadas” switch in the header), not of single photos.
-   */
-  const selectAllBox = (list: GalleryPhoto[], sectionKey: string) => {
-    if (list.length === 0) return null;
-    const canSelectAll = !parentLocked;
-    const picked = list.filter((p) => selected.has(p.id)).length;
-    const all = picked === list.length;
-    const some = picked > 0 && !all;
-    if (!canSelectAll && selected.size === 0) return null;
-    return (
-      <div className="pick-head">
-        {selected.size > 0 && sectionKey === actionsSectionKey && (
-          <div className="pick-head__actions">
-            <span className="pick-head__count">{selected.size === 1 ? tx("{n} selecionada", { n: selected.size }) : tx("{n} selecionadas", { n: selected.size })}</span>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void startDownload(selectedPhotos, tx("selecionadas"))}
-              disabled={dlRunning}
-              title={zipsDownloads() ? tx("Baixar as fotos selecionadas em um .zip") : tx("Baixar as fotos selecionadas, uma a uma")}
-            >
-              <DownloadGlyph /> {tx("Baixar")}
-            </button>
-            {canManage && (
-              <>
-                <button type="button" className="button button--secondary" onClick={() => setMoveOpen(true)} disabled={bulkBusy}>
-                  {tx("Mover para…")}
-                </button>
-                <button type="button" className="button button--danger" onClick={() => void bulkDelete()} disabled={bulkBusy}>
-                  🗑️ {tx("Excluir")}
-                </button>
-              </>
-            )}
-            {/* phones have no Esc: this is how the selection closes */}
-            <button
-              type="button"
-              className="button button--secondary pick-head__clear"
-              onClick={() => setSelected(new Set())}
-              disabled={bulkBusy}
-              title={tx("Cancelar a seleção")}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-        {canSelectAll && (
-          <button
-            type="button"
-            className="pick-all"
-            onClick={() =>
-              setSelected((prev) => {
-                const next = new Set(prev);
-                for (const p of list) if (all) next.delete(p.id);
-                  else next.add(p.id);
-                return next;
-              })
-            }
-            disabled={bulkBusy}
-            aria-pressed={all}
-            aria-label={all ? tx("Desmarcar todas desta seção") : tx("Selecionar todas desta seção")}
-            title={all ? tx("Desmarcar todas desta seção") : tx("Selecionar todas desta seção")}
-          >
-            <span className={`pick-all__box ${all ? "pick-all__box--on" : ""} ${some ? "pick-all__box--some" : ""}`} aria-hidden="true">
-              {all ? "✓" : some ? "–" : ""}
-            </span>
-          </button>
-        )}
-      </div>
-    );
-  };
+  async function removeSelected() {
+    const ids = [...selected];
+    const ok = await confirm({ title: tx("Tirar {n} foto(s) do álbum?", { n: ids.length }), message: tx("Elas saem do álbum para todo mundo. Não dá para desfazer."), confirmLabel: tx("Tirar do álbum") });
+    if (!ok) return;
+    await run(async () => {
+      const n = await deletePhotos(token, ids);
+      endSelection();
+      return tx("{n} foto(s) saíram do álbum.", { n });
+    });
+  }
 
-  const tile = (photo: GalleryPhoto, list: GalleryPhoto[], index: number, section: Section) => {
-    const picked = selected.has(photo.id);
-    // while a selection is open a plain click keeps picking instead of zooming
-    const selecting = selected.size > 0;
-    const moving = moveDrag?.ids.includes(photo.id) ?? false;
-    const marker = dropAt && dropAt.key === section.key && dropAt.index === index;
-    const going = vanishing.has(photo.id);
-    return (
-      <div
-        key={photo.id}
-        className={`gallery-cell ${picked ? "gallery-cell--picked" : ""} ${moving ? "gallery-cell--moving" : ""} ${marker ? "gallery-cell--before" : ""} ${going ? "gallery-cell--going" : ""}`}
-        // deleting a batch: the tiles leave one after another, not all at once
-        style={going ? ({ "--poof-delay": `${Math.min(index, 8) * 45}ms` } as CSSProperties) : undefined}
-        data-select-id={!going ? photo.id : undefined}
-        // only a picked tile is draggable: on the others the same gesture is the
-        // rubber band (a native drag would swallow it). Tick a photo first to
-        // move or rearrange it.
-        draggable={canManage && !going && picked}
-        onDragStart={(e) => startMove(e, photo)}
-        onDragEnd={endMove}
-        onDragOver={(e) => overTile(e, section, index)}
-        onDrop={(e) => void dropMove(e, section, index)}
-      >
-        {/* no draft badge: the "Publicadas" switch is the visual cue */}
-        <button
-          type="button"
-          className="gallery-tile"
-          onClick={(e) => {
-            // the touch-and-hold already picked this photo: ignore the tap that follows it
-            if (hold.current.fired) {
-              hold.current.fired = false;
-              return;
-            }
-            if (selecting || e.shiftKey || e.metaKey || e.ctrlKey) toggleOne(photo.id);
-            else setLightbox({ list, index });
-          }}
-          onTouchStart={(e) => startHold(e, photo.id)}
-          onTouchMove={moveHold}
-          onTouchEnd={cancelHold}
-          onTouchCancel={cancelHold}
-          onContextMenu={(e) => {
-            // the hold fired: keep the browser's own "save image" menu out of the way
-            if (hold.current.fired) e.preventDefault();
-          }}
-          aria-label={photo.caption || tx("Ver foto")}
-          aria-pressed={selecting ? picked : undefined}
-          disabled={going}
-        >
-          <img src={galleryUrl(photo.thumbUrl)} alt={photo.caption || tx("Foto do acampamento")} loading="lazy" draggable={false} />
-          {/* a picked photo carries its tick; there is no always-on checkbox to hunt for */}
-          {picked && <span className="gallery-tile__tick" aria-hidden="true">✓</span>}
-        </button>
-        {/* mouse only (hidden on touch, where the hold does this): the selection tick */}
-        <button
-          type="button"
-          className={`gallery-tile__pick ${picked ? "gallery-tile__pick--on" : ""}`}
-          onClick={() => toggleOne(photo.id)}
-          aria-pressed={picked}
-          aria-label={picked ? tx("Desmarcar foto") : tx("Selecionar foto")}
-        >
-          {picked ? "✓" : ""}
-        </button>
-      </div>
-    );
-  };
+  async function moveSelected(eventId: string | null) {
+    const ids = [...selected];
+    setMoveOpen(false);
+    await run(async () => {
+      const n = await movePhotos(token, ids, eventId);
+      endSelection();
+      return tx("{n} foto(s) mudaram de momento.", { n });
+    });
+  }
 
-  const grid = (list: GalleryPhoto[], section: Section) => (
-    <div
-      className={`gallery-grid ${dropAt?.key === section.key ? "gallery-grid--target" : ""}`}
-      onDragOver={(e) => overTile(e, section, list.length)}
-      onDrop={(e) => void dropMove(e, section, list.length)}
-    >
-      {list.map((p, i) => tile(p, list, i, section))}
-    </div>
-  );
-
-  const current = lightbox ? lightbox.list[lightbox.index] ?? null : null;
-  usePeopleVersion();
-  useEffect(() => {
-    if (current?.byPersonId) requestNames([current.byPersonId]);
-  }, [current?.byPersonId]);
-  const currentEvent = current?.eventId ? eventById.get(current.eventId) : undefined;
+  const shown = parentMode && kid !== "all" ? kidPhotos ?? [] : null;
 
   return (
-    <div className="admin-page admin-page--wide">
-      {/* rendered at the document root, like Dialog: an ancestor with a transform
-          or filter would otherwise anchor the fixed backdrop to the page box */}
-      {dragging && !parentMode &&
-        createPortal(
-          <div className="gallery-drop" aria-hidden="true">
-            <span className="gallery-drop__box"><img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" /> {tx("Solte as fotos aqui")}</span>
-          </div>,
-          document.body,
-        )}
-      <header className="admin-head">
-        <h1 className="admin-title">
-          <img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" />
-          {tx("Fotos")}
-        </h1>
-        {(canManage || selected.size > 0 || (visible.length > 0 && !parentLocked)) && (
-        <div className="admin-head__actions admin-head__actions--icons">
-          {/* parents: the whole filtered set after a search, or only what they ticked */}
-          {visible.length > 0 && (selected.size > 0 || !parentLocked) && (
-            <button
-              type="button"
-              className="button button--secondary admin-head__new"
-              onClick={() => void startDownload(selected.size > 0 ? selectedPhotos : visible, selected.size > 0 ? tx("selecionadas") : viewLabel())}
-              disabled={dlRunning}
-              title={
-                selected.size > 0
-                  ? tx("Baixar as {n} fotos selecionadas", { n: selected.size })
-                  : zipsDownloads()
-                    ? tx("Baixar estas fotos em um .zip")
-                    : tx("Baixar estas fotos, uma a uma")
-              }
-            >
-              <DownloadGlyph /> <span className="admin-head__action-label">{selected.size > 0 ? tx("Baixar ({n})", { n: selected.size }) : tx("Baixar")}</span>
-            </button>
-          )}
-          {canManage && (
-            <>
-              <input ref={fileInput} type="file" accept="image/*,.zip,application/zip" multiple hidden onChange={(e) => void handlePicked(e.target.files)} />
-              {/* while the panel is open it IS the upload affordance — no duplicate button */}
-              {!panelOpen && (
-                <button type="button" className="button button--secondary admin-head__new" onClick={() => setPickerOpen(true)}>
-                  <UploadGlyph /> <span className="admin-head__action-label">{tx("Enviar fotos")}</span>
-                </button>
-              )}
-              {/* the switch only makes sense once the album has something to show */}
-              {/* phones: the switch becomes a globe — filled green while the album is out, outlined while it is not */}
-              {photos.length > 0 && (phone ? (
-                <button
-                  type="button"
-                  className={`icon-btn album-globe ${anyPublished ? "album-globe--on" : ""}`}
-                  role="switch"
-                  aria-checked={anyPublished}
-                  title={anyPublished ? tx("Álbum publicado — os pais veem as fotos") : tx("Álbum não publicado")}
-                  aria-label={anyPublished ? tx("Álbum publicado — tocar para despublicar") : tx("Álbum não publicado — tocar para publicar")}
-                  disabled={albumBusy}
-                  onClick={() => void toggleAlbum(!anyPublished)}
-                >
-                  <svg className="album-globe__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M3 12h18" />
-                    <path d="M12 3c2.5 2.6 3.8 5.7 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z" />
-                  </svg>
-                </button>
-              ) : (
-                <Toggle checked={anyPublished} onChange={(next) => void toggleAlbum(next)} disabled={albumBusy} label={tx("Publicadas")} />
-              ))}
-            </>
-          )}
+    <div className={css.page}>
+      <header className={css.head}>
+        <img className={css.headIcon} src={ICONS.camera} alt="" aria-hidden="true" />
+        <div className={css.headText}>
+          <h1 className={css.title}>{album?.name ?? tx("Fotos")}</h1>
+          {album?.readable && <p className="cat-hint">{tx("As fotos de cada momento aparecem na ordem em que foram tiradas.")}</p>}
         </div>
-        )}
       </header>
-      <p className="admin-intro">{parentMode ? tx("Todas as fotos do acampamento. Uma foto do seu filho filtra as dele — e não fica salva.") : tx("Os momentos do acampamento para pais e equipe")}</p>
 
-      {parentMode && (
-        <section className={`face-search${dragging ? " face-search--over" : ""}${cameraOpen ? " face-search--live" : ""}`}>
-          <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => void handleReference(e.target.files?.[0] ?? null)} />
-          <input ref={referenceInput} type="file" accept="image/*" hidden onChange={(e) => void handleReference(e.target.files?.[0] ?? null)} />
-          <div className="face-search__shot">
-            {/* always mounted: iPhone only plays a stream attached in the same tap */}
-            <video ref={videoRef} className="face-search__video" playsInline muted autoPlay />
-            {!cameraOpen && (referencePreview
-              ? <img className="face-search__preview" src={referencePreview} alt={tx("Foto de referência")} />
-              : <img className="face-search__icon" src={ICONS.takingPhoto} alt="" aria-hidden="true" />)}
-            {cameraStarting && <span className="face-search__spinner" aria-hidden="true" />}
-          </div>
-          <div className="face-search__body">
-            {/* the copy follows the state: asking for a picture → aiming the camera →
-                a search is already on (the picture is right there, so "mande uma foto"
-                would make no sense any more) */}
-            <h2 className="face-search__title">
-              {cameraOpen ? tx("Enquadre o rosto e fotografe") : matchedIds ? tx("Mostrando as fotos do seu filho") : tx("Encontre as fotos do seu filho")}
-            </h2>
-            {!cameraOpen && (
-              <p className="cat-hint">
-                {dragging ? tx("Solte a foto aqui.") : matchedIds ? tx("Não deu certo? Tente novamente.") : tx("Mande uma foto do seu filho para filtrar as dele.")}
-              </p>
-            )}
-            <div className="face-search__actions">
-              {/* PHONES ONLY (hidden by CSS above 700px): with a search on, three
-                  buttons never fit on one line, so the two “how to search” ones
-                  collapse into “Tentar de novo”, repeating whichever was used
-                  last. The desktop row below is untouched. */}
-              {matchedIds && !cameraOpen && (
-                <button
-                  type="button"
-                  className="button button--primary face-search__retry"
-                  onClick={() => (lastSource === "camera" ? void openCamera() : referenceInput.current?.click())}
-                  disabled={faceSearching || !anyPublished || cameraStarting}
-                  title={lastSource === "camera" ? tx("Fotografar de novo") : tx("Escolher outra foto")}
-                >
-                  {faceSearching ? tx("Procurando…") : cameraStarting ? tx("Abrindo…") : tx("Tentar de novo")}
-                </button>
-              )}
-              <button
-                type="button"
-                className={`button button--primary ${matchedIds ? "face-search__again" : ""}`}
-                onClick={() => { setLastSource("camera"); void openCamera(); }}
-                disabled={faceSearching || !anyPublished || cameraStarting}
-              >
-                {faceSearching ? tx("Procurando…") : cameraOpen ? tx("Fotografar") : cameraStarting ? tx("Abrindo…") : tx("Abrir câmera")}
-              </button>
-              {cameraOpen ? (
-                <button type="button" className="button button--secondary" onClick={stopCamera}>
-                  {tx("Cancelar")}
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={`button button--secondary ${matchedIds ? "face-search__again" : ""}`}
-                    onClick={() => { setLastSource("file"); referenceInput.current?.click(); }}
-                    disabled={faceSearching || !anyPublished}
-                  >
-                    {matchedIds ? tx("Escolher outra") : tx("Escolher foto")}
-                  </button>
-                  {matchedIds && (
-                    <button type="button" className="button button--secondary" onClick={clearSearch} disabled={faceSearching}>
-                      {tx("Ver todas")}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            {!anyPublished && <p className="cat-hint">{tx("As fotos ainda não foram publicadas.")}</p>}
-          </div>
-        </section>
+      {error && (
+        <p className={`cat-hint cat-hint--error ${css.message}`} role="alert">
+          {error}
+        </p>
       )}
-
-      {error && <p className="message message--error">{error}</p>}
-
-      {/* open on request, and always while the album is empty (nothing else to do here) */}
-      {panelOpen && (
-        <section className="gallery-upload gallery-upload--picker">
-          <div className="gallery-upload__head">
-            <h2 className="gallery-upload__title"><img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" /> {tx("Arraste as fotos para cá")}</h2>
-            {/* with an empty album there is nothing to go back to */}
-            {photos.length > 0 && (
-              <button type="button" className="gallery-upload__close" onClick={() => setPickerOpen(false)}>
-                {tx("Fechar")}
-              </button>
-            )}
-          </div>
-          <p className="cat-hint">{tx("Solte as fotos (ou uma pasta / .zip) em qualquer lugar da página — ou escolha no aparelho.")}</p>
-          <div className="gallery-picker__row">
-            {/* where the photos land: the chosen event travels with every upload */}
-            <button type="button" className="field-btn" onClick={() => setEventPickOpen(true)}>
-              <span className="field-btn__label">{tx("Evento")}</span>
-              <span className="field-btn__value">
-                {uploadEvent ? `${uploadEvent.emoji || "📅"} ${uploadEvent.title}` : tx("🏕️ Fotos do acampamento")}
-              </span>
-            </button>
-            <button type="button" className="button button--primary" onClick={() => fileInput.current?.click()}>
-              {tx("Escolher fotos")}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {jobs && (
-        <section className={`gallery-upload ${!sending ? "gallery-upload--done" : ""} ${leaving ? "gallery-upload--leaving" : ""}`} aria-live="polite">
-          <div className="gallery-upload__head">
-            {!sending && (
-              /* the ring draws itself, then the tick is stroked on */
-              <svg className={`up-check ${failedCount > 0 ? "up-check--warn" : ""}`} viewBox="0 0 52 52" aria-hidden="true">
-                <circle className="up-check__circle" cx="26" cy="26" r="23" />
-                <path className="up-check__tick" d="M15 27 l8 8 l15 -16" />
-              </svg>
-            )}
-            {sending ? (
-              <h2 className="gallery-upload__title">{tx("Enviando {done} de {total}…", { done: doneCount, total: jobs.length })}</h2>
-            ) : failedCount > 0 ? (
-              <h2 className="gallery-upload__title">{failedCount === 1 ? tx("Envio concluído com {n} erro", { n: failedCount }) : tx("Envio concluído com {n} erros", { n: failedCount })}</h2>
-            ) : (
-              <h2 className="gallery-upload__title">{jobs.length === 1 ? tx("{n} foto enviada", { n: jobs.length }) : tx("{n} fotos enviadas", { n: jobs.length })}</h2>
-            )}
-            {sending && <span className="gallery-upload__pct">{progress}%</span>}
-          </div>
-
-          <div className="up-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-            <div className={`up-bar__fill ${!sending && failedCount === 0 ? "up-bar__fill--ok" : ""}`} style={{ width: `${progress}%` }} />
-          </div>
-
-          {/* only the failures stay listed: a wall of green ticks says nothing */}
-          {failedCount > 0 && (
-            <ul className="gallery-upload__list">
-              {jobs
-                .filter((j) => j.state === "error")
-                .map((j, i) => (
-                  <li key={i} className="gallery-upload__item gallery-upload__item--err">
-                    ❌ {j.name}
-                    {j.error ? ` — ${j.error}` : ""}
-                  </li>
-                ))}
-            </ul>
-          )}
-
-          {!sending && (
-            <button type="button" className="gallery-upload__close" onClick={() => setLeaving(true)}>
-              {tx("Fechar")}
-            </button>
-          )}
-        </section>
-      )}
-
-      {/* download progress — same card, same place as the upload one */}
-      {dl && (
-        <section className={`gallery-upload ${dl.state !== "running" ? "gallery-upload--done" : ""} ${dlLeaving ? "gallery-upload--leaving" : ""}`} aria-live="polite">
-          <div className="gallery-upload__head">
-            {dl.state === "done" && (
-              <svg className={`up-check ${dl.failed > 0 ? "up-check--warn" : ""}`} viewBox="0 0 52 52" aria-hidden="true">
-                <circle className="up-check__circle" cx="26" cy="26" r="23" />
-                <path className="up-check__tick" d="M15 27 l8 8 l15 -16" />
-              </svg>
-            )}
-            {dl.state === "running" ? (
-              <h2 className="gallery-upload__title">{dl.zipping ? tx("Montando o arquivo .zip…") : tx("Baixando {done} de {total}…", { done: dl.done, total: dl.total })}</h2>
-            ) : dl.state === "stopped" ? (
-              <h2 className="gallery-upload__title">{tx("Download interrompido — {done} de {total}", { done: dl.done, total: dl.total })}</h2>
-            ) : dl.state === "error" ? (
-              <h2 className="gallery-upload__title">{tx("Não consegui baixar as fotos")}</h2>
-            ) : dl.failed > 0 ? (
-              <h2 className="gallery-upload__title">{dl.failed === 1 ? tx("Download concluído com {n} erro", { n: dl.failed }) : tx("Download concluído com {n} erros", { n: dl.failed })}</h2>
-            ) : (
-              <h2 className="gallery-upload__title">{dl.total === 1 ? tx("{n} foto baixada", { n: dl.total }) : tx("{n} fotos baixadas", { n: dl.total })}</h2>
-            )}
-            {dl.state === "running" && <span className="gallery-upload__pct">{dlProgress}%</span>}
-            {/* stopping mid-run keeps whatever already landed */}
-            {dl.state === "running" && (
-              <button type="button" className="button button--secondary gallery-upload__stop" onClick={() => dlAbort.current?.abort()}>
-                {tx("Parar")}
-              </button>
-            )}
-          </div>
-
-          <div className="up-bar" role="progressbar" aria-valuenow={dlProgress} aria-valuemin={0} aria-valuemax={100}>
-            <div className={`up-bar__fill ${dl.state === "done" && dl.failed === 0 ? "up-bar__fill--ok" : ""}`} style={{ width: `${dlProgress}%` }} />
-          </div>
-
-          {dl.state === "error" && dl.error && <p className="gallery-upload__item gallery-upload__item--err">❌ {dl.error}</p>}
-          {dl.state !== "error" && dl.failed > 0 && (
-            <p className="gallery-upload__item gallery-upload__item--err">
-              ❌ {dl.failed === 1 ? tx("{n} foto não pôde ser baixada", { n: dl.failed }) : tx("{n} fotos não puderam ser baixadas", { n: dl.failed })}
-            </p>
-          )}
-          {dl.state === "running" && !dl.zip && <p className="cat-hint">{tx("Salvando uma foto de cada vez — mantenha esta tela aberta.")}</p>}
-
-          {dl.state !== "running" && (
-            <button type="button" className="gallery-upload__close" onClick={() => setDlLeaving(true)}>
-              {tx("Fechar")}
-            </button>
-          )}
-        </section>
-      )}
-
-      {parentMode && matchedIds && (
-        <p className="face-search__result">
-          {photos.length === 1 ? tx("{n} foto com o seu filho", { n: photos.length }) : tx("{n} fotos com o seu filho", { n: photos.length })}
-          {facePending > 0 ? ` · ${facePending === 1 ? tx("{n} ainda sendo analisada", { n: facePending }) : tx("{n} ainda sendo analisadas", { n: facePending })}` : ""}
+      {notice && (
+        <p className={`cat-hint ${css.message} ${css.notice}`} role="status">
+          {notice}
         </p>
       )}
 
-      {!parentMode && photos.length > 0 && (
-        <nav className="cat-tabs" aria-label={tx("Filtrar fotos")}>
-          {chip("all", tx("Todas"), photos.length)}
-          {/* same order as the sections: programme order, sem evento no fim */}
-          {eventSections.map(({ event, count }) => chip({ event: event.id }, <>{event.emoji || "📅"} {event.title}</>, count))}
-          {generalCount > 0 && chip("general", tx("🏕️ Gerais"), generalCount)}
-        </nav>
+      {!state && !error && (
+        <div className={css.grid} aria-busy="true" aria-label={tx("Carregando…")}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <span key={i} className={css.skeleton} />
+          ))}
+        </div>
       )}
 
-      {/* the marquee reads the tiles inside this container */}
-      {/* --selecting swaps the tile cursors: a click now picks instead of zooming */}
-      <div className={`gallery-surface ${selected.size > 0 ? "gallery-surface--selecting" : ""}`} ref={marquee.containerRef} {...marquee.handlers}>
-        {photos.length === 0 ? (
-          <div className="admin-empty">
-            <img className="admin-empty__icon admin-empty__icon--lg" src={ICONS.noPhotos} alt="" aria-hidden="true" />
-            <p>
-              {parentMode && matchedIds
-                ? tx("Não encontramos o seu filho. Tente outra foto, de frente e com boa luz — ou veja o álbum inteiro.")
-                : canManage
-                  ? tx("Nenhuma foto ainda — arraste as fotos para cá para começar.")
-                  : tx("Ainda não há fotos. Os fotógrafos estão capturando os melhores momentos!")}
-            </p>
-            {parentMode && matchedIds && facePending > 0 && <p className="cat-hint">{facePending === 1 ? tx("{n} foto ainda está sendo analisada.", { n: facePending }) : tx("{n} fotos ainda estão sendo analisadas.", { n: facePending })}</p>}
-          </div>
-        ) : visible.length === 0 ? (
-          <p className="opt-empty">{tx("Nenhuma foto aqui.")}</p>
-        ) : groups ? (
-          groups.map((g) => (
-            <section key={g.key} className={`gallery-group ${dropAt?.key === g.key ? "gallery-group--target" : ""}`}>
-              <header className="room-group__head gallery-group__head">
-                <h2 className="room-group__title room-group__title--green">
-                  {g.emoji} {g.title}
-                  {g.key.startsWith("event:") && eventById.get(g.key.slice(6)) && <span className="gallery-group__date"> · {speakDay(eventById.get(g.key.slice(6))!.date, "month")}</span>}
-                </h2>
-                {selectAllBox(g.photos, g.key)}
-              </header>
-              {grid(g.photos, g)}
-            </section>
-          ))
-        ) : (
-          <section className="gallery-group">
-            <header className="room-group__head gallery-group__head">
-              <h2 className="room-group__title room-group__title--green">
-                {flatSection.emoji} {flatSection.title}
-              </h2>
-              {selectAllBox(visible, flatSection.key)}
-            </header>
-            {grid(visible, flatSection)}
-          </section>
-        )}
-      </div>
+      {state && !state.edition && <Empty icon={ICONS.noPhotos} text={tx("Este acampamento ainda não tem edição no IPAlpha. O álbum começa quando ela existir.")} />}
 
-      {/* the rubber band itself (fixed to the viewport, like the drop overlay) */}
-      {marquee.rect && createPortal(<div className="gallery-marquee" style={marquee.rect} aria-hidden="true" />, document.body)}
+      {state?.edition && !album && (manage ? <CreateAlbum token={token} onCreated={() => setReload((n) => n + 1)} /> : <Empty icon={ICONS.noPhotos} text={tx("O álbum deste acampamento ainda não começou. Assim que a equipe enviar as fotos, elas aparecem aqui.")} />)}
 
-      <PageFooter className={!parentMode && !canManage ? "footer-note--gallery-publish" : undefined}>
-        {parentMode ? (
-          <><img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" /> {tx("Sua foto de referência não fica salva.")}</>
-        ) : canManage ? (
-          <><img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" /> {tx("Ao ligar Publicadas, pais e equipe veem na hora.")}</>
-        ) : (
-          <><img className="admin-title__icon" src={ICONS.camera} alt="" aria-hidden="true" /> {tx("Novas fotos aparecem aqui assim que o fotógrafo publica.")}</>
-        )}
-      </PageFooter>
-
-      {/* the photo itself: a card on a computer, a bottom sheet on phones */}
-      <Dialog open={!!current} onClose={() => setLightbox(null)} title={tx("Foto")} width={860} className="photo-sheet-dialog">
-        {current && (
-          <div className="lightbox" onTouchStart={swipeStart} onTouchEnd={swipeEnd}>
-            <span className="lightbox__handle" aria-hidden="true" />
-            <img className="lightbox__img" src={galleryUrl(current.url)} alt={current.caption || tx("Foto do acampamento")} />
-            <div className="lightbox__nav">
-              <button type="button" className="icon-btn icon-btn--lg" onClick={() => step(-1)} aria-label={tx("Foto anterior")} disabled={lightbox!.list.length < 2}>
-                ◀
-              </button>
-              <span className="lightbox__count">
-                {tx("{n} de {total}", { n: lightbox!.index + 1, total: lightbox!.list.length })}
-              </span>
-              <button type="button" className="icon-btn icon-btn--lg" onClick={() => step(1)} aria-label={tx("Próxima foto")} disabled={lightbox!.list.length < 2}>
-                ▶
-              </button>
-            </div>
-            {current.caption && <p className="lightbox__caption">{current.caption}</p>}
-            <p className="lightbox__meta">
-              {currentEvent ? `${currentEvent.emoji || "📅"} ${currentEvent.title} · ` : ""}
-              {tx("por {name}", { name: personInfo(current.byPersonId)?.name || "—" })} · {speakDay(dayKey(current.createdAt), "month")}
-            </p>
-
-            {/* carousel: every photo of the set, the open one highlighted */}
-            {lightbox!.list.length > 1 && (
-              <div className="lb-reel" role="tablist" aria-label={tx("Fotos")}>
-                {lightbox!.list.map((p, i) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={i === lightbox!.index}
-                    aria-label={p.caption || tx("Foto {n}", { n: i + 1 })}
-                    className={`lb-reel__item ${i === lightbox!.index ? "lb-reel__item--on" : ""}`}
-                    // keeps the open photo in view as the user steps with the arrows / keyboard
-                    ref={i === lightbox!.index ? (el) => el?.scrollIntoView({ block: "nearest", inline: "center" }) : undefined}
-                    onClick={() => setLightbox((lb) => (lb ? { ...lb, index: i } : lb))}
-                  >
-                    <img src={galleryUrl(p.thumbUrl)} alt="" loading="lazy" draggable={false} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </Dialog>
-
-      {/* where new photos land — the programme in the order it happens */}
-      <EventPickerDialog
-        open={eventPickOpen}
-        events={events}
-        selectedId={uploadEventId}
-        onClose={() => setEventPickOpen(false)}
-        onPick={(id) => {
-          setUploadEventId(id);
-          setEventPickOpen(false);
-        }}
-      />
-
-      {/* bulk move: pick the event the whole selection goes to */}
-      <Dialog open={moveOpen} onClose={() => setMoveOpen(false)} title={tx("Mover fotos")} width={520}>
-        <div className="cat-form cat-form--embedded">
-          <h2 className="cat-form__title">{selected.size === 1 ? tx("Mover {n} foto para", { n: selected.size }) : tx("Mover {n} fotos para", { n: selected.size })}</h2>
-          <div className="gallery-move">
-            <button type="button" className="gallery-move__item" disabled={bulkBusy} onClick={() => void bulkMove(null)}>
-              {tx("🏕️ Fotos do acampamento")} <span className="gallery-move__hint">{tx("sem evento")}</span>
-            </button>
-            {[...events]
-              .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime))
-              .map((e) => (
-                <button key={e.id} type="button" className="gallery-move__item" disabled={bulkBusy} onClick={() => void bulkMove(e.id)}>
-                  {e.emoji || "📅"} {e.title} <span className="gallery-move__hint">{speakDay(e.date, "month")}</span>
+      {album && !album.readable && (
+        <section className={css.card}>
+          {manage ? (
+            <>
+              <p>{tx("O álbum foi criado e ainda não foi publicado. Até lá, só quem envia as fotos vê o álbum — por aqui ele aparece quando for publicado.")}</p>
+              <div className={css.actions}>
+                <Uploader token={token} disabled={busy} onDone={(msg) => { setNotice(msg); setReload((n) => n + 1); }} onError={setError} />
+                <button type="button" className="button button--primary" disabled={busy} onClick={() => run(async () => { await updateAlbum(token, { published: true }); return tx("Álbum publicado. As famílias e a equipe já podem ver as fotos."); })}>
+                  {tx("Publicar o álbum")}
                 </button>
-              ))}
+              </div>
+            </>
+          ) : (
+            <Empty icon={ICONS.noPhotos} text={tx("As fotos ainda não foram publicadas. Assim que a equipe publicar, elas aparecem aqui.")} />
+          )}
+        </section>
+      )}
+
+      {album?.readable && manage && (
+        <section className={`${css.card} ${css.toolbar}`}>
+          <div className={css.publish}>
+            <Toggle checked={album.published} disabled={busy} label={tx("Álbum publicado")} onChange={(on) => run(async () => { await updateAlbum(token, { published: on }); return on ? tx("Álbum publicado. As famílias e a equipe já podem ver as fotos.") : tx("Álbum guardado. Agora só quem envia as fotos vê o álbum; as famílias veem quando você publicar de novo."); })} />
+            <small className="cat-hint">{tx("Publicado: as famílias e a equipe veem as fotos.")}</small>
           </div>
-          {events.length === 0 && <p className="cat-hint">{tx("Nenhum evento na programação ainda.")}</p>}
-          <div className="cat-form__actions">
-            <button type="button" className="button button--secondary" onClick={() => setMoveOpen(false)} disabled={bulkBusy}>
-              {tx("Cancelar")}
+          <div className={css.actions}>
+            <Uploader token={token} disabled={busy} onDone={(msg) => { setNotice(msg); setReload((n) => n + 1); }} onError={setError} />
+            <button type="button" className="button button--secondary" aria-expanded={momentsOpen} onClick={() => setMomentsOpen((o) => !o)}>
+              {tx("Momentos do álbum")}
+            </button>
+            <button type="button" className="button button--secondary" aria-pressed={selecting} onClick={() => (selecting ? endSelection() : setSelecting(true))}>
+              {selecting ? tx("Concluir") : tx("Organizar fotos")}
             </button>
           </div>
+          <div className={`${css.fold} ${momentsOpen ? css.foldOpen : ""}`}>
+            <div className={css.foldInner}>{momentsOpen && <Moments token={token} events={album.events} onChanged={(msg) => { if (msg) setNotice(msg); setReload((n) => n + 1); }} onError={setError} />}</div>
+          </div>
+        </section>
+      )}
+
+      {album?.readable && parentMode && <KidFinder value={kid} onChange={(k) => { setKid(k); setKidPhotos(null); setError(null); }} />}
+
+      {album?.readable && shown && (
+        <section className={css.section} aria-busy={kidBusy}>
+          {kidBusy && !kidPhotos ? (
+            <div className={css.grid}>
+              {Array.from({ length: 4 }, (_, i) => (
+                <span key={i} className={css.skeleton} />
+              ))}
+            </div>
+          ) : shown.length === 0 ? (
+            <Empty icon={ICONS.takingPhoto} text={tx("Ainda não encontramos fotos por aqui. As fotos chegam aos poucos, conforme a equipe envia e organiza o álbum — volte daqui a pouco.")} />
+          ) : (
+            <>
+              <SectionHead title={tx("Fotos encontradas")} count={shown.length} token={token} photos={shown} />
+              <Grid token={token} photos={shown} onOpen={(i) => setViewer({ list: shown, index: i })} />
+            </>
+          )}
+        </section>
+      )}
+
+      {album?.readable && !shown && (
+        <>
+          {sections.length === 0 && <Empty icon={ICONS.noPhotos} text={manage ? tx("Ainda não há fotos. Envie as primeiras — cada uma vai para o momento em que foi tirada.") : tx("Ainda não há fotos. Os fotógrafos estão registrando os melhores momentos!")} />}
+          {sections.map((s) => (
+            <section key={s.key} className={css.section} aria-label={s.title}>
+              <SectionHead title={s.title} when={s.when} linked={s.linked} count={s.photos.length} token={token} photos={s.photos} />
+              {s.photos.length === 0 ? (
+                <p className="cat-hint">{tx("Nenhuma foto neste momento ainda.")}</p>
+              ) : (
+                <Grid token={token} photos={s.photos} selecting={selecting} selected={selected} onToggle={toggle} onOpen={(i) => setViewer({ list: s.photos, index: i })} />
+              )}
+            </section>
+          ))}
+        </>
+      )}
+
+      {selecting && selected.size > 0 && (
+        <div className={css.bulk} role="toolbar" aria-label={tx("Fotos escolhidas")}>
+          <span>{tx("{n} foto(s) escolhida(s)", { n: selected.size })}</span>
+          <button type="button" className="button button--secondary" disabled={busy} onClick={() => setMoveOpen(true)}>
+            {tx("Mudar de momento")}
+          </button>
+          <button type="button" className="button button--danger" disabled={busy} onClick={removeSelected}>
+            {tx("Tirar do álbum")}
+          </button>
         </div>
+      )}
+
+      <Dialog open={moveOpen} onClose={() => setMoveOpen(false)} title={tx("Para qual momento?")} width={460} className="sheet-dialog">
+        <OptionCards<string>
+          label={tx("Para qual momento?")}
+          value={null}
+          disabled={busy}
+          options={[
+            ...(album?.events ?? []).map((e) => ({ key: e.id, icon: ICONS.schedule, title: e.name })),
+            { key: "", icon: ICONS.camera, title: tx("Fotos para organizar") },
+          ]}
+          onChange={(key) => void moveSelected(key || null)}
+        />
       </Dialog>
 
+      <Viewer token={token} state={viewer} onClose={() => setViewer(null)} onMove={(index) => setViewer((v) => (v ? { ...v, index } : v))} />
     </div>
   );
 }
 
-function cameraErrorText(err: unknown, tx: (pt: string, vars?: Record<string, string | number>) => string): string {
-  const name = typeof err === "object" && err && "name" in err ? String((err as { name: unknown }).name) : "";
-  if (name === "NotAllowedError") return tx("Permita o acesso à câmera nas configurações do iPhone e tente novamente.");
-  if (name === "NotFoundError") return tx("Nenhuma câmera foi encontrada neste aparelho.");
-  if (name === "NotReadableError") return tx("A câmera está sendo usada por outro aplicativo.");
-  if (!window.isSecureContext) return tx("A câmera só funciona em uma conexão segura (HTTPS).");
-  return tx("Não foi possível abrir a câmera. Confira a permissão e tente novamente.");
+function Empty({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className={css.empty}>
+      <img src={icon} alt="" aria-hidden="true" />
+      <p>{text}</p>
+    </div>
+  );
 }
 
-interface EventPickerDialogProps {
-  open: boolean;
-  events: CampEvent[];
-  /** null = the general "camp photos" bucket */
-  selectedId: string | null;
-  onClose: () => void;
-  onPick: (id: string | null) => void;
-}
+/** The edition's album: the camp days (pre-filled from the programme) and whether it opens to everyone at once. */
+function CreateAlbum({ token, onCreated }: { token: string; onCreated: () => void }) {
+  const { tx, te } = useI18n();
+  const events = useCollectionOrEmpty("events");
+  const days = events.map((e) => e.date).filter(Boolean).sort();
+  const [from, setFrom] = useState(days[0] ?? "");
+  const [until, setUntil] = useState(days[days.length - 1] ?? "");
+  // new albums start unpublished: the uploaders work on it first, the families see it after "Publicar o álbum"
+  const [publish, setPublish] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(until) && from <= until;
 
-/**
- * Chooses the event new photos belong to. A native <select> shows a bare list
- * of titles; the programme only makes sense with the day, the time and the
- * emoji, so this is a real dialog grouped by day, in the order things happen.
- * Day headers stick while that day's events scroll; the search stays put.
- */
-function EventPickerDialog({ open, events, selectedId, onClose, onPick }: EventPickerDialogProps) {
-  const { tx } = useI18n();
-  const [q, setQ] = useState("");
-  useEffect(() => {
-    if (open) setQ("");
-  }, [open]);
-  const collator = collatorLocale();
-  const query = q.trim().toLocaleLowerCase(collator);
-
-  /** chronological (the programme as it unfolds), grouped by day, filtered by search */
-  const days = useMemo(() => {
-    const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-    const match = (e: CampEvent) => {
-      if (!query) return true;
-      const day = speakDay(e.date).toLocaleLowerCase(collator);
-      const hay = `${e.emoji} ${e.title} ${e.startTime} ${e.endTime ?? ""} ${day}`;
-      return hay.toLocaleLowerCase(collator).includes(query);
-    };
-    const out: { date: string; events: CampEvent[] }[] = [];
-    for (const e of sorted) {
-      if (!match(e)) continue;
-      const last = out[out.length - 1];
-      if (last && last.date === e.date) last.events.push(e);
-      else out.push({ date: e.date, events: [e] });
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valid || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await createAlbum(token, { from, until, publish });
+      onCreated();
+    } catch (err) {
+      setError(te(err, "Não foi possível criar o álbum agora."));
+    } finally {
+      setBusy(false);
     }
-    return out;
-  }, [events, query, collator]);
-
-  const generalLabel = tx("fotos do acampamento");
-  const showGeneral = !query || generalLabel.toLocaleLowerCase(collator).includes(query) || tx("gerais").toLocaleLowerCase(collator).includes(query) || tx("sem evento").toLocaleLowerCase(collator).includes(query);
-  const empty = events.length === 0;
-  const noHits = !empty && !showGeneral && days.length === 0;
+  }
 
   return (
-    <Dialog open={open} onClose={onClose} title={tx("Escolher evento")} width={520} className="picker-sheet-dialog">
-      <div className="picker picker-sheet">
-        <header className="picker-sheet__head">
-          <span className="picker-sheet__handle" aria-hidden="true" />
-          <h2 className="cat-form__title">{tx("Onde entram as fotos?")}</h2>
-          <SearchField
-            placeholder={tx("Buscar evento, dia ou horário…")}
-            value={q}
-            onChange={setQ}
-            aria-label={tx("Buscar evento")}
-          />
-        </header>
-
-        <div className="picker-sheet__body">
-        <div className="ev-pick__list">
-          {showGeneral && (
-            <button type="button" className={`ev-pick__item ${selectedId === null ? "ev-pick__item--on" : ""}`} onClick={() => onPick(null)}>
-              <span className="ev-pick__emoji">🏕️</span>
-              <span className="ev-pick__body">
-                <span className="ev-pick__title">{tx("Fotos do acampamento")}</span>
-                <span className="ev-pick__meta">{tx("sem evento — momentos gerais")}</span>
-              </span>
-              {selectedId === null && <span className="ev-pick__check" aria-hidden="true">✓</span>}
-            </button>
-          )}
-
-          {days.map((day) => (
-            <div key={day.date} className="ev-pick__day">
-              <h3 className="ev-pick__dayhead">{speakDay(day.date)}</h3>
-              {day.events.map((e) => (
-                <button key={e.id} type="button" className={`ev-pick__item ${selectedId === e.id ? "ev-pick__item--on" : ""}`} onClick={() => onPick(e.id)}>
-                  <span className="ev-pick__emoji">{e.emoji || "📅"}</span>
-                  <span className="ev-pick__body">
-                    <span className="ev-pick__title">{e.title}</span>
-                    <span className="ev-pick__meta">
-                      {e.startTime}
-                      {e.endTime ? ` – ${e.endTime}` : ""}
-                    </span>
-                  </span>
-                  {selectedId === e.id && <span className="ev-pick__check" aria-hidden="true">✓</span>}
-                </button>
-              ))}
-            </div>
-          ))}
-
-          {empty && <p className="cat-hint">{tx("Nenhum evento na programação ainda — as fotos ficam como gerais.")}</p>}
-          {noHits && <p className="opt-empty">{tx("Nenhum evento encontrado.")}</p>}
-        </div>
-        </div>
-
-        <div className="cat-form__actions picker-sheet__actions">
-          <button type="button" className="button button--secondary" onClick={onClose}>
-            {tx("Cancelar")}
-          </button>
-        </div>
+    <form className={`${css.card} ${css.create}`} onSubmit={submit}>
+      <h2 className={css.cardTitle}>{tx("Criar o álbum do acampamento")}</h2>
+      <p className="cat-hint">{tx("Um álbum por ano, no IPAlpha. As fotos ficam guardadas lá; por aqui você envia e organiza.")}</p>
+      <div className={css.dates}>
+        <label className="cat-field">
+          <span className="cat-field__label">{tx("Primeiro dia")}</span>
+          <input className="cat-input" type="date" value={from} disabled={busy} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="cat-field">
+          <span className="cat-field__label">{tx("Último dia")}</span>
+          <input className="cat-input" type="date" value={until} min={from || undefined} disabled={busy} onChange={(e) => setUntil(e.target.value)} />
+        </label>
       </div>
+      <div className={css.publish}>
+        <Toggle checked={publish} disabled={busy} label={tx("Publicar já")} onChange={setPublish} />
+        <small className="cat-hint">{publish ? tx("As famílias e a equipe veem as fotos assim que chegam.") : tx("Só quem envia as fotos vê o álbum até você publicar. As famílias veem depois de “Publicar o álbum”.")}</small>
+      </div>
+      {error && (
+        <p className="cat-hint cat-hint--error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className={css.actions}>
+        <button type="submit" className="button button--primary" disabled={!valid || busy}>
+          {busy ? tx("Criando…") : tx("Criar o álbum")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** The album's moments: one per programme moment (helper), a free one, and taking an empty one away. */
+function Moments({ token, events, onChanged, onError }: { token: string; events: GalleryEvent[]; onChanged: (msg?: string) => void; onError: (msg: string) => void }) {
+  const { tx, te } = useI18n();
+  const confirm = useConfirm();
+  const [only, setOnly] = useState<"parents" | "all">("parents");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function act(fn: () => Promise<string | void>) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      onChanged((await fn()) ?? undefined);
+    } catch (e) {
+      onError(te(e, "Algo deu errado. Tente novamente."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={css.moments}>
+      <h2 className={css.cardTitle}>{tx("Um momento para cada momento da programação")}</h2>
+      <OptionCards<"parents" | "all">
+        label={tx("Quais momentos da programação?")}
+        value={only}
+        disabled={busy}
+        onChange={setOnly}
+        options={[
+          { key: "parents", icon: ICONS.parent, title: tx("Os que as famílias veem"), subtitle: tx("Os momentos da equipe ficam de fora do álbum.") },
+          { key: "all", icon: ICONS.schedule, title: tx("Todos os momentos"), subtitle: tx("O nome de cada momento aparece para as famílias no álbum.") },
+        ]}
+      />
+      <div className={css.actions}>
+        <button type="button" className="button button--primary" disabled={busy} onClick={() => act(async () => tx("{n} momento(s) criado(s).", { n: (await eventsFromProgramme(token, only)).created }))}>
+          {tx("Criar os momentos")}
+        </button>
+      </div>
+
+      <form
+        className={css.addMoment}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const clean = name.trim();
+          if (!clean) return;
+          void act(async () => {
+            await createGalleryEvent(token, { name: clean });
+            setName("");
+            return tx("Momento criado.");
+          });
+        }}
+      >
+        <label className="cat-field">
+          <span className="cat-field__label">{tx("Outro momento")}</span>
+          <input className="cat-input" value={name} maxLength={120} disabled={busy} placeholder={tx("Ex.: Fotos da equipe")} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <button type="submit" className="button button--secondary" disabled={busy || !name.trim()}>
+          {tx("Adicionar")}
+        </button>
+      </form>
+
+      {events.length > 0 && (
+        <ul className={css.momentList}>
+          {events.map((e) => (
+            <li key={e.id} className={css.moment}>
+              <img src={e.scheduleEntryId ? ICONS.schedule : ICONS.camera} alt="" aria-hidden="true" />
+              <span>
+                <strong>{e.name}</strong>
+                <small className="cat-hint">{e.scheduleEntryId ? tx("Segue o horário da programação") : tx("Momento livre")}</small>
+              </span>
+              <button
+                type="button"
+                className="icon-btn icon-btn--bare icon-btn--danger"
+                aria-label={tx("Tirar o momento {name}", { name: e.name })}
+                disabled={busy}
+                onClick={async () => {
+                  if (!(await confirm({ title: tx("Tirar o momento {name}?", { name: e.name }), message: tx("Só sai do álbum um momento sem fotos. A programação não muda."), confirmLabel: tx("Tirar") }))) return;
+                  void act(async () => {
+                    await deleteGalleryEvent(token, e.id);
+                    return tx("Momento tirado do álbum.");
+                  });
+                }}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Sends originals in batches (a .zip is opened on the device); camera time places each photo on its moment. */
+function Uploader({ token, disabled, onDone, onError }: { token: string; disabled: boolean; onDone: (msg: string) => void; onError: (msg: string) => void }) {
+  const { tx, te } = useI18n();
+  const input = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+
+  async function pick(e: ChangeEvent<HTMLInputElement>) {
+    const picked = [...(e.target.files ?? [])];
+    e.target.value = "";
+    if (picked.length === 0) return;
+    try {
+      const files: File[] = [];
+      for (const f of picked) files.push(...(isZip(f) ? await extractZipImages(f) : [f]));
+      const { batches, refused } = planBatches(files);
+      const total = batches.reduce((n, b) => n + b.length, 0);
+      setProgress({ done: 0, total });
+      let done = 0;
+      for (const batch of batches) {
+        await importBatch(token, batch);
+        done += batch.length;
+        setProgress({ done, total });
+      }
+      onDone(
+        refused.length > 0
+          ? tx("{n} foto(s) enviada(s). {m} arquivo(s) ficaram de fora (só JPG, PNG ou WebP de até 25 MB).", { n: done, m: refused.length })
+          : tx("{n} foto(s) enviada(s). Cada uma foi para o momento em que foi tirada.", { n: done }),
+      );
+    } catch (err) {
+      onError(te(err, "Não foi possível enviar as fotos."));
+    } finally {
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div className={css.uploader}>
+      <input ref={input} className={css.fileInput} type="file" multiple accept="image/jpeg,image/png,image/webp,.zip,application/zip" onChange={pick} aria-label={tx("Escolher fotos")} />
+      <button type="button" className="button button--primary" disabled={disabled || !!progress} onClick={() => input.current?.click()}>
+        {progress ? tx("Enviando…") : tx("Enviar fotos")}
+      </button>
+      {progress && (
+        <div className={css.progress} role="status">
+          <progress max={progress.total} value={progress.done} />
+          <small className="cat-hint">{tx("{done} de {total} foto(s)", { done: progress.done, total: progress.total })}</small>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A family picks one of their own children (cards) — or the whole album. */
+function KidFinder({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+  const { tx } = useI18n();
+  const kids = useCollectionOrEmpty("campers");
+  if (kids.length === 0) return null;
+  return (
+    <section className={`${css.card} ${css.finder}`}>
+      <h2 className={css.cardTitle}>{tx("Encontrar as fotos das crianças sob seus cuidados")}</h2>
+      <OptionCards<string>
+        row
+        label={tx("Quem você quer encontrar?")}
+        value={value}
+        onChange={onChange}
+        options={[
+          { key: "all", icon: ICONS.camera, title: tx("Todo o álbum") },
+          ...kids.map((k) => ({ key: k.id, icon: k.sex === "F" ? ICONS.girlFace : k.sex === "M" ? ICONS.boyFace : ICONS.camper, title: k.nickname || k.name || tx("Carregando nome…") })),
+        ]}
+      />
+    </section>
+  );
+}
+
+function SectionHead({ title, when, linked, count, token, photos }: { title: string; when?: string | null; linked?: boolean; count: number; token: string; photos: GalleryPhoto[] }) {
+  const { tx } = useI18n();
+  const [state, setState] = useState<{ done: number; total: number } | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+
+  async function download() {
+    if (state) {
+      abort.current?.abort();
+      return;
+    }
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    setState({ done: 0, total: photos.length });
+    try {
+      await downloadPhotos(
+        photos.map((p, i) => ({ url: p.originalUrl, folder: "", name: `${String(i + 1).padStart(3, "0")}`, createdAt: p.takenAt ?? p.createdAt ?? new Date().toISOString() })),
+        { signal: ctrl.signal, token, zipName: `${title}.zip`, onProgress: (p) => setState({ done: p.done, total: p.total }) },
+      );
+    } catch (err) {
+      if (!isAbort(err)) throw err;
+    } finally {
+      setState(null);
+    }
+  }
+
+  return (
+    <div className={css.sectionHead}>
+      <div>
+        <h2 className={css.sectionTitle}>{title}</h2>
+        {(when || linked) && <small className="cat-hint">{[when, linked ? tx("da programação") : null].filter(Boolean).join(" · ")}</small>}
+      </div>
+      <span className={css.count}>{tx("{n} foto(s)", { n: count })}</span>
+      {count > 0 && (
+        <button type="button" className="icon-btn icon-btn--bare" aria-label={state ? tx("Parar o download") : tx("Baixar as fotos de {title}", { title })} onClick={() => void download().catch(() => setState(null))}>
+          {state ? `${state.done}/${state.total}` : "⬇"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Grid({ token, photos, selecting = false, selected, onToggle, onOpen }: { token: string; photos: GalleryPhoto[]; selecting?: boolean; selected?: Set<string>; onToggle?: (id: string) => void; onOpen: (index: number) => void }) {
+  const { tx } = useI18n();
+  return (
+    <ul className={css.grid}>
+      {photos.map((p, i) => {
+        const on = !!selected?.has(p.id);
+        return (
+          <li key={p.id} className={css.cell}>
+            <button
+              type="button"
+              className={`${css.tile} ${on ? css.tileOn : ""}`}
+              aria-pressed={selecting ? on : undefined}
+              aria-label={selecting ? tx("Escolher a foto {n}", { n: i + 1 }) : tx("Abrir a foto {n}", { n: i + 1 })}
+              onClick={() => (selecting ? onToggle?.(p.id) : onOpen(i))}
+            >
+              <PhotoImage token={token} path={p.thumbUrl} />
+              {selecting && <span className={css.check} aria-hidden="true">{on ? "✓" : ""}</span>}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** One variant, fetched with the session when it scrolls near the screen; fades in once loaded. */
+export function PhotoImage({ token, path, alt = "" }: { token: string; path: string; alt?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [near, setNear] = useState(false);
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setNear(true), { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!near) return;
+    let alive = true;
+    setFailed(false);
+    photoObjectUrl(token, path)
+      .then((url) => alive && setSrc(url))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [near, token, path]);
+
+  return (
+    <span ref={ref} className={css.photo}>
+      {src ? <img className={css.img} src={src} alt={alt} draggable={false} /> : <span className={failed ? css.photoFailed : css.photoLoading} aria-hidden="true" />}
+    </span>
+  );
+}
+
+/** One photo large (the medium variant); the original is downloaded only on request. */
+function Viewer({ token, state, onClose, onMove }: { token: string; state: { list: GalleryPhoto[]; index: number } | null; onClose: () => void; onMove: (index: number) => void }) {
+  const { tx, te } = useI18n();
+  const [error, setError] = useState<string | null>(null);
+  const photo = state ? state.list[state.index] : null;
+  const count = state?.list.length ?? 0;
+
+  useEffect(() => {
+    if (!state) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && state.index > 0) onMove(state.index - 1);
+      if (e.key === "ArrowRight" && state.index < count - 1) onMove(state.index + 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state, count, onMove]);
+
+  async function save() {
+    if (!photo) return;
+    setError(null);
+    try {
+      const blob = await photoBlob(token, photo.originalUrl);
+      const day = photo.takenAt ? dayOf(photo.takenAt) : "foto";
+      saveBlob(blob, `acampa-${day}-${photo.id.slice(-6)}.${blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"}`);
+    } catch (err) {
+      setError(te(err, "Não foi possível baixar a foto."));
+    }
+  }
+
+  return (
+    <Dialog open={!!photo} onClose={onClose} title={tx("Foto {n} de {total}", { n: (state?.index ?? 0) + 1, total: count })} width={960} fullscreenOnMobile>
+      {photo && (
+        <div className={css.viewer}>
+          <div className={css.viewerFrame} key={photo.id}>
+            <PhotoImage token={token} path={photo.mediumUrl} alt={tx("Foto {n} de {total}", { n: (state?.index ?? 0) + 1, total: count })} />
+          </div>
+          {error && (
+            <p className="cat-hint cat-hint--error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className={css.viewerBar}>
+            <button type="button" className="button button--secondary" disabled={(state?.index ?? 0) === 0} onClick={() => onMove((state?.index ?? 0) - 1)}>
+              {tx("Anterior")}
+            </button>
+            <button type="button" className="button button--secondary" onClick={() => void save()}>
+              {tx("Baixar foto")}
+            </button>
+            <button type="button" className="button button--secondary" disabled={(state?.index ?? 0) >= count - 1} onClick={() => onMove((state?.index ?? 0) + 1)}>
+              {tx("Próxima")}
+            </button>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }

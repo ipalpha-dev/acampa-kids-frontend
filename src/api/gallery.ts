@@ -1,188 +1,178 @@
-import { ApiError, OFFLINE_MESSAGE, command, signalAuthFailure } from "./client";
+import { ApiError, OFFLINE_MESSAGE, api, signalAuthFailure } from "./client";
 import { bearer } from "../auth/store";
-import { shrinkImage } from "./files";
+
+/**
+ * The camp album (photos-api, through Acampa's proxy — backend routes/gallery.ts). The browser never holds an IPAlpha
+ * token: every call carries the Acampa session, the backend calls photos-api with the acting role's token and streams
+ * the bytes. Photo bytes are fetched with the session (an <img> cannot send it) and shown as object URLs that live in
+ * memory for this session only (./photoBytes.ts) — never in the HTTP cache, the service worker or storage.
+ */
 
 // In production the API is served by the same origin through the /api Ingress.
 const BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
-/** One photo of the camp album (the shape the server serializes). */
-export interface GalleryPhoto {
+/** A moment of the album; `scheduleEntryId` = it follows that programme moment (photos land on it by camera time). */
+export interface GalleryEvent {
   id: string;
-  /** relative: "/api/files/<fileId>" — resolve with `fullUrl()` before showing */
-  url: string;
-  /** relative: "/api/gallery/<id>/thumb" */
-  thumbUrl: string;
-  caption: string;
-  /** sort key, biggest first (drag & drop rewrites it) */
-  order: number;
-  /** id of the programme event this photo belongs to; null = general photo */
-  eventId: string | null;
-  /** who sent it (person id — name read live) */
-  byPersonId: string;
-  createdAt: string;
+  name: string;
+  span: { start: string; end: string } | null;
+  scheduleEntryId: string | null;
 }
 
-/** Makes a "/api/…" src absolute (the API may live on another host). */
+export interface GalleryAlbum {
+  id: string;
+  name: string;
+  icon: string;
+  published: boolean;
+  /** false: the album exists but this role cannot read it yet (photos-api: unpublished albums are church staff only) */
+  readable: boolean;
+  events: GalleryEvent[];
+}
+
+export interface GalleryState {
+  /** null = the edition has no album yet */
+  album: GalleryAlbum | null;
+  canManage: boolean;
+  /** false = the camp's edition does not exist in IPAlpha yet */
+  edition: boolean;
+}
+
+/** One photo: ids, placement and camera time — never faces, never who is in it. */
+export interface GalleryPhoto {
+  id: string;
+  eventId: string | null;
+  placement: "event" | "unsorted" | "album";
+  takenAt: string | null;
+  createdAt: string | null;
+  contentType: string;
+  bytes: number;
+  thumbUrl: string;
+  mediumUrl: string;
+  originalUrl: string;
+}
+
+/** What the realtime snapshot carries for the album: its id and a change stamp (refetch when it moves). */
+export interface GalleryStamp {
+  albumId: string | null;
+  version: number;
+}
+
+const json = (token: string, method: string, body?: unknown): RequestInit => ({ method, headers: bearer(token), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+
+export function fetchGallery(token: string): Promise<GalleryState> {
+  return api<GalleryState>("/api/gallery", { headers: bearer(token) });
+}
+
+export function fetchGalleryPhotos(token: string): Promise<{ photos: GalleryPhoto[]; readable: boolean; truncated: boolean }> {
+  return api("/api/gallery/photos", { headers: bearer(token) });
+}
+
+/** The edition's album: `from` / `until` are São Paulo days ("YYYY-MM-DD"). */
+export async function createAlbum(token: string, input: { from: string; until: string; publish: boolean }): Promise<GalleryAlbum> {
+  return (await api<{ album: GalleryAlbum }>("/api/gallery/album", json(token, "POST", input))).album;
+}
+
+export async function updateAlbum(token: string, patch: { published?: boolean; name?: string }): Promise<GalleryAlbum> {
+  return (await api<{ album: GalleryAlbum }>("/api/gallery/album", json(token, "PATCH", patch))).album;
+}
+
+export async function createGalleryEvent(token: string, input: { name: string; scheduleEntryId?: string }): Promise<GalleryEvent> {
+  return (await api<{ event: GalleryEvent }>("/api/gallery/events", json(token, "POST", input))).event;
+}
+
+/** One album moment per programme moment not linked yet: only those the families see (default), or all of them. */
+export function eventsFromProgramme(token: string, only: "parents" | "all"): Promise<{ created: number; skipped: number; alreadyLinked: number }> {
+  return api("/api/gallery/events/from-programme", json(token, "POST", { only }));
+}
+
+export async function updateGalleryEvent(token: string, id: string, input: { name: string; scheduleEntryId?: string | null }): Promise<GalleryEvent> {
+  return (await api<{ event: GalleryEvent }>(`/api/gallery/events/${encodeURIComponent(id)}`, json(token, "PATCH", input))).event;
+}
+
+export async function deleteGalleryEvent(token: string, id: string): Promise<void> {
+  await api(`/api/gallery/events/${encodeURIComponent(id)}`, json(token, "DELETE"));
+}
+
+/** Moves photos onto a moment (null = back to "to sort"). */
+export async function movePhotos(token: string, ids: string[], eventId: string | null): Promise<number> {
+  return (await api<{ count: number }>("/api/gallery/photos/move", json(token, "POST", { ids, eventId }))).count;
+}
+
+export async function deletePhotos(token: string, ids: string[]): Promise<number> {
+  return (await api<{ count: number }>("/api/gallery/photos/delete", json(token, "POST", { ids }))).count;
+}
+
+/** A responsável's own child: the photos where they appear (only children whose family agreed are ever recognised). */
+export function fetchKidPhotos(token: string, personId: string): Promise<{ photos: GalleryPhoto[]; truncated: boolean }> {
+  return api(`/api/gallery/kids/${encodeURIComponent(personId)}/photos`, { headers: bearer(token) });
+}
+
+// ── import (photos-api takes ≤ 50 files of ≤ 25 MB; Acampa streams each batch through) ──
+
+export const PHOTO_MAX_BYTES = 25 * 1024 * 1024;
+export const BATCH_MAX_FILES = 50;
+/** the backend refuses a request body over 120 MB: stay well under it */
+export const BATCH_MAX_BYTES = 90 * 1024 * 1024;
+export const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** The picked files in upload batches; files photos-api would refuse (type / size) come back apart, untouched. */
+export function planBatches(files: File[]): { batches: File[][]; refused: File[] } {
+  const batches: File[][] = [];
+  const refused: File[] = [];
+  let current: File[] = [];
+  let size = 0;
+  for (const file of files) {
+    if (!PHOTO_TYPES.has(file.type) || file.size > PHOTO_MAX_BYTES || file.size === 0) {
+      refused.push(file);
+      continue;
+    }
+    if (current.length > 0 && (current.length >= BATCH_MAX_FILES || size + file.size > BATCH_MAX_BYTES)) {
+      batches.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(file);
+    size += file.size;
+  }
+  if (current.length > 0) batches.push(current);
+  return { batches, refused };
+}
+
+function deviceZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+  } catch {
+    return "America/Sao_Paulo";
+  }
+}
+
+/** One batch of originals: camera time places each photo on its moment; the rest wait in "to sort". */
+export async function importBatch(token: string, files: File[], signal?: AbortSignal): Promise<GalleryPhoto[]> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file, file.name);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api/gallery/import?zone=${encodeURIComponent(deviceZone())}`, { method: "POST", headers: bearer(token), body: form, signal });
+  } catch (err) {
+    if ((err as Error)?.name === "AbortError") throw err;
+    throw new ApiError(0, "OFFLINE", OFFLINE_MESSAGE);
+  }
+  const data = (await res.json().catch(() => null)) as { photos?: GalleryPhoto[]; error?: { code?: string; message?: string; reason?: string } } | null;
+  if (!res.ok || !data?.photos) {
+    if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
+    throw new ApiError(res.status, data?.error?.code ?? "UPLOAD_FAILED", data?.error?.message ?? "Não foi possível enviar as fotos.", { reason: data?.error?.reason });
+  }
+  return data.photos;
+}
+
+/** Makes a "/api/…" path absolute (the API may live on another host). */
 export function galleryUrl(relative: string): string {
   return relative.startsWith("/api/") ? `${BASE}${relative}` : relative;
 }
 
-const THUMB_EDGE = 480;
+// ── .zip albums (unpacked on the device; the pictures inside go up as they are) ──
 
-/** Small square-ish JPEG for the grid (the full image goes to `files` ≤ 1280 px). */
-async function makeThumb(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) throw new ApiError(0, "UPLOAD_FAILED", "Não foi possível abrir a imagem.");
-  const scale = Math.min(1, THUMB_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    bitmap.close();
-    throw new ApiError(0, "UPLOAD_FAILED", "Não foi possível abrir a imagem.");
-  }
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
-  if (!blob) throw new ApiError(0, "UPLOAD_FAILED", "Não foi possível abrir a imagem.");
-  return blob;
-}
-
-export interface FaceSearchResult {
-  matches: { photo: GalleryPhoto; similarity: number }[];
-  indexedFaces: number;
-  pendingPhotos: number;
-}
-
-/** The reference stays in this request only; the server returns matched gallery ids. */
-export async function searchGalleryPerson(token: string, reference: File): Promise<FaceSearchResult> {
-  const image = await shrinkImage(reference);
-  const form = new FormData();
-  const name = reference.name.replace(/\.\w+$/, "") + (image.type === "image/png" ? ".png" : ".jpg");
-  form.append("reference", image, name);
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}/api/gallery/search-person`, { method: "POST", headers: bearer(token), body: form });
-  } catch {
-    throw new ApiError(0, "OFFLINE", OFFLINE_MESSAGE);
-  }
-  const data = (await res.json().catch(() => null)) as FaceSearchResult | { error?: { code?: string; message?: string } } | null;
-  if (!res.ok || !data || !("matches" in data)) {
-    const error = data && "error" in data ? data.error : undefined;
-    if (!res.ok) signalAuthFailure(res.status, error?.code ?? "");
-    throw new ApiError(res.status, error?.code ?? "FACE_SEARCH_FAILED", error?.message ?? "Não foi possível procurar as fotos.");
-  }
-  return data;
-}
-
-export interface GalleryUploadInput {
-  file: File;
-  caption: string;
-  eventId: string | null;
-}
-
-/** Sends ONE photo (full image + thumbnail) — the page loops over the picked files. */
-export async function uploadGalleryPhoto(token: string, input: GalleryUploadInput): Promise<GalleryPhoto> {
-  const full = await shrinkImage(input.file);
-  const thumb = await makeThumb(input.file);
-  const form = new FormData();
-  form.append("file", full, input.file.name.replace(/\.\w+$/, "") + (full.type === "image/png" ? ".png" : ".jpg"));
-  form.append("thumb", thumb, "thumb.jpg");
-  form.append("caption", input.caption);
-  if (input.eventId) form.append("eventId", input.eventId);
-
-  // multipart + the canonical value arrives in the `gallery` WebSocket collection
-  const { prepareCollectionWait } = await import("../store/realtime");
-  const waiter = prepareCollectionWait(["gallery"]);
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}/api/gallery`, { method: "POST", headers: bearer(token), body: form });
-  } catch {
-    waiter.cancel();
-    throw new ApiError(0, "OFFLINE", OFFLINE_MESSAGE);
-  }
-  const data = (await res.json().catch(() => null)) as { photo?: GalleryPhoto; error?: { code?: string; message?: string } } | null;
-  if (!res.ok || !data?.photo) {
-    waiter.cancel();
-    if (!res.ok) signalAuthFailure(res.status, data?.error?.code ?? "");
-    throw new ApiError(res.status, data?.error?.code ?? "UPLOAD_FAILED", data?.error?.message ?? "Não foi possível enviar a foto.");
-  }
-  await waiter.promise;
-  return data.photo;
-}
-
-export interface GalleryPatch {
-  caption?: string;
-  /** "" moves the photo to "general" */
-  eventId?: string | null;
-}
-
-export async function updateGalleryPhoto(token: string, id: string, patch: GalleryPatch): Promise<GalleryPhoto> {
-  const res = await command<{ photo: GalleryPhoto }>(`/api/gallery/${id}`, {
-    method: "PUT",
-    headers: { ...bearer(token), "content-type": "application/json" },
-    body: JSON.stringify(patch),
-  }, ["gallery"]);
-  return res.photo;
-}
-
-export async function deleteGalleryPhoto(token: string, id: string): Promise<void> {
-  await command(`/api/gallery/${id}`, { method: "DELETE", headers: bearer(token) }, ["gallery"]);
-}
-
-export interface GalleryBulkPatch {
-  /** "" moves the photos to "general" */
-  eventId?: string | null;
-}
-
-/** Moves a whole selection to an event in ONE request. Returns how many changed. */
-export async function updateGalleryPhotos(token: string, ids: string[], patch: GalleryBulkPatch): Promise<number> {
-  const res = await command<{ count: number }>(
-    "/api/gallery/bulk",
-    { method: "PUT", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ ids, ...patch }) },
-    ["gallery"],
-  );
-  return res.count;
-}
-
-/** Saves the new order of ONE section (first id = shown first). */
-export async function reorderGalleryPhotos(token: string, ids: string[]): Promise<number> {
-  const res = await command<{ count: number }>(
-    "/api/gallery/reorder",
-    { method: "PUT", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ ids }) },
-    ["gallery"],
-  );
-  return res.count;
-}
-
-/** Deletes a whole selection in ONE request. Returns how many were removed. */
-export async function deleteGalleryPhotos(token: string, ids: string[]): Promise<number> {
-  const res = await command<{ count: number }>(
-    "/api/gallery/bulk-delete",
-    { method: "POST", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ ids }) },
-    ["gallery"],
-  );
-  return res.count;
-}
-
-/**
- * The album switch (settings.galleryPublished): `true` shows every photo to the
- * camp at once (the server texts the team and the parents once), `false` hides
- * the album again. Publishing is never per photo.
- */
-export async function setAlbumPublished(token: string, published: boolean): Promise<number> {
-  const res = await command<{ published: boolean; count: number }>(
-    "/api/gallery/publish",
-    { method: "PUT", headers: { ...bearer(token), "content-type": "application/json" }, body: JSON.stringify({ published }) },
-    ["gallery"],
-  );
-  return res.count;
-}
-
-// ── .zip albums (unpacked on the device, so every photo is shrunk before upload) ──
-
-const ZIP_TYPES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
+const ZIP_TYPES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 /** a single zip never turns into more than this many uploads */
 const ZIP_MAX_ENTRIES = 300;
 

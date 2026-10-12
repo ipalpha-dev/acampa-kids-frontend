@@ -1,0 +1,476 @@
+// The camp album (photos-api). Tiles and sections arrive with a short stagger, panels unfold by animating their height
+// (grid rows 0fr → 1fr), messages grow in; prefers-reduced-motion shows everything at once (and the global rule in
+// styles.scss already stops every animation / transition).
+
+$ease: cubic-bezier(.22, .61, .36, 1);
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse {
+  from { opacity: .5; }
+  to { opacity: 1; }
+}
+
+@keyframes grow {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 160px; }
+}
+
+.page {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 96px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.headIcon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.headText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--forest);
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  overflow-wrap: anywhere;
+}
+
+.message {
+  overflow: hidden;
+  animation: grow .26s $ease both;
+}
+
+.notice {
+  color: var(--forest);
+  font-weight: 600;
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 3px solid #fff;
+  border-radius: var(--radius, 18px);
+  background: var(--paper);
+  box-shadow: 0 6px 0 rgba(24, 61, 54, .12);
+  animation: rise .28s $ease both;
+
+  > p {
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--forest);
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.toolbar {
+  grid-template-columns: 1fr;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.publish {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.create .dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+// a panel that unfolds / folds by animating its height
+.fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .3s $ease, opacity .22s ease;
+}
+
+.foldOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.foldInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.moments {
+  display: grid;
+  gap: 14px;
+  padding-top: 6px;
+}
+
+.addMoment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+
+  > label {
+    flex: 1 1 220px;
+  }
+}
+
+.momentList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moment {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid var(--sage);
+  border-radius: 14px;
+  background: #fff;
+  animation: rise .22s $ease both;
+
+  > img {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+  }
+
+  > span {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  strong {
+    overflow-wrap: anywhere;
+    color: var(--forest);
+  }
+}
+
+.uploader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.progress {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  animation: fade .2s ease both;
+
+  > progress {
+    width: 100%;
+    height: 10px;
+    accent-color: var(--forest);
+  }
+}
+
+.finder {
+  animation-delay: .04s;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+  animation: rise .3s $ease both;
+
+  &:nth-of-type(2) { animation-delay: .04s; }
+  &:nth-of-type(3) { animation-delay: .08s; }
+  &:nth-of-type(n + 4) { animation-delay: .12s; }
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  > div {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--forest);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.count {
+  flex: none;
+  color: var(--muted);
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (min-width: 560px) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (min-width: 920px) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+.cell {
+  min-width: 0;
+  animation: pop .26s $ease both;
+
+  &:nth-child(2) { animation-delay: .02s; }
+  &:nth-child(3) { animation-delay: .04s; }
+  &:nth-child(4) { animation-delay: .06s; }
+  &:nth-child(n + 5) { animation-delay: .08s; }
+}
+
+.tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 3px solid #fff;
+  border-radius: 14px;
+  background: var(--sky);
+  box-shadow: 0 4px 0 rgba(24, 61, 54, .12);
+  cursor: zoom-in;
+  transition: transform .22s $ease, border-color .18s ease, box-shadow .18s ease;
+
+  &:hover { transform: translateY(-2px); }
+  &:focus-visible { outline: 3px solid var(--forest); outline-offset: 2px; }
+  &[aria-pressed] { cursor: pointer; }
+}
+
+.tileOn {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px rgba(15, 154, 138, .3);
+  transform: scale(.96);
+
+  &:hover { transform: scale(.96); }
+}
+
+.check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: rgba(24, 61, 54, .55);
+  color: #fff;
+  font-weight: 800;
+  font-size: .8rem;
+  transition: background .18s ease;
+
+  .tileOn & { background: var(--forest); }
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: fade .3s ease both;
+}
+
+.photoLoading,
+.skeleton {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #e3ece6;
+  animation: pulse 1.1s ease-in-out infinite alternate;
+}
+
+.skeleton {
+  aspect-ratio: 1;
+  border-radius: 14px;
+}
+
+.photoFailed {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #f1ece2;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 20px;
+  border: 3px dashed var(--sage);
+  border-radius: var(--radius, 18px);
+  background: var(--paper);
+  color: var(--muted);
+  text-align: center;
+  animation: rise .3s $ease both;
+
+  > img {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+  }
+
+  > p {
+    max-width: 46ch;
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.bulk {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--forest);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(24, 61, 54, .3);
+  animation: rise .24s $ease both;
+}
+
+.viewer {
+  display: grid;
+  gap: 12px;
+}
+
+.viewerFrame {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  max-height: 72vh;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #11201c;
+  animation: fade .24s ease both;
+
+  .photo {
+    display: grid;
+    place-items: center;
+    max-height: 72vh;
+  }
+
+  .img {
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 72vh;
+    object-fit: contain;
+  }
+
+  .photoLoading {
+    min-height: 240px;
+    background: #1d332d;
+  }
+}
+
+.viewerBar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message,
+  .card,
+  .moment,
+  .progress,
+  .section,
+  .cell,
+  .img,
+  .empty,
+  .bulk,
+  .viewerFrame,
+  .photoLoading,
+  .skeleton {
+    animation: none;
+  }
+
+  .fold,
+  .tile,
+  .check {
+    transition: none;
+  }
+}
