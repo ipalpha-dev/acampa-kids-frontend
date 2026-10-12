@@ -342,4 +342,46 @@ export const LITERALS: Record<string, { en: string; es: string; fr: string; de: 
     fr: "Impossible d'envoyer l'image.",
     de: "Das Bild konnte nicht gesendet werden.",
   },
+  "Este recurso de IA não está disponível para este acesso no momento.": {
+    en: "This AI feature is not available for this access right now.",
+    es: "Este recurso de IA no está disponible para este acceso en este momento.",
+    fr: "Cette fonction d'IA n'est pas disponible pour cet accès pour le moment.",
+    de: "Diese KI-Funktion ist für diesen Zugang gerade nicht verfügbar.",
+  },
+  "Para continuar usando a IA, saia e entre de novo no Acampa.": {
+    en: "To keep using the AI, sign out and sign in to Acampa again.",
+    es: "Para seguir usando la IA, cierra sesión y vuelve a entrar en Acampa.",
+    fr: "Pour continuer à utiliser l'IA, déconnectez-vous puis reconnectez-vous à Acampa.",
+    de: "Um die KI weiter zu nutzen, melde dich bei Acampa ab und wieder an.",
+  },
+  "Este recurso de IA não está disponível para o seu perfil.": {
+    en: "This AI feature is not available for your profile.",
+    es: "Este recurso de IA no está disponible para tu perfil.",
+    fr: "Cette fonction d'IA n'est pas disponible pour votre profil.",
+    de: "Diese KI-Funktion ist für dein Profil nicht verfügbar.",
+  },
+  "O uso de IA do Acampa chegou ao limite deste mês. Ele se renova no começo do próximo mês.": {
+    en: "Acampa's AI use reached this month's limit. It renews at the start of next month.",
+    es: "El uso de IA de Acampa llegó al límite de este mes. Se renueva a comienzos del próximo mes.",
+    fr: "L'utilisation de l'IA d'Acampa a atteint la limite de ce mois. Elle se renouvelle au début du mois prochain.",
+    de: "Die KI-Nutzung von Acampa hat das Limit dieses Monats erreicht. Es erneuert sich zu Beginn des nächsten Monats.",
+  },
+  "A conversa por voz já foi bastante usada hoje. Amanhã ela volta a ficar disponível.": {
+    en: "The voice conversation has been used a lot today. It will be available again tomorrow.",
+    es: "La conversación por voz ya se usó bastante hoy. Mañana vuelve a estar disponible.",
+    fr: "La conversation vocale a déjà beaucoup servi aujourd'hui. Elle sera de nouveau disponible demain.",
+    de: "Das Sprachgespräch wurde heute schon viel genutzt. Morgen ist es wieder verfügbar.",
+  },
+  "O assistente está um pouco ocupado agora. Aguarde um instante e tente de novo.": {
+    en: "The assistant is a bit busy right now. Wait a moment and try again.",
+    es: "El asistente está un poco ocupado ahora. Espera un momento e inténtalo de nuevo.",
+    fr: "L'assistant est un peu occupé en ce moment. Patientez un instant et réessayez.",
+    de: "Der Assistent ist gerade etwas beschäftigt. Warte einen Moment und versuch es noch einmal.",
+  },
+  "O assistente ainda não lê imagens no chat. Cole o texto ou descreva o que está na imagem.": {
+    en: "The assistant can't read pictures in the chat yet. Paste the text or describe what the picture shows.",
+    es: "El asistente todavía no lee imágenes en el chat. Pega el texto o describe lo que muestra la imagen.",
+    fr: "L'assistant ne lit pas encore les images dans le chat. Collez le texte ou décrivez ce que montre l'image.",
+    de: "Der Assistent kann Bilder im Chat noch nicht lesen. Füge den Text ein oder beschreibe, was das Bild zeigt.",
+  },
 };

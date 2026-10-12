@@ -38,23 +38,6 @@ export async function aiTranscribe(token: string, audio: Blob, signal?: AbortSig
   return data?.text ?? "";
 }
 
-export interface AiVendorUsage {
-  vendor: AiVendor | string;
-  calls: number;
-  errors: number;
-  promptTokens: number;
-  completionTokens: number;
-  lastAt: string | null;
-  models: { model: string; calls: number; promptTokens: number; completionTokens: number }[];
-}
-
-export interface AiKindUsage {
-  kind: string;
-  calls: number;
-  promptTokens: number;
-  completionTokens: number;
-}
-
 export interface SmsUsage {
   sent: number;
   /** sent × R$ 0,095 (server-side rate) */
@@ -62,8 +45,8 @@ export interface SmsUsage {
   lastAt: string | null;
 }
 
-/** admin only: AI calls and tokens per company and per kind of request, plus the SMS counter */
-export async function aiUsage(token: string): Promise<{ vendors: AiVendorUsage[]; kinds: AiKindUsage[]; sms?: SmsUsage }> {
+/** admin only: the SMS counter (the AI cost per app lives in Oikos) */
+export async function aiUsage(token: string): Promise<{ sms?: SmsUsage }> {
   return api("/api/ai/usage", { headers: bearer(token) });
 }
 

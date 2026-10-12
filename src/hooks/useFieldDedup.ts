@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { aiDedupField, type DedupField } from "../api/ai";
+import { loadAuth } from "../auth/store";
 
 interface Options {
   token: string;
   /** the form is saving / disabled — don't start a pass */
   busy?: boolean;
+  /** override who may run it; default: the acting role is coordenação or saúde (the server's rule, D32) */
+  enabled?: boolean;
+}
+
+/** D32: the field clean-up handles health / family text — coordenação and the health team only (the server refuses others) */
+export function mayCleanFields(): boolean {
+  return ["coordenacao", "saude"].includes(loadAuth()?.user.activeRole ?? "");
 }
 
 /**
@@ -20,7 +28,7 @@ interface Options {
  * Only one request per field runs at a time; a newer blur cancels the older.
  * `cancelAll()` aborts everything (call it before submit).
  */
-export function useFieldDedup({ token, busy }: Options) {
+export function useFieldDedup({ token, busy, enabled = mayCleanFields() }: Options) {
   // one AbortController per field currently in flight
   const inflight = useRef(new Map<DedupField, AbortController>());
   // last value we already sent for a field, so an unchanged blur doesn't re-run
@@ -48,7 +56,7 @@ export function useFieldDedup({ token, busy }: Options) {
   async function run(field: DedupField, value: string, apply: (v: string) => void) {
     const text = value.trim();
     // nothing worth a round-trip: needs at least two entries to have a repeat
-    if (busy || !text || !/[\n,/]/.test(text) || seen.current.get(field) === text) return;
+    if (!enabled || busy || !text || !/[\n,/]/.test(text) || seen.current.get(field) === text) return;
     cancel(field);
     const ctrl = new AbortController();
     inflight.current.set(field, ctrl);

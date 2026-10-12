@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { aiCamperNotes, type AiNotesSubject, type CamperNotesFields } from "../api/ai";
+import { loadAuth } from "../auth/store";
 import { useI18n } from "../i18n";
 
 /** while the sorter runs, saving waits at least this long so the answer can land */
@@ -17,6 +18,14 @@ interface Options {
   apply: (fields: CamperNotesFields) => void;
   /** the form is saving / disabled */
   busy?: boolean;
+  /** override who may use it; default: D32 (coordenação / saúde, or the child's responsável on their own form) */
+  available?: boolean;
+}
+
+/** D32: the server sorts observations for coordenação / saúde, and for a child's responsável on their own form */
+export function maySortNotes(subject: AiNotesSubject): boolean {
+  const role = loadAuth()?.user.activeRole ?? "";
+  return subject === "parent" ? role === "responsavel" : ["coordenacao", "saude"].includes(role);
 }
 
 /**
@@ -30,8 +39,8 @@ interface Options {
  *   an answer never lands after the submit.
  * - `on` / `toggle()` is the switch state (a request in flight is cancelled on off).
  */
-export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, apply, busy }: Options) {
-  const [on, setOn] = useState(true);
+export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, apply, busy, available = maySortNotes(subject) }: Options) {
+  const [on, setOn] = useState(available);
   const [running, setRunning] = useState(false);
   /** save stays disabled until this instant while the sorter runs */
   const [holdUntil, setHoldUntil] = useState(0);
@@ -57,7 +66,7 @@ export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, app
 
   async function sort(text: string) {
     const notes = text.trim();
-    if (!on || !notes || notes === seen.current || busy) return;
+    if (!available || !on || !notes || notes === seen.current || busy) return;
     abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
@@ -84,6 +93,8 @@ export function useAiNotesSorter({ token, subject, initialNotes, getCurrent, app
   }
 
   return {
+    /** the person may use the sorter at all (the switch is hidden otherwise) */
+    available,
     on,
     toggle: () => {
       if (on) cancel();
