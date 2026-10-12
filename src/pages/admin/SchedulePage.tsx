@@ -25,6 +25,7 @@ import RoleForm from "./RoleForm";
 import RichHtml from "../../components/RichHtml";
 import { ICONS } from "../../icons";
 import { collatorLocale, useI18n } from "../../i18n";
+import { useLeavingRows } from "../../hooks/useLeavingRows";
 
 interface SchedulePageProps {
   token: string;
@@ -62,6 +63,8 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
   const { tx, te } = useI18n();
   const storedEvents = useCollection("events");
   const events = useMemo(() => (storedEvents ? sortEvents(storedEvents) : null), [storedEvents]);
+  // added moments slide in, removed ones fade out before they go (not with reduced motion)
+  const rows = useLeavingRows(events, sortEvents);
   const storedRoles = useCollectionOrEmpty("roles");
   const roles = useMemo(() => sortRoles(storedRoles), [storedRoles]);
   const staff = useCollectionOrEmpty("staff");
@@ -186,7 +189,7 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
     );
   }
 
-  const days = [...new Set(events.map((e) => e.date))].sort();
+  const days = [...new Set(rows.map((e) => e.date))].sort();
   const inForm = mode.kind !== "view";
   const editingEvent = mode.kind === "edit-event" ? events.find((e) => e.id === mode.id) : undefined;
   const editingRole = mode.kind === "edit-role" ? roles.find((r) => r.id === mode.id) : undefined;
@@ -327,10 +330,10 @@ export default function SchedulePage({ token, readOnly = false }: SchedulePagePr
               )}
             </header>
             <ol className="timeline">
-              {events
+              {rows
                 .filter((e) => e.date === d)
                 .map((e) => (
-                  <li key={e.id} className="timeline__item">
+                  <li key={e.id} className={`timeline__item ${e.rowState === "enter" ? "timeline__item--enter" : ""} ${e.rowState === "leave" ? "timeline__item--leave" : ""}`} aria-hidden={e.rowState === "leave" ? true : undefined}>
                     <div className="timeline__time">
                       <span className="timeline__start">{e.startTime}</span>
                       {e.endTime && <span className="timeline__end">{e.endTime}</span>}

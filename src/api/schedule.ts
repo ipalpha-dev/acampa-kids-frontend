@@ -159,8 +159,14 @@ export interface CampEvent {
   startTime: string;
   endTime: string | null;
   notes: string;
-  /** ids of the roles staff fulfil in this event */
+  /** ids of the funções (camp duties) staff fulfil in this event */
   roles: string[];
+  /** project roles present at the moment (schedule-api books them: equipe, saude, …) */
+  coreRoles: string[];
+  /** places-api ids of the moment */
+  placeIds: string[];
+  /** the same places with their names (from the cached catalog; an id the catalog does not know is not listed) */
+  places?: import("./places").EventPlace[];
   /** parents see this event on their programme (the team always does) */
   visibleToParents: boolean;
   assignments: EventAssignment[];
@@ -176,6 +182,9 @@ export interface CampEventInput {
   endTime: string | null;
   notes: string;
   roles: string[];
+  /** project roles present — the programme lives in the IPAlpha agenda (schedule-api) */
+  coreRoles?: string[];
+  placeIds?: string[];
   visibleToParents: boolean;
 }
 

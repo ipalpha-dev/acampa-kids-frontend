@@ -22,10 +22,16 @@ export const GROUP_META: Record<BedroomGroup, { label: string; icon?: string; fa
 
 export interface Bedroom {
   id: string;
+  /** the places-api bedroom behind this camp room (name, beds and capacity are the church's catalog) */
+  placeId: string;
+  /** the place is gone from the catalog: only the link to the camp can be removed */
+  placeMissing?: boolean;
   name: string;
   group: BedroomGroup;
   bunkBeds: number;
   singleBeds: number;
+  /** read-only here (set in Oikos); each sleeps 2 */
+  doubleBeds?: number;
   capacity: number;
   occupied: number;
   occupiedStaff: number;
@@ -41,6 +47,13 @@ export interface BedroomInput {
   group: BedroomGroup;
   bunkBeds: number;
   singleBeds: number;
+  notes: string;
+}
+
+/** An existing bedroom of the camp venue, taken into the camp (no new place is made). */
+export interface BedroomLinkInput {
+  placeId: string;
+  group: BedroomGroup;
   notes: string;
 }
 
@@ -66,6 +79,15 @@ export async function createBedroom(token: string, input: BedroomInput): Promise
   return res.bedroom;
 }
 
+export async function linkBedroom(token: string, input: BedroomLinkInput): Promise<Bedroom> {
+  const res = await command<{ bedroom: Bedroom }>("/api/bedrooms", {
+    method: "POST",
+    headers: json(token),
+    body: JSON.stringify(input),
+  }, ["bedrooms"]);
+  return res.bedroom;
+}
+
 export async function updateBedroom(token: string, id: string, patch: Partial<BedroomInput>): Promise<Bedroom> {
   const res = await command<{ bedroom: Bedroom }>(`/api/bedrooms/${id}`, {
     method: "PUT",
@@ -75,6 +97,7 @@ export async function updateBedroom(token: string, id: string, patch: Partial<Be
   return res.bedroom;
 }
 
+/** Takes the room out of the camp (the link only — the place stays in the church's catalog). */
 export async function deleteBedroom(token: string, id: string): Promise<void> {
   await command(`/api/bedrooms/${id}`, { method: "DELETE", headers: bearer(token) }, ["bedrooms"]);
 }

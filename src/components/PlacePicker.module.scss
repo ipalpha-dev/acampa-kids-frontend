@@ -1,0 +1,45 @@
+// Places of the camp venue: groups unfold, the place cards appear softly; reduced motion shows everything at once.
+
+@keyframes place-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.picker {
+  display: grid;
+  gap: 10px;
+  animation: place-in .22s ease-out both;
+}
+
+.group {
+  display: grid;
+  gap: 6px;
+}
+
+.groupTitle {
+  font-size: .8rem;
+  font-weight: 800;
+  opacity: .75;
+}
+
+// compact cards: these titles are short room names, the icon a little smaller than the big choices
+.group :global(.option-cards--row) {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.group :global(.option-card) {
+  animation: place-in .2s ease-out both;
+}
+
+.group :global(.option-card) > img {
+  width: 36px;
+  height: 36px;
+}
+
+.gone :global(.option-card) {
+  opacity: .7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picker, .group :global(.option-card) { animation: none; }
+}

@@ -118,6 +118,10 @@ export const ICONS = {
   superUser: icon("super-user"),
   /** cream calendar page with a bold orange arrow curving into it — import people / blocks from another year's camp */
   previousYear: icon("previous-year"),
+  /** cream lodge with an orange roof and chimney beside a pine — a camp venue (venue picker cards, the chosen venue badge) */
+  venue: icon("venue"),
+  /** teal map pin standing on a green mound with a small orange flag — a place inside the venue (programme place cards) */
+  place: icon("place"),
 } as const;
 
 /** A kid's icon follows the wing of the bedroom (meninas / meninos); without a wing, the probable gender. */

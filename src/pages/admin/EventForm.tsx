@@ -2,11 +2,19 @@ import { useState } from "react";
 import EmojiPicker from "../../components/EmojiPicker";
 import TimeInput from "../../components/TimeInput";
 import type { CampEvent, CampEventInput } from "../../api/schedule";
+import { MultiOptionCards } from "../../components/OptionCards";
 import ParentIcon from "../../components/ParentIcon";
+import PlacePicker from "../../components/PlacePicker";
+import { useVenue } from "../../hooks/useVenue";
+import { roleMeta } from "../../roles";
 import Toggle from "../../components/Toggle";
 import { useAiAutoFill } from "../../hooks/useAiAutoFill";
 import { useHideScanFab } from "../../scanFab";
 import { useI18n } from "../../i18n";
+
+/** the project roles that can be present at a moment (coordenação is always booked by schedule-api; responsável / participante are the families) */
+export const PRESENT_ROLES = ["equipe", "saude", "organizacao", "organizacao-jogos", "pontuacao", "coletes", "fotografia", "checkin", "checkin-onibus"] as const;
+type PresentRole = (typeof PRESENT_ROLES)[number];
 
 const EMOJI_SUGGESTIONS = ["📅", "🌅", "🥐", "🍽️", "🍝", "🏊", "🎯", "🌙", "🎤", "🙏", "🎶", "🔥", "🎬", "🛏️", "🚌", "🎁"];
 
@@ -34,6 +42,9 @@ export default function EventForm({ token, event, defaultDate, busy, onSubmit, o
   const [startTime, setStartTime] = useState(event?.startTime ?? "08:00");
   const [endTime, setEndTime] = useState(event?.endTime ?? "");
   const [notes, setNotes] = useState(event?.notes ?? "");
+  const [coreRoles, setCoreRoles] = useState<string[]>(event?.coreRoles ?? ["equipe"]);
+  const [placeIds, setPlaceIds] = useState<string[]>(event?.placeIds ?? []);
+  const venue = useVenue(token);
   const [visibleToParents, setVisibleToParents] = useState(event?.visibleToParents ?? true);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,6 +66,8 @@ export default function EventForm({ token, event, defaultDate, busy, onSubmit, o
         endTime: endTime || null,
         notes: notes.trim(),
         roles: event?.roles ?? [],
+        coreRoles,
+        placeIds,
         visibleToParents,
       });
     } catch (err) {
@@ -105,6 +118,27 @@ export default function EventForm({ token, event, defaultDate, busy, onSubmit, o
         </div>
         <p className="cat-hint">{tx("Aparece na programação dos pais. A equipe sempre vê.")}</p>
       </div>
+
+      <div className="cat-field">
+        <span className="cat-field__label">{tx("Quem está neste momento")}</span>
+        <MultiOptionCards<PresentRole>
+          label={tx("Quem está neste momento")}
+          value={coreRoles.filter((r): r is PresentRole => (PRESENT_ROLES as readonly string[]).includes(r))}
+          onChange={(keys) => setCoreRoles([...keys, ...coreRoles.filter((r) => !(PRESENT_ROLES as readonly string[]).includes(r))])}
+          disabled={busy}
+          row
+          options={PRESENT_ROLES.map((r) => ({ key: r, icon: roleMeta(r).icon, title: tx(roleMeta(r).label) }))}
+        />
+        <p className="cat-hint">{tx("Entram na agenda do IPAlpha de quem serve nestes perfis. A coordenação sempre entra.")}</p>
+      </div>
+
+      {venue.venue && venue.places.length > 0 && (
+        <div className="cat-field">
+          <span className="cat-field__label">{tx("Onde acontece (opcional)")}</span>
+          <PlacePicker label={tx("Onde acontece (opcional)")} places={venue.places} value={placeIds} onChange={setPlaceIds} known={event?.places} disabled={busy} />
+          <p className="cat-hint">{tx("Locais de {venue}, do cadastro de locais da igreja. Entram na agenda do IPAlpha.", { venue: venue.venue.name })}</p>
+        </div>
+      )}
 
       <label className="cat-field">
         <span className="cat-field__label">{tx("Observações (opcional)")}</span>

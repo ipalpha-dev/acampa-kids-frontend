@@ -1,0 +1,82 @@
+// Camp venue picker: cards appear one after the other, the "new venue" form unfolds; reduced motion shows them at once.
+
+@keyframes venue-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes venue-unfold {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 240px; }
+}
+
+.picker {
+  display: grid;
+  gap: 12px;
+}
+
+.options {
+  display: grid;
+  gap: 10px;
+}
+
+// each venue card (OptionCards) and the "new venue" card come in one after the other
+.options :global(.option-card),
+.option {
+  animation: venue-in .24s ease-out both;
+}
+
+.options :global(.option-cards) > :global(.option-card) {
+  &:nth-child(2) { animation-delay: .04s; }
+  &:nth-child(3) { animation-delay: .08s; }
+  &:nth-child(4) { animation-delay: .12s; }
+  &:nth-child(n + 5) { animation-delay: .16s; }
+}
+
+.option {
+  animation-delay: .1s;
+}
+
+.newVenue {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+  animation: venue-unfold .26s ease-out both;
+}
+
+.skeleton {
+  height: 64px;
+  border-radius: 16px;
+  background: #e9efe9;
+  animation: venue-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes venue-pulse {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.current {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.currentIcon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option, .newVenue, .skeleton, .options :global(.option-card) { animation: none; }
+}

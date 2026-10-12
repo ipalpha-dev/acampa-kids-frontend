@@ -1,6 +1,18 @@
 import type { Locale } from "../locales";
 
 export const LITERALS: Record<string, Partial<Record<Exclude<Locale, "pt">, string>>> = {
+  "Quem está neste momento": {
+    en: "Who is at this moment",
+    es: "Quién está en este momento",
+    fr: "Qui est présent à ce moment",
+    de: "Wer bei diesem Programmpunkt dabei ist",
+  },
+  "Entram na agenda do IPAlpha de quem serve nestes perfis. A coordenação sempre entra.": {
+    en: "It goes into the IPAlpha agenda of everyone serving in these roles. Coordination is always included.",
+    es: "Entra en la agenda de IPAlpha de quienes sirven en estos perfiles. La coordinación siempre entra.",
+    fr: "Il entre dans l'agenda IPAlpha de ceux qui servent dans ces rôles. La coordination y est toujours.",
+    de: "Es erscheint im IPAlpha-Kalender aller, die in diesen Rollen mitarbeiten. Die Koordination ist immer dabei.",
+  },
   "Evento não encontrado.": {
     en: "Event not found.",
     es: "Evento no encontrado.",

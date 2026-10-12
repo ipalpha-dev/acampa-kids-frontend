@@ -6,10 +6,12 @@ import {
   GROUP_META,
   createBedroom,
   deleteBedroom,
+  linkBedroom,
   updateBedroom,
   type Bedroom,
   type BedroomGroup,
   type BedroomInput,
+  type BedroomLinkInput,
 } from "../../api/bedrooms";
 import type { Camper } from "../../api/campers";
 import { compareRoomStaff, staffSex, type Staff } from "../../api/staff";
@@ -19,6 +21,8 @@ import RoomRoleIcon from "../../components/RoomRoleIcon";
 import StaffIcon from "../../components/StaffIcon";
 import Breadcrumbs from "../../components/Breadcrumbs";
 import BedroomForm from "./BedroomForm";
+import VenuePicker, { VenueBadge } from "../../components/VenuePicker";
+import { useVenue } from "../../hooks/useVenue";
 import DetailStack from "./DetailStack";
 import { useRoute } from "../../router";
 import { useCollection, useCollectionOrEmpty } from "../../store";
@@ -34,6 +38,8 @@ interface BedroomsPageProps {
   token: string;
   /** medical team: see every room and who sleeps there, but no create / edit / delete / Excel */
   readOnly?: boolean;
+  /** the camp the rooms belong to (the venue is picked for it) */
+  campId?: string;
 }
 
 /** URL → what to show:  /bedrooms · /bedrooms/new?group=girls · /bedrooms/:id · /bedrooms/:id/edit */
@@ -50,7 +56,7 @@ function modeOf(segments: string[], params: URLSearchParams): Mode {
 }
 
 /** Admin: bedrooms grouped by wing, each with its bed layout and occupancy; read-only for the medical team. */
-export default function BedroomsPage({ token, readOnly = false }: BedroomsPageProps) {
+export default function BedroomsPage({ token, readOnly = false, campId }: BedroomsPageProps) {
   const { tx, te } = useI18n();
   // from the local store (localStorage + live WebSocket feed) — occupancy is kept fresh by the server push
   const stored = useCollection("bedrooms");
@@ -73,6 +79,10 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
   // read-only viewers can't reach the forms even by URL
   const mode: Mode = readOnly && (rawMode.kind === "create" || rawMode.kind === "edit") ? { kind: "view" } : rawMode;
   const confirm = useConfirm();
+  // the camp venue (places-api): rooms are made inside it; the coordenação picks it first
+  const venue = useVenue(token, !readOnly);
+  const [changingVenue, setChangingVenue] = useState(false);
+  const linkable = useMemo(() => venue.places.filter((p) => p.kind === "bedroom" && !p.linked), [venue.places]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +101,11 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
     navigate("/bedrooms", { replace: true });
   }
 
+  async function handleLink(input: BedroomLinkInput) {
+    await withBusy(() => linkBedroom(token, input));
+    navigate("/bedrooms", { replace: true });
+  }
+
   async function handleEdit(input: BedroomInput) {
     if (mode.kind !== "edit") return;
     const updated = await withBusy(() => updateBedroom(token, mode.id, input));
@@ -98,7 +113,7 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
   }
 
   async function handleDelete(b: Bedroom) {
-    if (!(await confirm({ emoji: "🗑️", title: tx("Excluir o quarto {name} ({group})?", { name: b.name, group: tx(GROUP_META[b.group].label) }), message: tx("Isso não pode ser desfeito."), confirmLabel: tx("Excluir"), danger: true }))) return;
+    if (!(await confirm({ emoji: "🏕️", title: tx("Tirar o quarto {name} ({group}) do acampamento?", { name: b.name, group: tx(GROUP_META[b.group].label) }), message: tx("O quarto continua no cadastro de locais da igreja; só deixa de fazer parte deste acampamento."), confirmLabel: tx("Tirar do acampamento"), danger: true }))) return;
     try {
       await withBusy(() => deleteBedroom(token, b.id));
       navigate("/bedrooms", { replace: true });
@@ -177,8 +192,8 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
           <button
             type="button"
             className="icon-btn icon-btn--lg icon-btn--danger"
-            title={tx("Excluir quarto {name}", { name: editing.name })}
-            aria-label={tx("Excluir quarto {name}", { name: editing.name })}
+            title={tx("Tirar o quarto {name} do acampamento", { name: editing.name })}
+            aria-label={tx("Tirar o quarto {name} do acampamento", { name: editing.name })}
             disabled={busy}
             onClick={() => handleDelete(editing)}
           >
@@ -189,8 +204,11 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
 
       {error && <p className="message message--error">{error}</p>}
 
-      {mode.kind === "create" && (
-        <BedroomForm key={mode.group ?? "any"} defaultGroup={mode.group} busy={busy} onSubmit={handleCreate} onCancel={() => navigate("/bedrooms")} />
+      {mode.kind === "create" && !venue.loading && !venue.unavailable && !venue.venue && campId && (
+        <VenuePicker token={token} campId={campId} onChosen={() => venue.reload()} onCancel={() => navigate("/bedrooms")} />
+      )}
+      {mode.kind === "create" && (venue.venue || venue.loading || venue.unavailable || !campId) && (
+        <BedroomForm key={mode.group ?? "any"} defaultGroup={mode.group} busy={busy} onSubmit={handleCreate} linkable={linkable} onLink={handleLink} onCancel={() => navigate("/bedrooms")} />
       )}
       {mode.kind === "edit" && !editing && <p className="opt-empty">{tx("Quarto não encontrado.")}</p>}
       {mode.kind === "edit" && editing && (
@@ -202,6 +220,15 @@ export default function BedroomsPage({ token, readOnly = false }: BedroomsPagePr
           onCancel={() => navigate(`/bedrooms/${editing.id}`)}
         />
       )}
+
+      {mode.kind === "view" && !readOnly && campId && !venue.loading && !venue.unavailable && (
+        changingVenue || !venue.venue ? (
+          <VenuePicker token={token} campId={campId} onChosen={() => { setChangingVenue(false); venue.reload(); }} onCancel={venue.venue ? () => setChangingVenue(false) : undefined} />
+        ) : (
+          <VenueBadge venue={venue.venue} onChange={() => setChangingVenue(true)} />
+        )
+      )}
+      {mode.kind === "view" && !readOnly && venue.unavailable && <p className="message message--error" role="status">{tx("O cadastro de locais está descansando um instante. Os quartos continuam aparecendo; tente de novo daqui a pouco.")}</p>}
 
       {mode.kind === "view" && bedrooms.length === 0 && (
         <div className="admin-empty">

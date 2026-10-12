@@ -61,6 +61,8 @@ export default function BedroomDetail({ bedroomId, nav, onEdit, onOpenStaff, onO
         )}
       </header>
 
+      {b.placeMissing && <p className="message message--error" role="status">{tx("Este quarto não existe mais no cadastro de locais da igreja. Você pode tirá-lo do acampamento.")}</p>}
+
       <section className="detail-card">
         <dl className="detail-grid">
           <dt>{tx("Ala")}</dt>
@@ -70,6 +72,8 @@ export default function BedroomDetail({ bedroomId, nav, onEdit, onOpenStaff, onO
             {b.bunkBeds > 0 && tx(b.bunkBeds === 1 ? "{n} beliche" : "{n} beliches", { n: b.bunkBeds })}
             {b.bunkBeds > 0 && b.singleBeds > 0 && " + "}
             {b.singleBeds > 0 && tx("{n} solteiro", { n: b.singleBeds })}
+            {(b.doubleBeds ?? 0) > 0 && (b.bunkBeds > 0 || b.singleBeds > 0) && " + "}
+            {(b.doubleBeds ?? 0) > 0 && tx(b.doubleBeds === 1 ? "{n} cama de casal" : "{n} camas de casal", { n: b.doubleBeds ?? 0 })}
             {" "}· {tx("{n} lugares", { n: b.capacity })}
           </dd>
           <dt>{tx("Ocupação")}</dt>
